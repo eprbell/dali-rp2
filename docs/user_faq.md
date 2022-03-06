@@ -38,7 +38,7 @@
 Timestamp format is [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) (see [examples](https://en.wikipedia.org/wiki/ISO_8601#Combined_date_and_time_representations) of timestamps in this format). Note that RP2 requires full timestamps, including date, time and timezone.
 
 ### Can I Avoid Writing a Config File from Scratch?
-You can use the [test_config.ini](config/test_config.ini) as a starting point and the [configuration file](configuration_file.md) documentation as reference.
+You can use the [test_config.ini](../config/test_config.ini) as a starting point and the [configuration file](configuration_file.md) documentation as reference.
 
 
 ### How to Represent Transactions from Unsupported Exchanges and Wallets?
