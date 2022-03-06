@@ -33,7 +33,8 @@
   * [Design Guidelines](#design-guidelines)
   * [Development Workflow](#development-workflow)
   * [Unit Tests](#unit-tests)
-* **[Plugin Development](#plugin-development)**
+* **[DaLI Internals](#dali-internals)**
+  * [Plugin Development](#plugin-development)
 * **[Frequently Asked Developer Questions](#frequently-asked-developer-questions)**
 
 ## Introduction
@@ -167,7 +168,7 @@ LOG_LEVEL=DEBUG bin/dali -s -o output/ config/test.ini
 ```
 
 ### Unit Tests
-TBD
+Unit tests are in the [tests](tests) directory. Please add unit tests for any new code.
 
 ## DaLI Internals
 DaLI top-level function is in [dali_main.py](src/dali/dali_main.py). It performs the following operations:
