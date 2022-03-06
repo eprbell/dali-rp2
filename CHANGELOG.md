@@ -14,7 +14,7 @@
 
 # RP2 Change Log
 
-## v0.3.5
+## v0.3.6
 * template.ods was missing from the final package. Fixed in setup.cfg
 * various fixes to documentation
 
