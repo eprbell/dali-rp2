@@ -107,7 +107,7 @@ To try DaLI with the example configuration, download:
 * [test_manual_in.csv](input/test_manual_in.csv)
 * [test_manual_intra.csv](input/test_manual_intra.csv)
 * [test_trezor_alice.csv](input/test_trezor_alice_btc.csv)
-* [test_trezor_alice.csv](input/test_trezor_alice_btc.csv)
+* [test_trezor_bob.csv](input/test_trezor_bob_btc.csv)
 
 Let's call `<download_directory>` the location of the downloaded files and copy all CSV files into it. Open a terminal window (or PowerShell if on Windows) and enter the following commands:
 
