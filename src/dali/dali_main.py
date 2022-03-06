@@ -156,8 +156,8 @@ def _setup_argument_parser() -> ArgumentParser:
         "-v",
         "--version",
         action="version",
-        version=f"Dali {_VERSION} (https://pypi.org/project/dali_rp2/)",
-        help="Print Dali version",
+        version=f"DaLI {_VERSION} (https://pypi.org/project/dali_rp2/)",
+        help="Print DaLI version",
     )
     parser.add_argument(
         "ini_file",
