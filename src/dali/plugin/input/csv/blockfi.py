@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # CSV Format: currency, amount, type, timestamp
+# Note: BlockFi doesn't provide hash information, so BlockFi transactions cannot be resolved
 
 import logging
 from csv import reader
