@@ -194,7 +194,7 @@ If a field is unknown fill it with `Keywords.UNKNOWN`, unless it's an optional f
 
 For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
 
-When submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributing-to-the-repository), please make sure the following is true:
+When submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributing-to-the-repository), please make sure all the following bullet points are true:
 * transactions have unique_id populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
 * CSV data loaders have a comment at the beginning of the file, documenting the format. E.g.:
     ```
@@ -215,6 +215,7 @@ When submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributin
     ```
     super().__init__(account_holder)
     ```
+* ensure the load method is implemented and returning a list of AbstractTransaction subclasses.
 * in the constructor create a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameter to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
