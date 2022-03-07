@@ -13,8 +13,7 @@
 # limitations under the License.
 
 from datetime import datetime
-from inspect import Parameter, signature
-from types import MappingProxyType
+from inspect import signature
 from typing import Callable, Dict, List, NamedTuple, Optional, Union
 
 from dateutil.parser import parse
@@ -29,15 +28,6 @@ class StringAndDatetime(NamedTuple):
 
 
 class AbstractTransaction:
-
-    @classmethod
-    def _get_constructor_parameters(cls) -> MappingProxyType[str, Parameter]:
-        # This allows us to call signature() only once per class
-        try:
-            return cls._constructor_parameters  # type: ignore
-        except AttributeError:
-            cls._constructor_parameters = signature(cls).parameters  # type: ignore
-        return cls._constructor_parameters  # type: ignore
 
     @classmethod
     def _validate_string_field(cls, name: str, value: str, raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> str:
@@ -160,7 +150,7 @@ class AbstractTransaction:
     # Build a dictionary of constructor initialization parameters. Return true if any of them have UNKNOWN value
     def _setup_constructor_parameter_dictionary(self, parameter_dictionary: Dict[str, Union[str, bool, Optional[str], Optional[bool]]]) -> bool:
         result: bool = False
-        for parameter in self._get_constructor_parameters():
+        for parameter in signature(self.__class__).parameters:
             value: str = getattr(self, parameter)
             parameter_dictionary[parameter] = value
             if is_internal_field(parameter) or parameter == Keyword.UNIQUE_ID.value:
