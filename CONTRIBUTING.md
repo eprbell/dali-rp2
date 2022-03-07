@@ -27,7 +27,7 @@ Feel free to submit bugs via [Issue Tracker](https://github.com/eprbell/dali-rp2
 Logs are stored in the `log/` directory and each file name is appended with a timestamp. Outputs are stored in the `output/` directory or where specified by the user with the `-o` option.
 
 ## Contributing to the Repository
-Read the [developer guide](README.dev.md), which describes setup instructions, development workflow, design principles, source tree structure, plugin architecture, etc.
+Read the [developer guide](README.dev.md), which describes setup instructions, development workflow, design principles, source tree structure, plugin architecture, etc. In particular, if you're submitting a new plugin, be sure to read the [Plugin Development](README.dev.md#plugin-development) section.
 
 ### Submitting Pull Requests
 Feel free to submit pull requests. Please follow these practices:
