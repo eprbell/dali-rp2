@@ -57,7 +57,7 @@ Where:
 * *`<qualifiers>`* is an optional sequence of words with the purpose of distinguishing different sections initializing the same plugin (e.g. two different Trezor wallets belonging to the same user, or two Coinbase accounts belonging to two people filing together);
 * *`<parameter>`* and *`<value>`* are plugin-specific name-value pairs used to initialize a specific instance of the plugin. They are described in the plugin-specific sections below.
 
-DaLI comes with a few builtin plugins, but more are needed: help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets!
+DaLI comes with a few builtin plugins, but more are needed: help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](../CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets!
 
 ### Coinbase Section (REST)
 This plugin is REST-based and requires setting up API Keys in your Coinbase account settings (click on the API link).
