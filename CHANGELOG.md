@@ -14,6 +14,9 @@
 
 # RP2 Change Log
 
+## v0.3.15
+* minor edits to documentation and metafiles
+
 ## v0.3.12
 * fixed a few broken links in README.md (when used from Pypi only)
 * fixed CLI --help description
