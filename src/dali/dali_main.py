@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import sys
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from configparser import ConfigParser
 from importlib import import_module
 from inspect import Signature, signature
@@ -122,10 +122,13 @@ def input_loader() -> None:
 
 def _setup_argument_parser() -> ArgumentParser:
     parser: ArgumentParser = ArgumentParser(
-        description="Generate RP2 input and configuration files. Links:\n"
-        "- documentation: https://github.com/eprbell/dali-rp2/blob/main/README.md\n"
-        "- FAQ: https://github.com/eprbell/dali-rp2/blob/main/docs/user_faq.md\n"
-        "- leave a star on Github: https://github.com/eprbell/dali-rp2"
+        description=(
+            "Generate RP2 input and configuration files. Links:\n"
+            "- documentation: https://github.com/eprbell/dali-rp2/blob/main/README.md\n"
+            "- FAQ: https://github.com/eprbell/dali-rp2/blob/main/docs/user_faq.md\n"
+            "- leave a star on Github: https://github.com/eprbell/dali-rp2"
+        ),
+        formatter_class=RawTextHelpFormatter,
     )
 
     parser.add_argument(
