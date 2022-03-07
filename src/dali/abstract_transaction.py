@@ -34,10 +34,10 @@ class AbstractTransaction:
     def _get_constructor_parameters(cls) -> MappingProxyType[str, Parameter]:
         # This allows us to call signature() only once per class
         try:
-            return cls._constructor_parameters
+            return cls._constructor_parameters  # type: ignore
         except AttributeError:
-            cls._constructor_parameters = signature(cls).parameters
-        return cls._constructor_parameters
+            cls._constructor_parameters = signature(cls).parameters  # type: ignore
+        return cls._constructor_parameters  # type: ignore
 
     @classmethod
     def _validate_string_field(cls, name: str, value: str, raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> str:
