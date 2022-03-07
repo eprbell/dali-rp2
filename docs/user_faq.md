@@ -24,7 +24,7 @@
   * [What if I and My Spouse File Taxes Jointly?](#what-if-i-and-my-spouse-file-taxes-jointly)
   * [What if a Transaction Is Generated Differently Than I Expect?](#what-if-a-transaction-is-generated-differently-than-i-expect)
   * [How to Report a DaLI Bug Without Sharing Personal Information?](#how-to-report-a-dali-bug-without-sharing-personal-information)
-  * [What if I Don't Trust DaLI With My Crypto Data?](#what-if-i-dont-trust-rp2-with-my-crypto-data)
+  * [What if I Don't Trust DaLI With My Crypto Data?](#what-if-i-dont-trust-dali-with-my-crypto-data)
   * [Who is the Author of DaLI?](#who-is-the-author-of-dali)
 
 * **[Tax Questions](#tax-questions)**
@@ -40,7 +40,6 @@ Timestamp format is [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) (see [exam
 ### Can I Avoid Writing a Config File from Scratch?
 You can use the [test_config.ini](../config/test_config.ini) as a starting point and the [configuration file](configuration_file.md) documentation as reference.
 
-
 ### How to Represent Transactions from Unsupported Exchanges and Wallets?
 The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be used for this purpose.
 
@@ -48,10 +47,10 @@ The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be
 The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be used for this purpose.
 
 ### What if the Spot Price Is Missing for Some Transactions?
-In some cases exchange reports don't have spot price information. In such situations you can retrieve historical price data from the Web by passing the `-s` option to DaLI.
+In some cases exchange reports don't have spot price information. In such situations you can retrieve spot price information from Yahoo Finance (highest daily value) by passing the `-s` option to DaLI.
 
 ### What if I and My Spouse File Taxes Jointly?
-Suppose Alice and Bob are filing together and they both have a Coinbase account and a Trezor wallet. They can configure 4 plugin sections in the configuration file:
+Suppose Alice and Bob are filing together and they both have a Coinbase account and a Trezor wallet each. They can configure 4 plugin sections in the configuration file:
 * Coinbase / Bob
 * Coinbase / Alice
 * Trezor / Bob
@@ -59,13 +58,13 @@ Suppose Alice and Bob are filing together and they both have a Coinbase account 
 See the [configuration file](configuration_file.md) section of the documentation for more details.
 
 ### What if a Transaction Is Generated Differently Than I Expect?
-In certain cases DaLI doesn't know the user's intentions and it needs hints to generate a transaction correctly. For example an out transaction could be represented as a partial intra transaction or as a normal out transaction describing a gift to another person: only the user knows the correct representation. In such cases the [transaction_hints](configuration_file.md#transaction-hints-section) section of the configuration file can be used to resolve the problem.
+In certain cases DaLI doesn't know the user's intentions and it needs hints to generate a transaction correctly. For example an out transaction could be represented either as a partial intra transaction (as described above) or as a normal out transaction (perhaps a gift to another person): only the user knows the correct meaning of the transaction. In such cases [transaction_hints](configuration_file.md#transaction-hints-section) in the configuration file can be used to resolve the problem.
 
 ### How to Report a DaLI Bug Without Sharing Personal Information?
 See the Reporting Bugs section in the [CONTRIBUTING](../CONTRIBUTING.md#reporting-bugs) document.
 
 ### What if I Don't Trust DaLI With My Crypto Data?
-In other words, how to be sure DaLI is not malware/spyware? After all, Bitcoin's motto is *"don't trust, verify"*. DaLI is open-source and written in Python, so anybody with Python skills can inspect the code anytime: if DaLI were to try anything untoward, someone would likely notice. However if you don't have the time, patience or skill to verify the code and you don't trust others to do so for you, you can still use DaLI in an isolated environment (but this will limit functionality to CSV-based plugins because REST-based ones need networking):
+In other words, how to be sure DaLI is not malware/spyware? After all, Bitcoin's motto is *"don't trust, verify"*. DaLI is open-source and written in Python, so anybody with Python skills can inspect the code anytime: if DaLI were to try anything untoward, someone would likely notice. However if you don't have the time, patience or skill to verify the code and you don't trust others to do so for you, you can still use DaLI in an isolated environment (but this will limit its functionality to CSV-based plugins because REST-based ones need networking):
 - start a fresh virtual machine with your OS of choice;
 - install DaLI in the virtual machine;
 - isolate the virtual machine: kill networking, shared directories and other mechanisms of outside communication;

@@ -44,7 +44,7 @@ This document describes [DaLI](https://github.com/eprbell/dali-rp2) setup instru
 DaLI is released under the terms of Apache License Version 2.0. For more information see [LICENSE](LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>.
 
 ## Download
-The latest DaLI source can be downloaded at: <https://github.com/eprbell/dali-rp2>
+The latest DaLI source can be downloaded at: <https://github.com/eprbell/dali-rp2>.
 
 ## Setup
 DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.7.0 or greater. Virtualenv is recommended for DaLI development. Note that requirements.txt contains `-e .`, which installs the DaLI package in editable mode.
@@ -127,7 +127,7 @@ The RP2 source tree is organized as follows:
 * `src/dali/data/`: spreadsheet templates that are used by the ODS generator;
 * `src/dali/plugin/input/csv/`: CSV-based data loader plugins;
 * `src/dali/plugin/input/rest/`: REST-based data loader plugins;
-* `src/stubs/`: RP2 relies on the pyexcel-ezodf library, which doesn't have typing information, so it is added here;
+* `src/stubs/`: DaLI relies on the pyexcel-ezodf library, which doesn't have typing information, so it is added here;
 * `tests/`: unit tests.
 
 ## Development
@@ -143,7 +143,7 @@ DaLI code adheres to these principles:
 * no id-based hashing: classes that are added to dictionaries and sets redefine `__eq__()`, `__neq__()` and `__hash__()`;
 * encapsulated math: all high-precision math is done via `RP2Decimal` (a subclass of Decimal), to ensure the correct precision is used throughout the code. `RP2Decimal` instances are never mixed with other types in expressions;
 * f-strings only: every time string interpolation is needed, f-strings are used;
-* logging: logging is done via `logger.LOGGER`;
+* logging: logging is done via the `logger` module;
 * no unnamed tuples: dataclasses or named tuples are used instead;
 * one class per file (with exceptions for trivial classes);
 * files containing a class must have the same name as the class (but lowercase with underscores): e.g. class AbstractEntry lives in file abstract_entry.py;
@@ -164,48 +164,48 @@ While every commit and push are automatically tested as described, sometimes it'
 
 Logs are stored in the `log` directory. To generate debug logs, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
 ```
-LOG_LEVEL=DEBUG bin/dali -s -o output/ config/test.ini
+LOG_LEVEL=DEBUG bin/dali -s -o output/ config/test_config.ini
 ```
 
 ### Unit Tests
 Unit tests are in the [tests](tests) directory. Please add unit tests for any new code.
 
 ## DaLI Internals
-DaLI top-level function is in [dali_main.py](src/dali/dali_main.py). It performs the following operations:
-* it reads the INI configuration file which includes data loader plugin initialization parameters;
-* it instantiates data loader plugins using the initialization parameters from the config file and calls their load() method, which reads data from the source (CSV file or REST service) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances, which can be any of its subclasses [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transfer across accounts controlled by the same person);
-* it passes the results of all plugin load() calls to the [transaction resolver](src/dali/transaction_resolver.py), which has the purpose of merging incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
-* it passes the resolved data to the RP2 [ODS input file generator](src/dali/ods_generator.py) and to the RP2 [config file generator](src/dali/config_generator.py), which create the files to feed to RP2;
+The DaLI top-level function is in [dali_main.py](src/dali/dali_main.py). It performs the following operations:
+* it parses the INI configuration file which includes data loader plugin initialization parameters and global configuration sections;
+* it instantiates data loader plugins using the initialization parameters from the config file and calls their load() method, which reads data from native sources (CSV files or REST endpoints) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
+* it joins the lists from all plugin load() calls and passes them to the [transaction resolver](src/dali/transaction_resolver.py), which has the purpose of merging incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
+* it passes the resolved data to the RP2 [ODS input file generator](src/dali/ods_generator.py) and to the RP2 [config file generator](src/dali/config_generator.py), which create the input files for RP2;
 
-The transaction resolver is a critical component of DaLI and needs more description. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the to_exchange and to_holder fields of the IntraTransaction (it fills them with `Keywords.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the from_exchange and from_holder fields of the IntraTransaction. So how does DaLI merge these two incomplete transactions into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction: typically this is the transaction hash, but it could be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for incomplete ones with the same `unique_id` and merges them into a single one.
+The [transaction resolver](src/dali/transaction_resolver.py) is a critical component of DaLI and needs more description. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the `to_exchange`, `to_holder` and `crypto_received` fields of the IntraTransaction (so it fills them with `Keywords.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the `from_exchange`, `from_holder` and `crypto_sent` fields of the IntraTransaction. So how does DaLI merge these two incomplete transaction parts into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction to pair them: typically this is the transaction hash, but in certain cases it could also be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for pairs of incomplete ones with the same `unique_id` and merges them into a single one.
 
 For this reason it's essential that all data loader plugins populate the `unique_id` field as best they can: without it the transaction resolver cannot merge incomplete data. Sometimes (especially with CSV files) hash information is missing and so it's impossible to populate the `unique_id` field: is such cases it's still possible to write a plugin, but the user will have to manually modify the generated result and perform transaction resolution manually, which is not ideal.
 
 ### Plugin Development
 All data loader plugins are subclasses of [AbstractInputPlugin](src/dali/abstract_input_plugin.py) and they must:
-* invoke the superclass constructor in their own constructor
-* implement the load() method, which reads data from the native source and returns a list of AbstractTransaction instances, which can be InTransaction (acquired crypto), OutTransaction (disposed-of crypto) or IntraTransaction (crypto transfer across accounts controlled by the same person)
+* invoke the superclass constructor in their own constructor;
+* implement the load() method, which reads data from the native source and returns a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances, which can be of any of the following classes: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together).
 
 Data loader plugins live in one of the following directories, depending on their type (CSV or REST):
 * `src/dali/plugin/input/csv/`;
 * `src/dali/plugin/input/rest/`.
 
-If a field is unknown fill it with `Keywords.UNKNOWN`, unless it's optional, in which case it can be left blank.
+If a field is unknown fill it with `Keywords.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be left blank.
 
 For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
 
-Here's a laundry list to use when submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributing-to-the-repository):
-* ensure transactions have unique_id populated (typically with the hash), unless the information is missing from the native source: this is critical for the transaction resolver;
-* ensure CSV data loaders have a comment at the beginning of the file, documenting the format. E.g.:
+When submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributing-to-the-repository), please make sure the following is true:
+* transactions have unique_id populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
+* CSV data loaders have a comment at the beginning of the file, documenting the format. E.g.:
     ```
     # CSV Format: timestamp; type; transaction_id; address; fee; total
     ```
-* ensure REST data loaders have three comments at the beginning of the file, containing links to:
+* REST data loaders have three comments at the beginning of the file, containing links to:
   * REST API documentation
   * authentication procedure documentation
   * URL of the REST endpoint
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For example:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This makes it easier to review the code. For example:
 ```
     # REST API: https://developers.coinbase.com/api/v2
     # Authentication: https://developers.coinbase.com/docs/wallet/api-key-authentication
@@ -215,11 +215,11 @@ Here's a laundry list to use when submitting a new data loader plugin with a [PR
     ```
     super().__init__(account_holder)
     ```
-* in the constructor create a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin: this way in the logs it's easy to distinguish lines by plugin instance. Example of a plugin-specific log in the constructor of the Coinbase plugin:
+* in the constructor create a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameter to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
-    self.__logger: logging.Logger = create_logger(f"{self.__COINBASE}/{self.account_holder}")
+        self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
     ```
-* ensure self.__logger.debug() calls capture all of the native format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging).
+* ensure self.__logger.debug() are used throughout the plugin, to capture all native-format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging).
 
 ## Frequently Asked Developer Questions
 Read the [frequently asked developer questions](docs/developer_faq.md).

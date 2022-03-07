@@ -39,16 +39,16 @@
 * **[Change Log](https://github.com/eprbell/dali-rp2/tree/main/README.md#change-log)**
 
 ## Introduction
-[DaLI](https://pypi.org/project/dali-rp2) (Data Loader Interface) is an experimental data loader and input generator for [RP2](https://pypi.org/project/rp2/), the privacy-focused, free, [open-source](https://github.com/eprbell/dali-rp2) US cryptocurrency tax calculator.
+[DaLI](https://pypi.org/project/dali-rp2) (Data Loader Interface) is an experimental data loader and input generator for [RP2](https://pypi.org/project/rp2/), the privacy-focused, free, open-source US cryptocurrency tax calculator. Just like RP2, DaLI is also free, [open-source](https://github.com/eprbell/dali-rp2) and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
 
 It performs the following operations:
 * it reads in crypto transaction information from multiples sources: CSV files and/or REST-based services;
 * it analyzes, processes and merges this data;
 * it uses it the processed data to generate an ODS input file for RP2 and its respective JSON configuration file;
 
-DaLI has a programmable plugin architecture for data loaders (both CSV and REST-based): help us make DaLI a robust open-source, community-driven crypto data loader by contributing plugins for exchanges and wallets!
+DaLI has a [programmable plugin architecture](README.dev.md#dali-internals) for data loaders (both CSV and REST-based): help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets!
 
-Read instructions on [how to run DaLI](https://github.com/eprbell/dali-rp2/tree/main/README.md#running).
+RP2 has [unit test](https://github.com/eprbell/dali-rp2/tree/main/tests/) coverage to reduce the risk of regression.
 
 **IMPORTANT DISCLAIMER**:
 * DaLI offers no guarantee of correctness (read the [license](https://github.com/eprbell/dali-rp2/tree/main/LICENSE)): always verify results with the help of a tax professional.
@@ -98,31 +98,25 @@ pip install dali-rp2
 ## Running
 DaLI reads in a user-prepared configuration file in [INI format](https://en.wikipedia.org/wiki/INI_file), which is used to initialize data loaders (plugins) and configure DaLI's behavior. The format of the configuration file is described in detail in the [configuration file](https://github.com/eprbell/dali-rp2/tree/main/docs/configuration_file.md) documentation.
 
-An example of a configuration file can be found in [test_config.ini](config/test_config.ini)
+An example of a configuration file can be found in [test_config.ini](config/test_config.ini).
 
-After reading the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
+After reading the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and a RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
 
-To try DaLI with the example configuration, download:
+To try DaLI with the example configuration, download the following files:
 * [test_config.ini](config/test_config.ini)
 * [test_manual_in.csv](input/test_manual_in.csv)
 * [test_manual_intra.csv](input/test_manual_intra.csv)
 * [test_trezor_alice.csv](input/test_trezor_alice_btc.csv)
 * [test_trezor_bob.csv](input/test_trezor_bob_btc.csv)
 
-Let's call `<download_directory>` the location of the downloaded files and copy all CSV files into it. Open a terminal window (or PowerShell if on Windows) and enter the following commands:
-
-Create an `input` directory in the `<download_directory>`:
+Let's call `<download_directory>` the location of the downloaded files. To generate RP2 input files using DaLI, open a terminal window (or PowerShell if on Windows) and enter the following commands:
   ```
   cd <download_directory>
   mkdir input
   mv *.csv input
-  ```
-To generate output for the example files::
-  ```
-  cd <download_directory>
   dali -s -o output -p test_ test_config.ini
   ```
-The `-s` option enables reading spot price information from Yahoo Finance, when it's not available in the CSV or REST service.
+The `-s` option allows DaLI to retrieve spot price information from Yahoo Finance (highest daily value), when it's not available from the CSV files or REST services.
 
 The ODS output file is generated in the output directory (or wherever specified with the -o option).
 
@@ -131,12 +125,13 @@ To print command usage information for the `dali` command:
   dali --help
   ```
 
-To compute taxes with RP2 using the generated input files:
+To compute taxes with RP2 using the generated input files (using both FIFO and LIFO accounting methods):
   ```
   cd <download_directory>
   rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
   rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
   ```
+
 ## Configuration File
 Read the [configuration file](https://github.com/eprbell/dali-rp2/tree/main/docs/configuration_file.md) documentation.
 
