@@ -44,9 +44,9 @@
 It performs the following operations:
 * it reads in crypto transaction information from multiples sources: CSV files and/or REST-based services;
 * it analyzes, processes and merges this data;
-* it uses it the processed data to generate an ODS input file for RP2 and its respective JSON configuration file;
+* it uses it the processed data to generate an ODS input file for RP2 and its respective JSON configuration file.
 
-DaLI has a [programmable plugin architecture](README.dev.md#dali-internals) for data loaders (both CSV and REST-based): help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets!
+DaLI has a [programmable plugin architecture](https://github.com/eprbell/dali-rp2/tree/main/README.dev.md#dali-internals) for data loaders (both CSV and REST-based): help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](https://github.com/eprbell/dali-rp2/tree/main/CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets!
 
 RP2 has [unit test](https://github.com/eprbell/dali-rp2/tree/main/tests/) coverage to reduce the risk of regression.
 
@@ -98,16 +98,16 @@ pip install dali-rp2
 ## Running
 DaLI reads in a user-prepared configuration file in [INI format](https://en.wikipedia.org/wiki/INI_file), which is used to initialize data loaders (plugins) and configure DaLI's behavior. The format of the configuration file is described in detail in the [configuration file](https://github.com/eprbell/dali-rp2/tree/main/docs/configuration_file.md) documentation.
 
-An example of a configuration file can be found in [test_config.ini](config/test_config.ini).
+An example of a configuration file can be found in [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini).
 
 After reading the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and a RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
 
 To try DaLI with the example configuration, download the following files:
-* [test_config.ini](config/test_config.ini)
-* [test_manual_in.csv](input/test_manual_in.csv)
-* [test_manual_intra.csv](input/test_manual_intra.csv)
-* [test_trezor_alice.csv](input/test_trezor_alice_btc.csv)
-* [test_trezor_bob.csv](input/test_trezor_bob_btc.csv)
+* [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini)
+* [test_manual_in.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_in.csv)
+* [test_manual_intra.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_intra.csv)
+* [test_trezor_alice.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_alice_btc.csv)
+* [test_trezor_bob.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_bob_btc.csv)
 
 Let's call `<download_directory>` the location of the downloaded files. To generate RP2 input files using DaLI, open a terminal window (or PowerShell if on Windows) and enter the following commands:
   ```
