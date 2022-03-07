@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## v0.3.12
+* fixed a few broken links in README.md (when used from Pypi only)
+* fixed CLI --help description
+* minor improvements to documentation
+
 ## v0.3.7
 * major improvements to documentation
 * added notes in generated file to describe crypto conversion transactions in Coinbase Pro
