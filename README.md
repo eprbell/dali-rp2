@@ -39,7 +39,7 @@
 * **[Change Log](https://github.com/eprbell/dali-rp2/tree/main/README.md#change-log)**
 
 ## Introduction
-[DaLI](https://pypi.org/project/dali-rp2) (Data Loader Interface) is an experimental data loader and input generator for [RP2](https://pypi.org/project/rp2/), the privacy-focused, free, open-source US cryptocurrency tax calculator. Just like RP2, DaLI is also free, [open-source](https://github.com/eprbell/dali-rp2) and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
+[DaLI](https://pypi.org/project/dali-rp2) (Data Loader Interface) is an data loader and input generator for [RP2](https://pypi.org/project/rp2/), the privacy-focused, free, open-source US cryptocurrency tax calculator. Just like RP2, DaLI is also free, [open-source](https://github.com/eprbell/dali-rp2) and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
 
 It performs the following operations:
 * it reads in crypto transaction information from multiples sources: CSV files and/or REST-based services;
