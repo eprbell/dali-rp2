@@ -332,7 +332,7 @@ class InputPlugin(AbstractInputPlugin):
                     None,
                     None,
                     None,
-                    None,
+                    f"Sell side of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
                 ),
             )
             self.__append_transaction(
@@ -351,7 +351,7 @@ class InputPlugin(AbstractInputPlugin):
                     "0",
                     None,
                     None,
-                    None,
+                    f"Buy side of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
                 ),
             )
             self.__append_transaction(
@@ -371,7 +371,7 @@ class InputPlugin(AbstractInputPlugin):
                     None,
                     None,
                     None,
-                    f"Conversion fee for {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
+                    f"Fee of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
                 ),
             )
 
