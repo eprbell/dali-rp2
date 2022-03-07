@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## v0.3.7
+* major improvements to documentation
+* added notes in generated file to describe crypto conversion transactions in Coinbase Pro
+* small performance improvement: signature reflexive call is now called only once per class, instead of once per instance
+
 ## v0.3.6
 * template.ods was missing from the final package. Fixed in setup.cfg
 * various fixes to documentation
