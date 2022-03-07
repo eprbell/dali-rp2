@@ -35,6 +35,7 @@
   * [Unit Tests](#unit-tests)
 * **[DaLI Internals](#dali-internals)**
   * [Plugin Development](#plugin-development)
+  * [Plugin Laundry List](#plugin-laundry-list)
 * **[Frequently Asked Developer Questions](#frequently-asked-developer-questions)**
 
 ## Introduction
@@ -194,13 +195,15 @@ If a field is unknown fill it with `Keywords.UNKNOWN`, unless it's an optional f
 
 For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
 
-When submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributing-to-the-repository), please make sure all the following bullet points are true:
-* transactions have unique_id populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
-* CSV data loaders have a comment at the beginning of the file, documenting the format. E.g.:
+### Plugin Laundry List
+When submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributing-to-the-repository), please make sure all the following bullet points apply to your code:
+* the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
+* the plugin creates transactions that have unique_id populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
+* CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
     ```
     # CSV Format: timestamp; type; transaction_id; address; fee; total
     ```
-* REST data loaders have three comments at the beginning of the file, containing links to:
+* REST plugins have three comments at the beginning of the file, containing links to:
   * REST API documentation
   * authentication procedure documentation
   * URL of the REST endpoint
@@ -211,16 +214,17 @@ When submitting a new data loader plugin with a [PR](CONTRIBUTING.md#contributin
     # Authentication: https://developers.coinbase.com/docs/wallet/api-key-authentication
     # Endpoint: https://api.coinbase.com
 ```
-* ensure the __init__ method is calling the superclass constructor:
+* the plugin's __init__ method is calling the superclass constructor:
     ```
     super().__init__(account_holder)
     ```
-* ensure the load method is implemented and returning a list of AbstractTransaction subclasses.
-* in the constructor create a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameter to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
+* the plugin's load method is implemented and returning a list of AbstractTransaction subclasses.
+* the plugin's __init__ method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameter to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
     ```
-* ensure self.__logger.debug() are used throughout the plugin, to capture all native-format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging).
+* the plugin uses self.__logger.debug() throughout its code, to capture all native-format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging);
+* CSV plugins have one or more unit test. REST plugins have one or more unit tests, if possible.
 
 ## Frequently Asked Developer Questions
 Read the [frequently asked developer questions](docs/developer_faq.md).
