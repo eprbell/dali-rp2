@@ -81,23 +81,7 @@ class InputPlugin(AbstractInputPlugin):
                 total_number: RP2Decimal = RP2Decimal(line[self.__TOTAL_INDEX])
 
                 if total_number == ZERO and fee_number > ZERO:
-                    # Cost-only transaction
-                    result.append(
-                        OutTransaction(
-                            self.__TREZOR,
-                            crypto_hash,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} {self.__timezone}",
-                            self.__currency,
-                            self.__account_nickname,
-                            self.account_holder,
-                            "Sell",
-                            spot_price,
-                            line[self.__FEE_INDEX],
-                            "0",
-                            notes="Cost-only transaction",
-                        )
-                    )
+                    self.__logger.warning("Possible dusting attack (fee > 0, total = 0): %s", raw_data)
                 else:
                     result.append(
                         IntraTransaction(
