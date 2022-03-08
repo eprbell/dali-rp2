@@ -25,7 +25,6 @@ from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
 from dali.dali_configuration import Keyword
 from dali.intra_transaction import IntraTransaction
-from dali.out_transaction import OutTransaction
 
 _SENT: str = "SENT"
 _RECV: str = "RECV"
