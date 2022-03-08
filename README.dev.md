@@ -39,7 +39,7 @@
 * **[Frequently Asked Developer Questions](#frequently-asked-developer-questions)**
 
 ## Introduction
-This document describes [DaLI](https://github.com/eprbell/dali-rp2) setup instructions, development workflow, design principles, source tree structure and plugin architecture.
+This document describes [DaLI](https://github.com/eprbell/dali-rp2) setup instructions, development workflow, design principles, source tree structure, internal design and plugin architecture.
 
 ## License
 DaLI is released under the terms of Apache License Version 2.0. For more information see [LICENSE](LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>.
@@ -173,12 +173,12 @@ Unit tests are in the [tests](tests) directory. Please add unit tests for any ne
 
 ## DaLI Internals
 The DaLI top-level function is in [dali_main.py](src/dali/dali_main.py). It performs the following operations:
-* it parses the INI configuration file which includes data loader plugin initialization parameters and global configuration sections;
-* it instantiates data loader plugins using the initialization parameters from the config file and calls their load() method, which reads data from native sources (CSV files or REST endpoints) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
-* it joins the lists from all plugin load() calls and passes them to the [transaction resolver](src/dali/transaction_resolver.py), which has the purpose of merging incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
-* it passes the resolved data to the RP2 [ODS input file generator](src/dali/ods_generator.py) and to the RP2 [config file generator](src/dali/config_generator.py), which create the input files for RP2;
+* parse the INI configuration file which includes data loader plugin initialization parameters and global configuration sections;
+* instantiate data loader plugins using the initialization parameters from the config file and call their load() method, which reads data from native sources (CSV files or REST endpoints) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
+* join the lists returned by plugin load() calls and pass them to the [transaction resolver](src/dali/transaction_resolver.py), which has the purpose of merging incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
+* pass the resolved data to the RP2 [ODS input file generator](src/dali/ods_generator.py) and to the RP2 [config file generator](src/dali/config_generator.py), which create the input files for RP2.
 
-The [transaction resolver](src/dali/transaction_resolver.py) is a critical component of DaLI and needs more description. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the `to_exchange`, `to_holder` and `crypto_received` fields of the IntraTransaction (so it fills them with `Keywords.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the `from_exchange`, `from_holder` and `crypto_sent` fields of the IntraTransaction. So how does DaLI merge these two incomplete transaction parts into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction to pair them: typically this is the transaction hash, but in certain cases it could also be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for pairs of incomplete ones with the same `unique_id` and merges them into a single one.
+The [transaction resolver](src/dali/transaction_resolver.py) is a critical component of DaLI and has the purpose of merging and normalizing transaction data from data loader plugins. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the `to_exchange`, `to_holder` and `crypto_received` fields of the IntraTransaction (so it fills them with `Keywords.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the `from_exchange`, `from_holder` and `crypto_sent` fields of the IntraTransaction. So how does DaLI merge these two incomplete transaction parts into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction to pair them: typically this is the transaction hash, but in certain cases it could also be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for pairs of incomplete ones with the same `unique_id` and merges them into a single one.
 
 For this reason it's essential that all data loader plugins populate the `unique_id` field as best they can: without it the transaction resolver cannot merge incomplete data. Sometimes (especially with CSV files) hash information is missing and so it's impossible to populate the `unique_id` field: is such cases it's still possible to write a plugin, but the user will have to manually modify the generated result and perform transaction resolution manually, which is not ideal.
 
@@ -191,7 +191,7 @@ Data loader plugins live in one of the following directories, depending on their
 * `src/dali/plugin/input/csv/`;
 * `src/dali/plugin/input/rest/`.
 
-If a field is unknown fill it with `Keywords.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be left blank.
+If a field is unknown the plugin can fill it with `Keywords.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`.
 
 For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
 
@@ -200,7 +200,7 @@ When submitting a new data loader plugin open a [PR](https://github.com/eprbell/
 * the plugin is privacy-focused: it doesn't send user data anywhere;
 * the plugin follows the [contribution guidelines](CONTRIBUTING.md#contributing-to-the-repository);
 * the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
-* the plugin creates transactions that have unique_id populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
+* the plugin creates transactions that have `unique_id` populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
 * CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
     ```
     # CSV Format: timestamp; type; transaction_id; address; fee; total
