@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Coinbase REST plugin links:
 # REST API: https://developers.coinbase.com/api/v2
 # Authentication: https://developers.coinbase.com/docs/wallet/api-key-authentication
 # Endpoint: https://api.coinbase.com
@@ -38,6 +39,7 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
+# Native format keywords
 _AMOUNT: str = "amount"
 _BUY: str = "buy"
 _CODE: str = "code"
@@ -414,10 +416,10 @@ class InputPlugin(AbstractInputPlugin):
                 "Interest",
                 Keyword.UNKNOWN.value,
                 transaction[_AMOUNT][_AMOUNT],
-                "0",  # Fee TBD
+                "0",
                 None,
                 None,
-                None,  # Add notes
+                None,
             )
         )
 

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# CoinbasePro REST plugin links:
 # REST API: https://docs.cloud.coinbase.com/exchange/reference
 # Authentication: https://docs.cloud.coinbase.com/exchange/docs/authorization-and-authentication
 # Endpoint: https://api.pro.coinbase.com
@@ -40,6 +41,8 @@ from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 from dali.transaction_resolver import AssetAndUniqueId
 
+
+# Native format keywords
 _AMOUNT: str = "amount"
 _BUY: str = "buy"
 _COINBASE_TRANSACTION_ID: str = "coinbase_transaction_id"
@@ -66,11 +69,6 @@ _USD_VOLUME: str = "usd_volume"
 _WITHDRAW: str = "withdraw"
 
 
-class FromToCurrencyPair(NamedTuple):
-    from_currency: str
-    to_currency: str
-
-
 class CoinbaseProAuth(AuthBase):
     def __init__(self, api_key: str, api_secret: str, api_passphrase: str) -> None:
         self.__api_key: str = api_key
@@ -95,6 +93,10 @@ class CoinbaseProAuth(AuthBase):
         )
         return request
 
+
+class FromToCurrencyPair(NamedTuple):
+    from_currency: str
+    to_currency: str
 
 class InputPlugin(AbstractInputPlugin):
 
