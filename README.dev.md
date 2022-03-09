@@ -226,9 +226,9 @@ When submitting a new data loader plugin open a [PR](https://github.com/eprbell/
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
     ```
 * the plugin uses self.__logger.debug() throughout its code to capture all native-format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging);
-* CSV plugins have one or more unit test;
-* REST plugins have one or more unit tests, if possible.
+* CSV plugins have one or more [unit test](tests/);
+* REST plugins have one or more [unit tests](tests/), if possible;
+* plugin initialization parameters are documented in [docs/configuration_file.md](docs/configuration_file.md#data-loader-plugin-sections).
 
 ## Frequently Asked Developer Questions
 Read the [frequently asked developer questions](docs/developer_faq.md).
-
