@@ -48,7 +48,7 @@ It performs the following operations:
 
 DaLI has a [programmable plugin architecture](https://github.com/eprbell/dali-rp2/tree/main/README.dev.md#dali-internals) for data loaders (both CSV and REST-based): help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](https://github.com/eprbell/dali-rp2/tree/main/CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets!
 
-RP2 has [unit test](https://github.com/eprbell/dali-rp2/tree/main/tests/) coverage to reduce the risk of regression.
+RP2 has [unit tests](https://github.com/eprbell/dali-rp2/tree/main/tests/) coverage to reduce the risk of regression.
 
 **IMPORTANT DISCLAIMER**:
 * DaLI offers no guarantee of correctness (read the [license](https://github.com/eprbell/dali-rp2/tree/main/LICENSE)): always verify results with the help of a tax professional.

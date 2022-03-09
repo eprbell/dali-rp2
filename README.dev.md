@@ -197,15 +197,15 @@ For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/inp
 
 ### Plugin Laundry List
 When submitting a new data loader plugin open a [PR](https://github.com/eprbell/dali-rp2/pulls) and make sure all the following bullet points apply to your code:
-* the plugin is privacy-focused: it doesn't send user data anywhere;
-* the plugin follows the [contribution guidelines](CONTRIBUTING.md#contributing-to-the-repository);
-* the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
-* the plugin creates transactions that have `unique_id` populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
-* CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
+1. the plugin is privacy-focused: it doesn't send user data anywhere;
+2. the plugin follows the [contribution guidelines](CONTRIBUTING.md#contributing-to-the-repository);
+3. the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
+4. the plugin creates transactions that have `unique_id` populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the transaction resolver;
+5. CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
     ```
     # CSV Format: timestamp; type; transaction_id; address; fee; total
     ```
-* REST plugins have three comments at the beginning of the file, containing links to:
+6. REST plugins have three comments at the beginning of the file, containing links to:
   * REST API documentation
   * authentication procedure documentation
   * URL of the REST endpoint
@@ -216,19 +216,19 @@ When submitting a new data loader plugin open a [PR](https://github.com/eprbell/
     # Authentication: https://developers.coinbase.com/docs/wallet/api-key-authentication
     # Endpoint: https://api.coinbase.com
 ```
-* the plugin's `load()` method is implemented and returns a list of AbstractTransaction subclasses;
-* the plugin's `__init__()` method calls the superclass constructor:
+7. the plugin's `load()` method is implemented and returns a list of AbstractTransaction subclasses;
+8. the plugin's `__init__()` method calls the superclass constructor:
     ```
     super().__init__(account_holder)
     ```
-* the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameter to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
+9. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameter to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
     ```
-* the plugin uses self.__logger.debug() throughout its code to capture all native-format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging);
-* CSV plugins have one or more [unit test](tests/);
-* REST plugins have one or more [unit tests](tests/), if possible;
-* plugin initialization parameters are documented in [docs/configuration_file.md](docs/configuration_file.md#data-loader-plugin-sections).
+10. the plugin uses self.__logger.debug() throughout its code to capture all native-format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging);
+11. CSV plugins have one or more [unit test](tests/);
+12. REST plugins have one or more [unit tests](tests/), if possible;
+13. plugin initialization parameters are documented in [docs/configuration_file.md](docs/configuration_file.md#data-loader-plugin-sections).
 
 ## Frequently Asked Developer Questions
 Read the [frequently asked developer questions](docs/developer_faq.md).
