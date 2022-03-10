@@ -14,9 +14,13 @@
 
 # RP2 Change Log
 
+## v0.3.17
+* added new FAQ on adding support for new wallets and exchanges
+* minor fixes
+
 ## v0.3.16
 * Trezor plugin: dusting attack was incorrectly interpreted as cost-only transaction. Now it issues a warning to the user
-* minor fixes to documentation.
+* minor fixes to documentation
 
 ## v0.3.15
 * minor edits to documentation and metafiles
