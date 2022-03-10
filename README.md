@@ -46,9 +46,11 @@ It performs the following operations:
 * it analyzes, processes and merges this data;
 * it uses the processed data to generate an ODS input file for RP2 and its respective JSON configuration file.
 
-DaLI has a [programmable plugin architecture](https://github.com/eprbell/dali-rp2/tree/main/README.dev.md#dali-internals) for data loaders (both CSV and REST-based): help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](https://github.com/eprbell/dali-rp2/tree/main/CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets!
+DaLI has a [programmable plugin architecture](https://github.com/eprbell/dali-rp2/tree/main/README.dev.md#dali-internals) for data loaders (both CSV and REST-based). While some exchanges and wallets are already supported out-of-the-box, more are needed: help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](https://github.com/eprbell/dali-rp2/tree/main/CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets! Check [data-loader-plugin open issues](https://github.com/eprbell/dali-rp2/issues).
 
-RP2 has [unit tests](https://github.com/eprbell/dali-rp2/tree/main/tests/) coverage to reduce the risk of regression.
+DaLI has [unit tests](https://github.com/eprbell/dali-rp2/tree/main/tests/) coverage to reduce the risk of regression.
+
+Note that DaLI has RP2 as a dependency, so installing DaLI causes RP2 to be installed as well.
 
 **IMPORTANT DISCLAIMER**:
 * DaLI offers no guarantee of correctness (read the [license](https://github.com/eprbell/dali-rp2/tree/main/LICENSE)): always verify results with the help of a tax professional.
