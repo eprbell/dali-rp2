@@ -18,6 +18,7 @@
 * **[General Questions](#general-questions)**
   * [What Is the Timestamp Format?](#what-is-the-timestamp-format)
   * [Can I Avoid Writing a Config File from Scratch?](#can-i-avoid-writing-a-config-file-from-scratch)
+  * [Can You Add Support for a New Wallet or Exchange?](#can-you-add-support-for-a-new-wallet-or-exchange)
   * [How to Represent Transactions from Unsupported Exchanges and Wallets?](#how-to-represent-transactions-from-unsupported-exchanges-and-wallets)
   * [How to Represent a Transaction from/to a Supported Exchange/Wallet to/from an Unsupported One](#how-to-represent-a-transaction-fromto-a-supported-exchangewallet-tofrom-an-unsupported-one)
   * [What if the Spot Price Is Missing for Some Transactions?](#what-if-the-spot-price-is-missing-for-some-transactions)
@@ -39,6 +40,19 @@ Timestamp format is [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) (see [exam
 
 ### Can I Avoid Writing a Config File from Scratch?
 You can use the [test_config.ini](../config/test_config.ini) as a starting point and the [configuration file](configuration_file.md) documentation as reference.
+
+### Can You Add Support for a New Wallet or Exchange?
+Since there are hundreds of CSV formats and REST APIs, it's not possible for DaLI's author to single-handedly add support for everything. For this reason DaLI has been imagined as a community effort and designed with a robust data loader plugin infrastructure, allowing people to contribute plugins for new exchanges and wallets with minimal work. The plugin API is encapsulated and well defined: this makes it easy for new coders to enter the project.
+
+Here are a few pointers to start working on a plugin:
+* [contributing guidelines](../CONTRIBUTING.md#contributing-to-the-repository);
+* plugin development is described in the [developer documentation](../README.dev.md), in particular read the [Dali Internals](../README.dev.md#dali-internals) and [Plugin Development](../README.dev.md#plugin-development) sections, which contain all the information needed to build a new data loader plugin;
+* before submitting a PR double-check the [DaLI Plugin Laundry List](../README.dev.md#plugin-laundry-list);
+* the [Coinbase plugin](../src/dali/plugin/input/rest/coinbase.py) can be used as an example for REST-based plugins, the [Trezor plugin](../src/dali/plugin/input/csv/trezor.py) for CSV-based plugins.
+
+Also check [open issues](https://github.com/eprbell/dali-rp2/issues), or open a new one, if needed.
+
+Finally read the question on [how to represent transactions for unsupported exchanges and wallets](#how-to-represent-transactions-from-unsupported-exchanges-and-wallets).
 
 ### How to Represent Transactions from Unsupported Exchanges and Wallets?
 The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be used for this purpose.
