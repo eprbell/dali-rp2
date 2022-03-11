@@ -16,6 +16,7 @@
 jsonschema
 pyexcel-ezodf
 python-dateutil
+pytz
 requests
 rp2
 yfinance

@@ -19,6 +19,7 @@ import logging
 from csv import reader
 from typing import List
 
+import pytz
 from dateutil.parser import parse
 from dateutil.tz import gettz
 from rp2.logger import create_logger
@@ -57,9 +58,10 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder)
         self.__account_nickname: str = account_nickname
         self.__currency: str = currency
-        self.__timezone_value = gettz(timezone)
-        if not self.__timezone_value:
+        timezone = timezone.strip()
+        if not timezone in pytz.all_timezones_set:
             raise Exception(f"Unrecognized timezone {timezone}")
+        self.__timezone_value = pytz.timezone(timezone)
         self.__csv_file: str = csv_file
 
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR_OLD}/{currency}/{self.__account_nickname}/{self.account_holder}")
