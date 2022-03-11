@@ -98,6 +98,7 @@ class FromToCurrencyPair(NamedTuple):
     from_currency: str
     to_currency: str
 
+
 class InputPlugin(AbstractInputPlugin):
 
     __API_URL: str = "https://api.pro.coinbase.com/"

@@ -28,7 +28,6 @@ class StringAndDatetime(NamedTuple):
 
 
 class AbstractTransaction:
-
     @classmethod
     def _validate_string_field(cls, name: str, value: str, raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> str:
         if not isinstance(name, str):
