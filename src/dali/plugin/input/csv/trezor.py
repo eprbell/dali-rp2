@@ -61,6 +61,8 @@ class InputPlugin(AbstractInputPlugin):
         if not timezone in pytz.all_timezones_set:
             raise Exception(f"Unrecognized timezone {timezone}")
         self.__timezone_value = pytz.timezone(timezone)
+        if not self.__timezone_value:
+            raise Exception(f"Timezone is None")
         self.__csv_file: str = csv_file
 
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
