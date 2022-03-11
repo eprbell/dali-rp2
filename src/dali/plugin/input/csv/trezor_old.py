@@ -62,7 +62,8 @@ class InputPlugin(AbstractInputPlugin):
         if not timezone in pytz.all_timezones_set:
             raise Exception(f"Unrecognized timezone {timezone}")
         self.__timezone_value = pytz.timezone(timezone)
-        print(self.__timezone_value)
+        if not self.__timezone_value:
+            raise Exception(f"Timezone is None")
         self.__csv_file: str = csv_file
 
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR_OLD}/{currency}/{self.__account_nickname}/{self.account_holder}")
@@ -83,7 +84,7 @@ class InputPlugin(AbstractInputPlugin):
                 timestamp: str = f"{line[self.__DATE_INDEX]} {line[self.__TIME_INDEX]}"
                 timestamp_value: datetime
                 try:
-                    timestamp_value = parse(timestamp)
+                    timestamp_value = parse(timestamp, ignoretz=True)
                 except Exception as exc:
                     raise Exception(f"Internal error parsing datetime: {timestamp}\n{raw_data}\n{str(exc)}") from exc
                 timestamp_value = timestamp_value.astimezone(self.__timezone_value)

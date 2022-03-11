@@ -83,7 +83,7 @@ class InputPlugin(AbstractInputPlugin):
                 timestamp: str = line[self.__TIMESTAMP_INDEX]
                 timestamp_value: datetime
                 try:
-                    timestamp_value = parse(timestamp)
+                    timestamp_value = parse(timestamp, ignoretz=True)
                 except Exception as exc:
                     raise Exception(f"Internal error parsing datetime: {timestamp}\n{raw_data}\n{str(exc)}") from exc
                 timestamp_value = timestamp_value.astimezone(self.__timezone_value)
