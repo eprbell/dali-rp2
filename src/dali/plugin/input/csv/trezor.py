@@ -14,10 +14,13 @@
 
 # CSV Format: timestamp; type; transaction_id; address; fee; total
 
+from datetime import datetime
 import logging
 from csv import reader
 from typing import List
 
+from dateutil.parser import parse
+from dateutil.tz import gettz
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal, ZERO
 
@@ -52,9 +55,12 @@ class InputPlugin(AbstractInputPlugin):
     ) -> None:
 
         super().__init__(account_holder)
+
         self.__account_nickname: str = account_nickname
         self.__currency: str = currency
-        self.__timezone: str = timezone
+        self.__timezone_value = gettz(timezone)
+        if not self.__timezone_value:
+            raise Exception(f"Unrecognized timezone {timezone}")
         self.__csv_file: str = csv_file
 
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
@@ -72,6 +78,13 @@ class InputPlugin(AbstractInputPlugin):
                     header_found = True
                     self.__logger.debug("Header: %s", raw_data)
                     continue
+                timestamp: str = line[self.__TIMESTAMP_INDEX]
+                timestamp_value: datetime
+                try:
+                    timestamp_value = parse(timestamp)
+                except Exception as exc:
+                    raise Exception(f"Internal error parsing datetime: {timestamp}\n{raw_data}\n{str(exc)}") from exc
+                timestamp_value = timestamp_value.astimezone(self.__timezone_value)
                 self.__logger.debug("Transaction: %s", raw_data)
                 transaction_type: str = line[self.__TYPE_INDEX]
                 spot_price: str = Keyword.UNKNOWN.value
@@ -81,22 +94,22 @@ class InputPlugin(AbstractInputPlugin):
 
                 if total_number == ZERO and fee_number > ZERO:
                     self.__logger.warning("Possible dusting attack (fee > 0, total = 0): %s", raw_data)
-                else:
-                    result.append(
-                        IntraTransaction(
-                            self.__TREZOR,
-                            crypto_hash,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} {self.__timezone}",
-                            self.__currency,
-                            self.__account_nickname if transaction_type == _SENT else Keyword.UNKNOWN.value,
-                            self.account_holder if transaction_type == _SENT else Keyword.UNKNOWN.value,
-                            self.__account_nickname if transaction_type == _RECV else Keyword.UNKNOWN.value,
-                            self.account_holder if transaction_type == _RECV else Keyword.UNKNOWN.value,
-                            spot_price,
-                            str(total_number + fee_number) if transaction_type == _SENT else Keyword.UNKNOWN.value,
-                            str(total_number) if transaction_type == _RECV else Keyword.UNKNOWN.value,
-                        )
+                    continue
+                result.append(
+                    IntraTransaction(
+                        self.__TREZOR,
+                        crypto_hash,
+                        raw_data,
+                        timestamp_value.strftime("%Y-%m-%d %H:%M:%S %z"),
+                        self.__currency,
+                        self.__account_nickname if transaction_type == _SENT else Keyword.UNKNOWN.value,
+                        self.account_holder if transaction_type == _SENT else Keyword.UNKNOWN.value,
+                        self.__account_nickname if transaction_type == _RECV else Keyword.UNKNOWN.value,
+                        self.account_holder if transaction_type == _RECV else Keyword.UNKNOWN.value,
+                        spot_price,
+                        str(total_number + fee_number) if transaction_type == _SENT else Keyword.UNKNOWN.value,
+                        str(total_number) if transaction_type == _RECV else Keyword.UNKNOWN.value,
                     )
+                )
 
         return result
