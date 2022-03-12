@@ -14,6 +14,10 @@
 
 # RP2 Change Log
 
+## 0.3.18
+* fixed a limitation in timestamp processing in Trezor and Trezor Old plugins. The timezone that was passed to the plugin constructor could only be an ISO 8601 format offset: something like "America/Los Angeles" would not be accepted. This caused problems with daylight saving timestamps in Trezor CSV files: daylight savings time would just be ignored, thus causing Trezor summer timestamps to be 1 hour off
+* updated input, input/golden, config and docs/configuration_file.md to reflect the above fix
+
 ## v0.3.17
 * added new FAQ on adding support for new wallets and exchanges
 * minor fixes

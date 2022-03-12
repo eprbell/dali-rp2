@@ -14,10 +14,12 @@
 
 # CSV Format: timestamp; type; transaction_id; address; fee; total
 
+from datetime import datetime
 import logging
 from csv import reader
 from typing import List
 
+import pytz
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal, ZERO
 
@@ -54,7 +56,7 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder)
         self.__account_nickname: str = account_nickname
         self.__currency: str = currency
-        self.__timezone: str = timezone
+        self.__timezone = pytz.timezone(timezone)
         self.__csv_file: str = csv_file
 
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
@@ -72,6 +74,9 @@ class InputPlugin(AbstractInputPlugin):
                     header_found = True
                     self.__logger.debug("Header: %s", raw_data)
                     continue
+                timestamp: str = line[self.__TIMESTAMP_INDEX]
+                timestamp_value = datetime.strptime(timestamp, "%m/%d/%Y, %H:%M:%S %p")
+                timestamp_value = self.__timezone.normalize(self.__timezone.localize(timestamp_value))
                 self.__logger.debug("Transaction: %s", raw_data)
                 transaction_type: str = line[self.__TYPE_INDEX]
                 spot_price: str = Keyword.UNKNOWN.value
@@ -87,7 +92,7 @@ class InputPlugin(AbstractInputPlugin):
                             self.__TREZOR,
                             crypto_hash,
                             raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} {self.__timezone}",
+                            f"{timestamp_value}",
                             self.__currency,
                             self.__account_nickname if transaction_type == _SENT else Keyword.UNKNOWN.value,
                             self.account_holder if transaction_type == _SENT else Keyword.UNKNOWN.value,
