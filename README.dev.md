@@ -33,7 +33,7 @@
   * [Design Guidelines](#design-guidelines)
   * [Development Workflow](#development-workflow)
   * [Unit Tests](#unit-tests)
-* **[DaLI Internals](#dali-internals)**
+* **[Internal Design](#internal-design)**
   * [Plugin Development](#plugin-development)
   * [Plugin Laundry List](#plugin-laundry-list)
 * **[Frequently Asked Developer Questions](#frequently-asked-developer-questions)**
@@ -171,7 +171,7 @@ LOG_LEVEL=DEBUG bin/dali -s -o output/ config/test_config.ini
 ### Unit Tests
 Unit tests are in the [tests](tests) directory. Please add unit tests for any new code.
 
-## DaLI Internals
+## Internal Design
 DaLI's control flow is as follows (see [dali_main.py](src/dali/dali_main.py)):
 * parse the INI configuration file which includes data loader plugin initialization parameters and global configuration sections;
 * instantiate data loader plugins using the initialization parameters from the config file and call their load() method, which reads data from native sources (CSV files or REST endpoints) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
