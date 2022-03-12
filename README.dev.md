@@ -172,7 +172,7 @@ LOG_LEVEL=DEBUG bin/dali -s -o output/ config/test_config.ini
 Unit tests are in the [tests](tests) directory. Please add unit tests for any new code.
 
 ## DaLI Internals
-The DaLI top-level function is in [dali_main.py](src/dali/dali_main.py). It performs the following operations:
+DaLI's control flow is as follows (see [dali_main.py](src/dali/dali_main.py)):
 * parse the INI configuration file which includes data loader plugin initialization parameters and global configuration sections;
 * instantiate data loader plugins using the initialization parameters from the config file and call their load() method, which reads data from native sources (CSV files or REST endpoints) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
 * join the lists returned by plugin load() calls and pass them to the [transaction resolver](src/dali/transaction_resolver.py), which has the purpose of merging incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
@@ -221,11 +221,11 @@ When submitting a new data loader plugin open a [PR](https://github.com/eprbell/
     ```
     super().__init__(account_holder)
     ```
-9. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameter to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
+9. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameters to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
     ```
-10. the plugin uses self.__logger.debug() throughout its code to capture all native-format data (this will occur only if the user sets `LOG_LEVEL=DEBUG` and it will be useful for debugging);
+10. the plugin uses `self.__logger.debug()` throughout its code to capture all native-format data (which is is useful for debugging). Note that `logger.debug()` calls only occur if the user sets `LOG_LEVEL=DEBUG`;
 11. CSV plugins have one or more [unit test](tests/);
 12. REST plugins have one or more [unit tests](tests/), if possible;
 13. plugin initialization parameters are documented in [docs/configuration_file.md](docs/configuration_file.md#data-loader-plugin-sections).
