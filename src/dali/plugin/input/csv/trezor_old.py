@@ -14,9 +14,9 @@
 
 # CSV Format: date, time, transaction_id, address, type, value, total, balance
 
-from datetime import datetime
 import logging
 from csv import reader
+from datetime import datetime
 from typing import List
 
 import pytz
@@ -56,7 +56,7 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder)
         self.__account_nickname: str = account_nickname
         self.__currency: str = currency
-        self.__timezone: pytz.timezone(timezone)
+        self.__timezone = pytz.timezone(timezone)
         self.__csv_file: str = csv_file
 
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR_OLD}/{currency}/{self.__account_nickname}/{self.account_holder}")
@@ -75,7 +75,7 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.debug("Header: %s", raw_data)
                     continue
                 timestamp: str = f"{line[self.__DATE_INDEX]} {line[self.__TIME_INDEX]}"
-                timestamp_value = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+                timestamp_value: datetime = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
                 timestamp_value = self.__timezone.normalize(self.__timezone.localize(timestamp_value))
                 self.__logger.debug("Transaction: %s", raw_data)
                 transaction_type: str = line[self.__TYPE_INDEX]

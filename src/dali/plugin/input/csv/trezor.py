@@ -14,14 +14,14 @@
 
 # CSV Format: timestamp; type; transaction_id; address; fee; total
 
-from datetime import datetime
 import logging
 from csv import reader
+from datetime import datetime
 from typing import List
 
 import pytz
 from rp2.logger import create_logger
-from rp2.rp2_decimal import RP2Decimal, ZERO
+from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -75,7 +75,7 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.debug("Header: %s", raw_data)
                     continue
                 timestamp: str = line[self.__TIMESTAMP_INDEX]
-                timestamp_value = datetime.strptime(timestamp, "%m/%d/%Y, %H:%M:%S %p")
+                timestamp_value: datetime = datetime.strptime(timestamp, "%m/%d/%Y, %H:%M:%S %p")
                 timestamp_value = self.__timezone.normalize(self.__timezone.localize(timestamp_value))
                 self.__logger.debug("Transaction: %s", raw_data)
                 transaction_type: str = line[self.__TYPE_INDEX]
