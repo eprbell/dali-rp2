@@ -26,8 +26,8 @@ from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
 from dali.config_generator import generate_config_file
 from dali.dali_configuration import (
-    DIRECTION_2_TRANSACTION_TYPE_SET,
     DEFAULT_CONFIGURATION,
+    DIRECTION_2_TRANSACTION_TYPE_SET,
     DIRECTION_SET,
     Keyword,
     is_builtin_section_name,

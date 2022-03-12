@@ -21,7 +21,12 @@ import ezodf
 from rp2.rp2_error import RP2TypeError
 
 from dali.abstract_transaction import AbstractTransaction
-from dali.dali_configuration import Keyword, is_crypto_field, is_fiat_field, is_internal_field
+from dali.dali_configuration import (
+    Keyword,
+    is_crypto_field,
+    is_fiat_field,
+    is_internal_field,
+)
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
