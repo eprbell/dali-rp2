@@ -14,11 +14,11 @@
 
 import os
 import shutil
+import unittest
+from pathlib import Path
 from subprocess import run
 from typing import List
-import unittest
 
-from pathlib import Path
 from ods_diff import ods_diff
 
 ROOT_PATH: Path = Path(os.path.dirname(__file__)).parent.absolute()

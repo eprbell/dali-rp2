@@ -18,7 +18,7 @@ from typing import Any, Dict, List, NamedTuple, Optional
 
 import yfinance as yf  # type: ignore
 from rp2.rp2_decimal import RP2Decimal
-from rp2.rp2_error import RP2ValueError, RP2TypeError
+from rp2.rp2_error import RP2TypeError, RP2ValueError
 
 from dali.abstract_transaction import AbstractTransaction
 from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none

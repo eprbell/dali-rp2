@@ -31,7 +31,7 @@ from requests.auth import AuthBase
 from requests.models import Response
 from requests.sessions import Session
 from rp2.logger import create_logger
-from rp2.rp2_decimal import RP2Decimal, ZERO
+from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -40,7 +40,6 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 from dali.transaction_resolver import AssetAndUniqueId
-
 
 # Native format keywords
 _AMOUNT: str = "amount"
