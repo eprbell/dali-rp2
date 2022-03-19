@@ -45,19 +45,22 @@ def _row_as_string(row: Any) -> str:
 
 def _parse_cell_value(cell: Any) -> Any:
     value: Any
-    try:
-        if cell.formula:
-            value = cell.formula
-            if _PURGE_HYPERLIKS and value.startswith("=HYPERLINK"):
-                value = value.split(";")[1].lstrip(' "').rstrip('")')
-        elif cell.value or cell.value == 0:
-            value = round(float(cell.value), CRYPTO_DECIMALS)
-            if value == -0.0:
-                value = 0
-        else:
-            value = ""
-    except ValueError:
+    if cell.formula:
+        value = cell.formula
+        if _PURGE_HYPERLIKS and value.startswith("=HYPERLINK"):
+            value = value.split(";")[1].lstrip(' "').rstrip('")')
+    elif cell.value or cell.value == 0:
         value = cell.value
+    else:
+        value = ""
+    try:
+        value = round(float(value), CRYPTO_DECIMALS)
+        if value == -0.0:
+            value = 0
+    except ValueError:
+        pass
+    if value is None:
+        value = ""
 
     return value
 
