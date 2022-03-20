@@ -75,7 +75,7 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.debug("Header: %s", raw_data)
                     continue
                 timestamp: str = line[self.__TIMESTAMP_INDEX]
-                timestamp_value: datetime = datetime.strptime(timestamp, "%m/%d/%Y, %H:%M:%S %p")
+                timestamp_value: datetime = datetime.strptime(timestamp, "%m/%d/%Y, %I:%M:%S %p")
                 timestamp_value = self.__timezone.normalize(self.__timezone.localize(timestamp_value))
                 self.__logger.debug("Transaction: %s", raw_data)
                 transaction_type: str = line[self.__TYPE_INDEX]
