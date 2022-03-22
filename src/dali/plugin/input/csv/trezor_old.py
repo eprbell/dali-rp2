@@ -83,18 +83,19 @@ class InputPlugin(AbstractInputPlugin):
                 crypto_hash: str = line[self.__TRANSACTION_ID_INDEX]
                 result.append(
                     IntraTransaction(
-                        self.__TREZOR_OLD,
-                        crypto_hash,
-                        raw_data,
-                        f"{timestamp_value}",
-                        self.__currency,
-                        self.__account_nickname if transaction_type == _OUT else Keyword.UNKNOWN.value,
-                        self.account_holder if transaction_type == _OUT else Keyword.UNKNOWN.value,
-                        self.__account_nickname if transaction_type == _IN else Keyword.UNKNOWN.value,
-                        self.account_holder if transaction_type == _IN else Keyword.UNKNOWN.value,
-                        spot_price,
-                        str(-RP2Decimal(line[self.__TOTAL_INDEX])) if transaction_type == _OUT else Keyword.UNKNOWN.value,
-                        line[self.__TOTAL_INDEX] if transaction_type == _IN else Keyword.UNKNOWN.value,
+                        plugin=self.__TREZOR_OLD,
+                        unique_id=crypto_hash,
+                        raw_data=raw_data,
+                        timestamp=f"{timestamp_value}",
+                        asset=self.__currency,
+                        from_exchange=self.__account_nickname if transaction_type == _OUT else Keyword.UNKNOWN.value,
+                        from_holder=self.account_holder if transaction_type == _OUT else Keyword.UNKNOWN.value,
+                        to_exchange=self.__account_nickname if transaction_type == _IN else Keyword.UNKNOWN.value,
+                        to_holder=self.account_holder if transaction_type == _IN else Keyword.UNKNOWN.value,
+                        spot_price=spot_price,
+                        crypto_sent=str(-RP2Decimal(line[self.__TOTAL_INDEX])) if transaction_type == _OUT else Keyword.UNKNOWN.value,
+                        crypto_received=line[self.__TOTAL_INDEX] if transaction_type == _IN else Keyword.UNKNOWN.value,
+                        notes=None,
                     )
                 )
 
