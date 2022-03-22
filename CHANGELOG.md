@@ -17,7 +17,7 @@
 ## 0.3.20
 * fixed a bug in transaction resolver: IN -> IN transaction hint was assigning wrong value to fiat_fee
 * fixed a bug in Coinbase plugin: receiving a crypto gift from another Coinbase user generated a transaction with wrong fiat_in_with_fee value
-* made use of latest RP2 features: specifically fee-only transactions and crypto_fee in in-transactions. E.g.: Coinbase Pro coin swap code, transaction resolver INTRA -> OUT transaction hint application, etc.
+* reworked some of the code to use latest RP2 features: specifically fee-only transactions and crypto_fee in in-transactions. E.g.: Coinbase Pro coin swap code, transaction resolver INTRA -> OUT transaction hint application, etc.
 * DaLI output file (the RP2 input file) now has in-transaction crypto_fee. Also updated unit test golden file
 * refactored all transaction constructor calls to use keyword arg calling style
 * updated setup.cfg dependencies to latest RP2
