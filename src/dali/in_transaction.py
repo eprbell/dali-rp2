@@ -39,9 +39,10 @@ class InTransaction(AbstractTransaction):
         transaction_type: str,
         spot_price: str,
         crypto_in: str,
-        fiat_fee: str,
+        crypto_fee: Optional[str] = None,
         fiat_in_no_fee: Optional[str] = None,
         fiat_in_with_fee: Optional[str] = None,
+        fiat_fee: Optional[str] = None,
         notes: Optional[str] = None,
         is_spot_price_from_web: Optional[bool] = None,
     ) -> None:
@@ -52,13 +53,18 @@ class InTransaction(AbstractTransaction):
         self.__transaction_type: str = self._validate_transaction_type_field(Keyword.TRANSACTION_TYPE.value, transaction_type, raw_data)
         self.__spot_price: str = self._validate_numeric_field(Keyword.SPOT_PRICE.value, spot_price, raw_data, disallow_empty=True, disallow_unknown=False)
         self.__crypto_in: str = self._validate_numeric_field(Keyword.CRYPTO_IN.value, crypto_in, raw_data, disallow_empty=True, disallow_unknown=True)
-        self.__fiat_fee: str = self._validate_numeric_field(Keyword.FIAT_FEE.value, fiat_fee, raw_data, disallow_empty=True, disallow_unknown=True)
+        self.__crypto_fee: Optional[str] = self._validate_optional_numeric_field(Keyword.CRYPTO_FEE.value, crypto_fee, raw_data, disallow_empty=False, disallow_unknown=True)
         self.__fiat_in_no_fee: Optional[str] = self._validate_optional_numeric_field(
             Keyword.FIAT_IN_NO_FEE.value, fiat_in_no_fee, raw_data, disallow_empty=False, disallow_unknown=True
         )
         self.__fiat_in_with_fee: Optional[str] = self._validate_optional_numeric_field(
             Keyword.FIAT_IN_WITH_FEE.value, fiat_in_with_fee, raw_data, disallow_empty=False, disallow_unknown=True
         )
+        self.__fiat_fee: str = self._validate_optional_numeric_field(Keyword.FIAT_FEE.value, fiat_fee, raw_data, disallow_empty=False, disallow_unknown=True)
+
+        if self.__crypto_fee is not None and self.__fiat_fee is not None:
+            raise Exception(f"Internal error: both 'crypto_fee' and 'fiat_fee' are defined, instead of only one: their values are {crypto_fee} and {fiat_fee} respectively")
+
         self.__constructor_parameter_dictionary: Dict[str, Union[str, bool, Optional[str], Optional[bool]]] = {}
         self.__is_unresolved: bool = self._setup_constructor_parameter_dictionary(self.__constructor_parameter_dictionary)
 
@@ -105,6 +111,10 @@ class InTransaction(AbstractTransaction):
         return self.__crypto_in
 
     @property
+    def crypto_fee(self) -> str:
+        return self.__crypto_fee
+
+    @property
     def fiat_in_no_fee(self) -> Optional[str]:
         return self.__fiat_in_no_fee
 
@@ -115,6 +125,11 @@ class InTransaction(AbstractTransaction):
     @property
     def fiat_fee(self) -> str:
         return self.__fiat_fee
+
+    # Returns True if crypto fee was passed in to the constructor, False otherwise
+    @property
+    def is_crypto_fee_defined(self) -> bool:
+        return self.crypto_fee is not None
 
     @property
     def is_unresolved(self) -> bool:
