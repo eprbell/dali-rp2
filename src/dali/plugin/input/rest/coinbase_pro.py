@@ -354,31 +354,11 @@ class InputPlugin(AbstractInputPlugin):
                     transaction_type="Buy",
                     spot_price=str(to_currency_price),
                     crypto_in=str(to_currency_size),
-                    crypto_fee=None,
+                    crypto_fee=str(crypto_fee),
                     fiat_in_no_fee=None,
                     fiat_in_with_fee=None,
                     fiat_fee=None,
                     notes=f"Buy side of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
-                ),
-            )
-            self.__append_transaction(
-                cast(List[AbstractTransaction], out_transaction_list),
-                OutTransaction(
-                    plugin=self.__COINBASE_PRO,
-                    unique_id=f"{unique_id}/fee",
-                    raw_data=json.dumps(transaction),
-                    timestamp=fill[_CREATED_AT],
-                    asset=to_currency,
-                    exchange=self.__COINBASE_PRO,
-                    holder=self.account_holder,
-                    transaction_type="Sell",
-                    spot_price=str(to_currency_price),
-                    crypto_out_no_fee=str(crypto_fee),
-                    crypto_fee="0",
-                    crypto_out_with_fee=None,
-                    fiat_out_no_fee=None,
-                    fiat_fee=None,
-                    notes=f"Fee of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
                 ),
             )
 
