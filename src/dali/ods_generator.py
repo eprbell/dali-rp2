@@ -74,9 +74,10 @@ _TABLE_TO_HEADER: Dict[str, Dict[str, str]] = {
         Keyword.TRANSACTION_TYPE.value: "Transaction Type",
         Keyword.SPOT_PRICE.value: "Spot Price",
         Keyword.CRYPTO_IN.value: "Crypto In",
-        Keyword.FIAT_FEE.value: "USD Fee",
+        Keyword.CRYPTO_FEE.value: "Crypto Fee",
         Keyword.FIAT_IN_NO_FEE.value: "USD In No Fee",
         Keyword.FIAT_IN_WITH_FEE.value: "USD In With Fee",
+        Keyword.FIAT_FEE.value: "USD Fee",
         Keyword.NOTES.value: "Notes",
     },
     _OUT: {
