@@ -175,52 +175,52 @@ class InputPlugin(AbstractInputPlugin):
         if transaction_type == _PRO_WITHDRAWAL:
             intra_transaction_list.append(
                 IntraTransaction(
-                    self.__COINBASE,
-                    transaction[_ID],
-                    json.dumps(transaction),
-                    transaction[_CREATED_AT],
-                    currency,
-                    self.__COINBASE_PRO,
-                    self.account_holder,
-                    self.__COINBASE,
-                    self.account_holder,
-                    None,  # Spot price
-                    str(amount),
-                    str(amount),
+                    plugin=self.__COINBASE,
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=transaction[_CREATED_AT],
+                    asset=currency,
+                    from_exchange=self.__COINBASE_PRO,
+                    from_holder=self.account_holder,
+                    to_exchange=self.__COINBASE,
+                    to_holder=self.account_holder,
+                    spot_price=None,
+                    crypto_sent=str(amount),
+                    crypto_received=str(amount),
                 )
             )
         elif transaction_type == _PRO_DEPOSIT:
             intra_transaction_list.append(
                 IntraTransaction(
-                    self.__COINBASE,
-                    transaction[_ID],
-                    json.dumps(transaction),
-                    transaction[_CREATED_AT],
-                    currency,
-                    self.__COINBASE,
-                    self.account_holder,
-                    self.__COINBASE_PRO,
-                    self.account_holder,
-                    None,  # Spot price
-                    str(-amount),
-                    str(-amount),
+                    plugin=self.__COINBASE,
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=transaction[_CREATED_AT],
+                    asset=currency,
+                    from_exchange=self.__COINBASE,
+                    from_holder=self.account_holder,
+                    to_exchange=self.__COINBASE_PRO,
+                    to_holder=self.account_holder,
+                    spot_price=None,
+                    crypto_sent=str(-amount),
+                    crypto_received=str(-amount),
                 )
             )
         elif transaction_type == _EXCHANGE_DEPOSIT:
             intra_transaction_list.append(
                 IntraTransaction(
-                    self.__COINBASE,
-                    transaction[_ID],
-                    json.dumps(transaction),
-                    transaction[_CREATED_AT],
-                    currency,
-                    self.__COINBASE,
-                    self.account_holder,
-                    self.__COINBASE_PRO,
-                    self.account_holder,
-                    None,  # Spot price
-                    str(-amount),
-                    str(-amount),
+                    plugin=self.__COINBASE,
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=transaction[_CREATED_AT],
+                    asset=currency,
+                    from_exchange=self.__COINBASE,
+                    from_holder=self.account_holder,
+                    to_exchange=self.__COINBASE_PRO,
+                    to_holder=self.account_holder,
+                    spot_price=None,
+                    crypto_sent=str(-amount),
+                    crypto_received=str(-amount),
                 )
             )
         elif transaction_type == _SEND:
@@ -236,38 +236,38 @@ class InputPlugin(AbstractInputPlugin):
                     # Outgoing gift to another Coinbase user
                     out_transaction_list.append(
                         OutTransaction(
-                            self.__COINBASE,
-                            transaction[_ID],
-                            json.dumps(transaction),
-                            transaction[_CREATED_AT],
-                            currency,
-                            self.__COINBASE,
-                            self.account_holder,
-                            "Gift",
-                            str(native_amount / amount),
-                            str(-amount),
-                            "0",
-                            str(-amount),
-                            str(-native_amount),
-                            "0",
-                            f"To: {transaction[_TO][_EMAIL]}",
+                            plugin=self.__COINBASE,
+                            unique_id=transaction[_ID],
+                            raw_data=json.dumps(transaction),
+                            timestamp=transaction[_CREATED_AT],
+                            asset=currency,
+                            exchange=self.__COINBASE,
+                            holder=self.account_holder,
+                            transaction_type="Gift",
+                            spot_price=str(native_amount / amount),
+                            crypto_out_no_fee=str(-amount),
+                            crypto_fee="0",
+                            crypto_out_with_fee=str(-amount),
+                            fiat_out_no_fee=str(-native_amount),
+                            fiat_fee="0",
+                            notes=f"To: {transaction[_TO][_EMAIL]}",
                         )
                     )
                 else:
                     intra_transaction_list.append(
                         IntraTransaction(
-                            self.__COINBASE,
-                            crypto_hash,
-                            json.dumps(transaction),
-                            transaction[_CREATED_AT],
-                            currency,
-                            self.__COINBASE,
-                            self.account_holder,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            str(native_amount / amount),
-                            str(-amount),
-                            Keyword.UNKNOWN.value,
+                            plugin=self.__COINBASE,
+                            unique_id=crypto_hash,
+                            raw_data=json.dumps(transaction),
+                            timestamp=transaction[_CREATED_AT],
+                            asset=currency,
+                            from_exchange=self.__COINBASE,
+                            from_holder=self.account_holder,
+                            to_exchange=Keyword.UNKNOWN.value,
+                            to_holder=Keyword.UNKNOWN.value,
+                            spot_price=str(native_amount / amount),
+                            crypto_sent=str(-amount),
+                            crypto_received=Keyword.UNKNOWN.value,
                         )
                     )
             else:
@@ -276,57 +276,59 @@ class InputPlugin(AbstractInputPlugin):
                         # Incoming gift from another Coinbase user
                         in_transaction_list.append(
                             InTransaction(
-                                self.__COINBASE,
-                                transaction[_ID],
-                                json.dumps(transaction),
-                                transaction[_CREATED_AT],
-                                currency,
-                                self.__COINBASE,
-                                self.account_holder,
-                                "Income",
-                                str(native_amount / amount),
-                                transaction[_AMOUNT][_AMOUNT],
-                                "0",
-                                str(native_amount),
-                                "0",
-                                f"From: {transaction[_FROM][_EMAIL]}",
+                                plugin=self.__COINBASE,
+                                unique_id=transaction[_ID],
+                                raw_data=json.dumps(transaction),
+                                timestamp=transaction[_CREATED_AT],
+                                asset=currency,
+                                exchange=self.__COINBASE,
+                                holder=self.account_holder,
+                                transaction_type="Income",
+                                spot_price=str(native_amount / amount),
+                                crypto_in=transaction[_AMOUNT][_AMOUNT],
+                                crypto_fee=None,
+                                fiat_in_no_fee=str(native_amount),
+                                fiat_in_with_fee=str(native_amount),
+                                fiat_fee="0",
+                                notes=f"From: {transaction[_FROM][_EMAIL]}",
                             )
                         )
                     elif transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
                         # Coinbase Earn transactions
                         in_transaction_list.append(
                             InTransaction(
-                                self.__COINBASE,
-                                transaction[_ID],
-                                json.dumps(transaction),
-                                transaction[_CREATED_AT],
-                                currency,
-                                self.__COINBASE,
-                                self.account_holder,
-                                "Income",
-                                str(native_amount / amount),
-                                transaction[_AMOUNT][_AMOUNT],
-                                "0",
-                                str(native_amount),
-                                str(native_amount),
-                                "Coinbase EARN",
+                                plugin=self.__COINBASE,
+                                unique_id=transaction[_ID],
+                                raw_data=json.dumps(transaction),
+                                timestamp=transaction[_CREATED_AT],
+                                asset=currency,
+                                exchange=self.__COINBASE,
+                                holder=self.account_holder,
+                                transaction_type="Income",
+                                spot_price=str(native_amount / amount),
+                                crypto_in=transaction[_AMOUNT][_AMOUNT],
+                                crypto_fee=None,
+                                fiat_in_no_fee=str(native_amount),
+                                fiat_in_with_fee=str(native_amount),
+                                fiat_fee="0",
+                                notes="Coinbase EARN",
                             )
                         )
                 else:
                     intra_transaction_list.append(
                         IntraTransaction(
-                            self.__COINBASE,
-                            crypto_hash,
-                            json.dumps(transaction),
-                            transaction[_CREATED_AT],
-                            currency,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            self.__COINBASE,
-                            self.account_holder,
-                            str(native_amount / amount),
-                            Keyword.UNKNOWN.value,
-                            str(amount),
+                            plugin=self.__COINBASE,
+                            unique_id=crypto_hash,
+                            raw_data=json.dumps(transaction),
+                            timestamp=transaction[_CREATED_AT],
+                            asset=currency,
+                            from_exchange=Keyword.UNKNOWN.value,
+                            from_holder=Keyword.UNKNOWN.value,
+                            to_exchange=self.__COINBASE,
+                            to_holder=self.account_holder,
+                            spot_price=str(native_amount / amount),
+                            crypto_sent=Keyword.UNKNOWN.value,
+                            crypto_received=str(amount),
                         )
                     )
 
@@ -359,20 +361,21 @@ class InputPlugin(AbstractInputPlugin):
                 spot_price = RP2Decimal(buy[_UNIT_PRICE][_AMOUNT])
             in_transaction_list.append(
                 InTransaction(
-                    self.__COINBASE,
-                    transaction[_ID],
-                    json.dumps(transaction),
-                    transaction[_CREATED_AT],
-                    currency,
-                    self.__COINBASE,
-                    self.account_holder,
-                    "Buy",
-                    str(spot_price),
-                    str(crypto_amount),
-                    str(fiat_fee),
-                    str(native_amount - fiat_fee),
-                    str(native_amount),
-                    None,  # Add notes
+                    plugin=self.__COINBASE,
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=transaction[_CREATED_AT],
+                    asset=currency,
+                    exchange=self.__COINBASE,
+                    holder=self.account_holder,
+                    transaction_type="Buy",
+                    spot_price=str(spot_price),
+                    crypto_in=str(crypto_amount),
+                    crypto_fee=None,
+                    fiat_in_no_fee=str(native_amount - fiat_fee),
+                    fiat_in_with_fee=str(native_amount),
+                    fiat_fee=str(fiat_fee),
+                    notes=None,  # Add notes
                 )
             )
         elif transaction_type == _SELL:
@@ -382,21 +385,21 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.debug("Sell: %s", json.dumps(sell))
             out_transaction_list.append(
                 OutTransaction(
-                    self.__COINBASE,
-                    transaction[_ID],
-                    json.dumps(transaction),
-                    transaction[_CREATED_AT],
-                    currency,
-                    self.__COINBASE,
-                    self.account_holder,
-                    "Sell",
-                    str(spot_price),
-                    str(-crypto_amount - fiat_fee / spot_price),
-                    str(fiat_fee / spot_price),
-                    str(-crypto_amount),
-                    str(-native_amount),
-                    str(fiat_fee),
-                    None,  # Add notes
+                    plugin=self.__COINBASE,
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=transaction[_CREATED_AT],
+                    asset=currency,
+                    exchange=self.__COINBASE,
+                    holder=self.account_holder,
+                    transaction_type="Sell",
+                    spot_price=str(spot_price),
+                    crypto_out_no_fee=str(-crypto_amount - fiat_fee / spot_price),
+                    crypto_fee=str(fiat_fee / spot_price),
+                    crypto_out_with_fee=str(-crypto_amount),
+                    fiat_out_no_fee=str(-native_amount),
+                    fiat_fee=str(fiat_fee),
+                    notes=None,
                 )
             )
         else:
@@ -406,20 +409,21 @@ class InputPlugin(AbstractInputPlugin):
 
         in_transaction_list.append(
             InTransaction(
-                self.__COINBASE,
-                transaction[_ID],
-                json.dumps(transaction),
-                transaction[_CREATED_AT],
-                currency,
-                self.__COINBASE,
-                self.account_holder,
-                "Interest",
-                Keyword.UNKNOWN.value,
-                transaction[_AMOUNT][_AMOUNT],
-                "0",
-                None,
-                None,
-                None,
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=json.dumps(transaction),
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type="Interest",
+                spot_price=Keyword.UNKNOWN.value,
+                crypto_in=transaction[_AMOUNT][_AMOUNT],
+                crypto_fee=None,
+                fiat_in_no_fee=None,
+                fiat_in_with_fee=None,
+                fiat_fee="0",
+                notes=None,
             )
         )
 
