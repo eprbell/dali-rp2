@@ -357,7 +357,7 @@ class InputPlugin(AbstractInputPlugin):
                     crypto_fee=None,
                     fiat_in_no_fee=None,
                     fiat_in_with_fee=None,
-                    fiat_fee="0",
+                    fiat_fee=None,
                     notes=f"Buy side of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
                 ),
             )
