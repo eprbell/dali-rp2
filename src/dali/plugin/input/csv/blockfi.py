@@ -80,35 +80,35 @@ class InputPlugin(AbstractInputPlugin):
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
-                            self.__BLOCKFI,
-                            Keyword.UNKNOWN.value,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            line[self.__CURRENCY_INDEX],
-                            self.__BLOCKFI,
-                            self.account_holder,
-                            "Interest",
-                            Keyword.UNKNOWN.value,
-                            line[self.__AMOUNT_INDEX],
-                            "0",
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            exchange=self.__BLOCKFI,
+                            holder=self.account_holder,
+                            transaction_type="Interest",
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_in=line[self.__AMOUNT_INDEX],
+                            fiat_fee="0",
                         )
                     )
                 elif line[self.__TYPE_INDEX] == _CRYPTO_TRANSFER:
                     last_withdrawal_fee = None
                     result.append(
                         IntraTransaction(
-                            self.__BLOCKFI,
-                            Keyword.UNKNOWN.value,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            line[self.__CURRENCY_INDEX],
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            self.__BLOCKFI,
-                            self.account_holder,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            line[self.__AMOUNT_INDEX],
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            from_exchange=Keyword.UNKNOWN.value,
+                            from_holder=Keyword.UNKNOWN.value,
+                            to_exchange=self.__BLOCKFI,
+                            to_holder=self.account_holder,
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_sent=Keyword.UNKNOWN.value,
+                            crypto_received=line[self.__AMOUNT_INDEX],
                         )
                     )
                 elif line[self.__TYPE_INDEX] == _WITHDRAWAL:
@@ -119,18 +119,18 @@ class InputPlugin(AbstractInputPlugin):
                     last_withdrawal_fee = None
                     result.append(
                         IntraTransaction(
-                            self.__BLOCKFI,
-                            Keyword.UNKNOWN.value,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            line[self.__CURRENCY_INDEX],
-                            self.__BLOCKFI,
-                            self.account_holder,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            str(amount),
-                            Keyword.UNKNOWN.value,
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            from_exchange=self.__BLOCKFI,
+                            from_holder=self.account_holder,
+                            to_exchange=Keyword.UNKNOWN.value,
+                            to_holder=Keyword.UNKNOWN.value,
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_sent=str(amount),
+                            crypto_received=Keyword.UNKNOWN.value,
                         )
                     )
                 elif line[self.__TYPE_INDEX] == _WITHDRAWAL_FEE:
