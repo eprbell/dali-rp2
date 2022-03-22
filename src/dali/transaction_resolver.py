@@ -290,8 +290,8 @@ def _apply_transaction_hint(
             crypto_out_no_fee: RP2Decimal = RP2Decimal(transaction.crypto_sent)
             crypto_fee: RP2Decimal = ZERO
             if not is_unknown(transaction.crypto_received):
-                crypto_out_no_fee: RP2Decimal = RP2Decimal(transaction.crypto_received)
-                crypto_fee: RP2Decimal = RP2Decimal(transaction.crypto_sent) - RP2Decimal(transaction.crypto_received)
+                crypto_out_no_fee = RP2Decimal(transaction.crypto_received)
+                crypto_fee = RP2Decimal(transaction.crypto_sent) - RP2Decimal(transaction.crypto_received)
 
             result = OutTransaction(
                 plugin=transaction.plugin,

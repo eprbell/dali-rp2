@@ -14,7 +14,6 @@
 
 from datetime import datetime
 
-
 class _UTCclass:
     def __init__(self) -> None: ...
     def localize(self, dt: datetime) -> datetime: ...
