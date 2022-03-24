@@ -120,14 +120,13 @@ class InputPlugin(AbstractInputPlugin):
                     )
                 elif entry_type == _CRYPTO_TRANSFER:
                     last_withdrawal_fee = None
-                    asset = line[self.__CURRENCY_INDEX]
                     result.append(
                         IntraTransaction(
                             plugin=self.__BLOCKFI,
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            asset=asset,
+                            asset=line[self.__CURRENCY_INDEX],
                             from_exchange=Keyword.UNKNOWN.value,
                             from_holder=Keyword.UNKNOWN.value,
                             to_exchange=self.__BLOCKFI,
@@ -152,7 +151,7 @@ class InputPlugin(AbstractInputPlugin):
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_out_no_fee=str(-RP2Decimal(line[self.__AMOUNT_INDEX])),
                             crypto_fee="0",
-                            notes="ACH redrawal",
+                            notes="ACH withdrawal",
                         )
                     )
                 elif entry_type == _WITHDRAWAL:
