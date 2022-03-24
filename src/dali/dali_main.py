@@ -290,6 +290,14 @@ def _validate_plugin_configuration(ini_config: ConfigParser, plugin_name: str, c
 
     for parameter in constructor_signature.parameters:
         annotation: Any = constructor_signature.parameters[parameter].annotation
+        if getattr(annotation, '__origin__', None) is Union \
+                and len(annotation.__args__) == 2 \
+                and annotation.__args__[1] is type(None):
+            if ini_config[plugin_name].get(parameter) is not None:
+                annotation = annotation.__args__[0]
+            else:
+                result[parameter] = None
+                continue
         if annotation is str:
             result[parameter] = ini_config[plugin_name][parameter]
         elif annotation is int:

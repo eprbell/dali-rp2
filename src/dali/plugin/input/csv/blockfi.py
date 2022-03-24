@@ -27,11 +27,16 @@ from dali.abstract_transaction import AbstractTransaction
 from dali.dali_configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
+from dali.out_transaction import OutTransaction
 
 _CRYPTO_TRANSFER: str = "Crypto Transfer"
 _INTEREST_PAYMENT: str = "Interest Payment"
 _WITHDRAWAL: str = "Withdrawal"
 _WITHDRAWAL_FEE: str = "Withdrawal Fee"
+_TRADE: str = "Trade"
+_ACH_DEPOSIT: str = "Ach Deposit"
+_ACH_WITHDRAWAL: str = "Ach Withdrawal"
+_REFERRAL_BONUS: str = "Referral Bonus"
 
 
 class InputPlugin(AbstractInputPlugin):
@@ -50,11 +55,18 @@ class InputPlugin(AbstractInputPlugin):
         self,
         account_holder: str,
         csv_file: str,
+        addresses: Optional[str] = None,
+        trade_csv_file: Optional[str] = None,
     ) -> None:
 
         super().__init__(account_holder)
         self.__csv_file: str = csv_file
-
+        self.__trade_csv_file = trade_csv_file
+        self.__addresses = {}
+        if addresses:
+            for address in addresses.split(","):
+                (asset, addr) = address.split(":")
+                self.__addresses[asset.upper()] = addr
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")
 
     def load(self) -> List[AbstractTransaction]:
@@ -76,7 +88,8 @@ class InputPlugin(AbstractInputPlugin):
                 if last_withdrawal_fee is not None and line[self.__TYPE_INDEX] != _WITHDRAWAL:
                     raise Exception(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
 
-                if line[self.__TYPE_INDEX] == _INTEREST_PAYMENT:
+                entry_type = line[self.__TYPE_INDEX]
+                if entry_type == _INTEREST_PAYMENT:
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
@@ -93,25 +106,63 @@ class InputPlugin(AbstractInputPlugin):
                             "0",
                         )
                     )
-                elif line[self.__TYPE_INDEX] == _CRYPTO_TRANSFER:
+                elif entry_type == _REFERRAL_BONUS:
                     last_withdrawal_fee = None
                     result.append(
-                        IntraTransaction(
-                            self.__BLOCKFI,
-                            Keyword.UNKNOWN.value,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            line[self.__CURRENCY_INDEX],
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            self.__BLOCKFI,
-                            self.account_holder,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            line[self.__AMOUNT_INDEX],
+                        InTransaction(
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            exchange=self.__BLOCKFI,
+                            holder=self.account_holder,
+                            transaction_type="Income",
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_in=line[self.__AMOUNT_INDEX],
+                            fiat_fee="0",
+                            notes="Referral Bonus"
                         )
                     )
-                elif line[self.__TYPE_INDEX] == _WITHDRAWAL:
+                elif entry_type == _CRYPTO_TRANSFER:
+                    last_withdrawal_fee = None
+                    asset = line[self.__CURRENCY_INDEX]
+                    result.append(
+                        IntraTransaction(
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=asset,
+                            from_exchange=Keyword.UNKNOWN.value,
+                            from_holder=Keyword.UNKNOWN.value,
+                            to_exchange=self.__BLOCKFI,
+                            to_holder=self.account_holder,
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_sent=Keyword.UNKNOWN.value,
+                            crypto_received=line[self.__AMOUNT_INDEX],
+                        )
+                    )
+                elif entry_type == _ACH_WITHDRAWAL:
+                    last_withdrawal_fee = None
+                    amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
+                    result.append(
+                        OutTransaction(
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            exchange=self.__BLOCKFI,
+                            holder=self.account_holder,
+                            transaction_type="Sell",
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_out_no_fee=str(-amount),
+                            crypto_fee="0",
+                            notes="ACH redrawal",
+                        )
+                    )
+                elif entry_type == _WITHDRAWAL:
                     amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
                     amount = -amount  # type: ignore
                     if last_withdrawal_fee is not None:
@@ -133,9 +184,99 @@ class InputPlugin(AbstractInputPlugin):
                             Keyword.UNKNOWN.value,
                         )
                     )
-                elif line[self.__TYPE_INDEX] == _WITHDRAWAL_FEE:
+                elif entry_type == _ACH_DEPOSIT:
+                    amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
+                    last_withdrawal_fee = None
+                    result.append(
+                        InTransaction(
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            exchange=self.__BLOCKFI,
+                            holder=self.account_holder,
+                            transaction_type="Buy",
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_in=line[self.__AMOUNT_INDEX],
+                            fiat_fee="0",
+                            notes="Ach deposit",
+                        )
+                    )
+                elif entry_type == _TRADE:
+                    # Trades will be handled by parsing trade_report_all.csv
+                    # export
+                    continue
+                elif entry_type == _WITHDRAWAL_FEE:
                     last_withdrawal_fee = RP2Decimal(line[self.__AMOUNT_INDEX])
                     last_withdrawal_fee = -last_withdrawal_fee  # type: ignore
                 else:
-                    self.__logger.debug("Unsupported transaction type (skipping): %s", raw_data)
+                    self.__logger.error("Unsupported transaction type (skipping): %s", raw_data)
+
+        if self.__trade_csv_file:
+            result += self.parse_trade_report(self.__trade_csv_file)
+        return result
+
+    def parse_trade_report(self, file_path: str) -> List[AbstractTransaction]:
+        result: List[AbstractTransaction] = []
+
+        with open(file_path, mode="r", encoding="utf-8") as csv_file:
+            lines = reader(csv_file)
+            # skip csv header
+            header = next(lines)
+            self.__logger.debug("Header: %s", header)
+
+            col_idx = {}
+            for (idx, name) in enumerate(header):
+                col_idx[name] = idx
+
+            for line in lines:
+                raw_data: str = self.__DELIMITER.join(line)
+                self.__logger.debug("Transaction: %s", raw_data)
+
+                trans_type = line[col_idx["Type"]]
+                if trans_type != "Trade":
+                    raise Exception(f"Internal error: unsupported transaction type: {trans_type}")
+
+                trade_id = line[col_idx["Trade ID"]]
+                date = line[col_idx["Date"]]
+                timestamp = f"{date} -00:00"
+                from_currency = line[col_idx["Sold Currency"]].upper()
+                from_size = line[col_idx["Sold Quantity"]]
+                to_currency = line[col_idx["Buy Currency"]].upper()
+                to_size = line[col_idx["Buy Quantity"]]
+
+                result.append(
+                    OutTransaction(
+                        plugin=self.__BLOCKFI,
+                        unique_id=trade_id,
+                        raw_data=raw_data,
+                        timestamp=timestamp,
+                        asset=from_currency,
+                        exchange=self.__BLOCKFI,
+                        holder=self.account_holder,
+                        transaction_type="Sell",
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_out_no_fee=from_size,
+                        crypto_fee="0",
+                        notes=f"Sell side of trade: {from_size} {from_currency} -> {to_size} {to_currency}",
+                    ),
+                )
+                result.append(
+                    InTransaction(
+                        plugin=self.__BLOCKFI,
+                        unique_id=f"{trade_id}/buy",
+                        raw_data=raw_data,
+                        timestamp=timestamp,
+                        asset=to_currency,
+                        exchange=self.__BLOCKFI,
+                        holder=self.account_holder,
+                        transaction_type="Buy",
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_in=to_size,
+                        fiat_fee="0",
+                        notes=f"Buy side of trade: {from_size} {from_currency} -> {to_size} {to_currency}",
+                    ),
+                )
+
         return result
