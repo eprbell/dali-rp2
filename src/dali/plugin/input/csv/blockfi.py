@@ -17,7 +17,7 @@
 
 import logging
 from csv import reader
-from typing import List, Optional
+from typing import List, Dict, Optional
 
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
@@ -225,7 +225,7 @@ class InputPlugin(AbstractInputPlugin):
             header = next(lines)
             self.__logger.debug("Header: %s", header)
 
-            col_idx = {}
+            col_idx: Dict[str, int] = {}
             for (idx, name) in enumerate(header):
                 col_idx[name] = idx
 
