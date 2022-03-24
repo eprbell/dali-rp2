@@ -82,7 +82,7 @@ class InputPlugin(AbstractInputPlugin):
                 if last_withdrawal_fee is not None and line[self.__TYPE_INDEX] != _WITHDRAWAL:
                     raise Exception(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
 
-                entry_type = line[self.__TYPE_INDEX]
+                entry_type: str = line[self.__TYPE_INDEX]
                 if entry_type == _INTEREST_PAYMENT:
                     last_withdrawal_fee = None
                     result.append(
