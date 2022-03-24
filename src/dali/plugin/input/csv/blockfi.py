@@ -54,12 +54,12 @@ class InputPlugin(AbstractInputPlugin):
     def __init__(
         self,
         account_holder: str,
-        csv_file: str,
+        transaction_csv_file: str,
         trade_csv_file: Optional[str] = None,
     ) -> None:
 
         super().__init__(account_holder)
-        self.__csv_file: str = csv_file
+        self.__transaction_csv_file: str = transaction_csv_file
         self.__trade_csv_file = trade_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")
 
@@ -67,8 +67,8 @@ class InputPlugin(AbstractInputPlugin):
         result: List[AbstractTransaction] = []
 
         last_withdrawal_fee: Optional[RP2Decimal] = None
-        with open(self.__csv_file, mode="r", encoding="utf-8") as csv_file:
-            lines = reader(csv_file)
+        with open(self.__transaction_csv_file, mode="r", encoding="utf-8") as transaction_csv_file:
+            lines = reader(transaction_csv_file)
             header_found: bool = False
             for line in lines:
                 raw_data: str = self.__DELIMITER.join(line)
