@@ -46,10 +46,11 @@ class InputPlugin(AbstractInputPlugin):
     __IN_TYPE_INDEX: int = 5
     __IN_SPOT_PRICE_INDEX: int = 6
     __IN_CRYPTO_IN_INDEX: int = 7
-    __IN_FIAT_FEE_INDEX: int = 8
+    __IN_CRYPTO_FEE_INDEX: int = 8
     __IN_FIAT_IN_NO_FEE_INDEX: int = 9
     __IN_FIAT_IN_WITH_FEE_INDEX: int = 10
-    __IN_NOTES_INDEX: int = 11
+    __IN_FIAT_FEE_INDEX: int = 11
+    __IN_NOTES_INDEX: int = 12
 
     __OUT_UNIQUE_ID_INDEX: int = 0
     __OUT_TIMESTAMP_INDEX: int = 1
@@ -127,20 +128,21 @@ class InputPlugin(AbstractInputPlugin):
                 self.__logger.debug("Transaction: %s", ",".join(line))
                 transactions.append(
                     InTransaction(
-                        self.__MANUAL,
-                        unique_id,
-                        raw_data,
-                        line[self.__IN_TIMESTAMP_INDEX],
-                        line[self.__IN_ASSET_INDEX],
-                        line[self.__IN_EXCHANGE_INDEX],
-                        line[self.__IN_HOLDER_INDEX],
-                        line[self.__IN_TYPE_INDEX],
-                        line[self.__IN_SPOT_PRICE_INDEX],
-                        line[self.__IN_CRYPTO_IN_INDEX],
-                        line[self.__IN_FIAT_FEE_INDEX],
-                        line[self.__IN_FIAT_IN_NO_FEE_INDEX],
-                        line[self.__IN_FIAT_IN_WITH_FEE_INDEX],
-                        line[self.__IN_NOTES_INDEX],
+                        plugin=self.__MANUAL,
+                        unique_id=unique_id,
+                        raw_data=raw_data,
+                        timestamp=line[self.__IN_TIMESTAMP_INDEX],
+                        asset=line[self.__IN_ASSET_INDEX],
+                        exchange=line[self.__IN_EXCHANGE_INDEX],
+                        holder=line[self.__IN_HOLDER_INDEX],
+                        transaction_type=line[self.__IN_TYPE_INDEX],
+                        spot_price=line[self.__IN_SPOT_PRICE_INDEX],
+                        crypto_in=line[self.__IN_CRYPTO_IN_INDEX],
+                        crypto_fee=line[self.__IN_CRYPTO_FEE_INDEX],
+                        fiat_in_no_fee=line[self.__IN_FIAT_IN_NO_FEE_INDEX],
+                        fiat_in_with_fee=line[self.__IN_FIAT_IN_WITH_FEE_INDEX],
+                        fiat_fee=line[self.__IN_FIAT_FEE_INDEX],
+                        notes=line[self.__IN_NOTES_INDEX],
                     )
                 )
 
@@ -170,21 +172,21 @@ class InputPlugin(AbstractInputPlugin):
                 self.__logger.debug("Transaction: %s", ",".join(line))
                 transactions.append(
                     OutTransaction(
-                        self.__MANUAL,
-                        unique_id,
-                        raw_data,
-                        line[self.__OUT_TIMESTAMP_INDEX],
-                        line[self.__OUT_ASSET_INDEX],
-                        line[self.__OUT_EXCHANGE_INDEX],
-                        line[self.__OUT_HOLDER_INDEX],
-                        line[self.__OUT_TYPE_INDEX],
-                        line[self.__OUT_SPOT_PRICE_INDEX],
-                        line[self.__OUT_CRYPTO_OUT_NO_FEE_INDEX],
-                        line[self.__OUT_CRYPTO_FEE_INDEX],
-                        line[self.__OUT_CRYPTO_OUT_WITH_FEE_INDEX],
-                        line[self.__OUT_FIAT_OUT_NO_FEE_INDEX],
-                        line[self.__OUT_FIAT_FEE_INDEX],
-                        line[self.__OUT_NOTES_INDEX],
+                        plugin=self.__MANUAL,
+                        unique_id=unique_id,
+                        raw_data=raw_data,
+                        timestamp=line[self.__OUT_TIMESTAMP_INDEX],
+                        asset=line[self.__OUT_ASSET_INDEX],
+                        exchange=line[self.__OUT_EXCHANGE_INDEX],
+                        holder=line[self.__OUT_HOLDER_INDEX],
+                        transaction_type=line[self.__OUT_TYPE_INDEX],
+                        spot_price=line[self.__OUT_SPOT_PRICE_INDEX],
+                        crypto_out_no_fee=line[self.__OUT_CRYPTO_OUT_NO_FEE_INDEX],
+                        crypto_fee=line[self.__OUT_CRYPTO_FEE_INDEX],
+                        crypto_out_with_fee=line[self.__OUT_CRYPTO_OUT_WITH_FEE_INDEX],
+                        fiat_out_no_fee=line[self.__OUT_FIAT_OUT_NO_FEE_INDEX],
+                        fiat_fee=line[self.__OUT_FIAT_FEE_INDEX],
+                        notes=line[self.__OUT_NOTES_INDEX],
                     )
                 )
 
@@ -217,18 +219,18 @@ class InputPlugin(AbstractInputPlugin):
                 crypto_received: str = line[self.__INTRA_CRYPTO_RECEIVED_INDEX]
                 transactions.append(
                     IntraTransaction(
-                        self.__MANUAL,
-                        line[self.__INTRA_UNIQUE_ID_INDEX],
-                        raw_data,
-                        line[self.__INTRA_TIMESTAMP_INDEX],
-                        line[self.__INTRA_ASSET_INDEX],
-                        from_exchange if from_exchange else Keyword.UNKNOWN.value,
-                        from_holder if from_holder else Keyword.UNKNOWN.value,
-                        to_exchange if to_exchange else Keyword.UNKNOWN.value,
-                        to_holder if to_holder else Keyword.UNKNOWN.value,
-                        line[self.__INTRA_SPOT_PRICE_INDEX],
-                        crypto_sent if crypto_sent else Keyword.UNKNOWN.value,
-                        crypto_received if crypto_received else Keyword.UNKNOWN.value,
-                        line[self.__INTRA_NOTES_INDEX],
+                        plugin=self.__MANUAL,
+                        unique_id=line[self.__INTRA_UNIQUE_ID_INDEX],
+                        raw_data=raw_data,
+                        timestamp=line[self.__INTRA_TIMESTAMP_INDEX],
+                        asset=line[self.__INTRA_ASSET_INDEX],
+                        from_exchange=from_exchange if from_exchange else Keyword.UNKNOWN.value,
+                        from_holder=from_holder if from_holder else Keyword.UNKNOWN.value,
+                        to_exchange=to_exchange if to_exchange else Keyword.UNKNOWN.value,
+                        to_holder=to_holder if to_holder else Keyword.UNKNOWN.value,
+                        spot_price=line[self.__INTRA_SPOT_PRICE_INDEX],
+                        crypto_sent=crypto_sent if crypto_sent else Keyword.UNKNOWN.value,
+                        crypto_received=crypto_received if crypto_received else Keyword.UNKNOWN.value,
+                        notes=line[self.__INTRA_NOTES_INDEX],
                     )
                 )

@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional
 
 import yfinance as yf  # type: ignore
-from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_decimal import RP2Decimal, ZERO
 from rp2.rp2_error import RP2TypeError, RP2ValueError
 
 from dali.abstract_transaction import AbstractTransaction
@@ -208,8 +208,12 @@ def _apply_transaction_hint(
     global_configuration: Dict[str, Any],
 ) -> AbstractTransaction:
     result: AbstractTransaction
+
+    if Keyword.TRANSACTION_HINTS.value not in global_configuration:
+        return transaction
     if transaction.unique_id not in global_configuration[Keyword.TRANSACTION_HINTS.value]:
         return transaction
+
     direction: str
     transaction_type: str
     notes: str
@@ -229,7 +233,10 @@ def _apply_transaction_hint(
                 transaction_type=transaction_type,
                 spot_price=transaction.spot_price if transaction.spot_price else Keyword.UNKNOWN.value,
                 crypto_in=transaction.crypto_in,
-                fiat_fee=transaction.crypto_in,
+                crypto_fee=transaction.crypto_fee,
+                fiat_in_no_fee=transaction.fiat_in_no_fee,
+                fiat_in_with_fee=transaction.fiat_in_with_fee,
+                fiat_fee=transaction.fiat_fee,
                 notes=notes,
             )
         elif isinstance(transaction, OutTransaction):
@@ -253,7 +260,6 @@ def _apply_transaction_hint(
                 transaction_type=transaction_type,
                 spot_price=transaction.spot_price if transaction.spot_price else Keyword.UNKNOWN.value,
                 crypto_in=transaction.crypto_received,
-                fiat_fee="0",
                 notes=notes,
             )
     elif direction == Keyword.OUT.value:
@@ -272,6 +278,9 @@ def _apply_transaction_hint(
                 spot_price=transaction.spot_price if transaction.spot_price else Keyword.UNKNOWN.value,
                 crypto_out_no_fee=transaction.crypto_out_no_fee,
                 crypto_fee=transaction.crypto_fee,
+                crypto_out_with_fee=transaction.crypto_out_with_fee,
+                fiat_out_no_fee=transaction.fiat_out_no_fee,
+                fiat_fee=transaction.fiat_fee,
                 notes=notes,
             )
         elif isinstance(transaction, IntraTransaction):
@@ -282,6 +291,12 @@ def _apply_transaction_hint(
                         f"{Keyword.TO_HOLDER.value}/{Keyword.TO_EXCHANGE.value} must be unknown: {transaction}"
                     )
                 )
+            crypto_out_no_fee: RP2Decimal = RP2Decimal(transaction.crypto_sent)
+            crypto_fee: RP2Decimal = ZERO
+            if not is_unknown(transaction.crypto_received):
+                crypto_out_no_fee = RP2Decimal(transaction.crypto_received)
+                crypto_fee = RP2Decimal(transaction.crypto_sent) - RP2Decimal(transaction.crypto_received)
+
             result = OutTransaction(
                 plugin=transaction.plugin,
                 unique_id=transaction.unique_id,
@@ -292,8 +307,8 @@ def _apply_transaction_hint(
                 holder=transaction.from_holder,
                 transaction_type=transaction_type,
                 spot_price=transaction.spot_price if transaction.spot_price else Keyword.UNKNOWN.value,
-                crypto_out_no_fee=transaction.crypto_sent,
-                crypto_fee="0",
+                crypto_out_no_fee=str(crypto_out_no_fee),
+                crypto_fee=str(crypto_fee),
                 notes=notes,
             )
     elif direction == Keyword.INTRA.value:
@@ -314,6 +329,13 @@ def _apply_transaction_hint(
                 notes=notes,
             )
         elif isinstance(transaction, OutTransaction):
+            if is_unknown(transaction.crypto_out_no_fee) or is_unknown(transaction.crypto_fee):
+                raise RP2ValueError(
+                    (
+                        f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
+                        f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} canot be unknown: {transaction}"
+                    )
+                )
             result = IntraTransaction(
                 plugin=transaction.plugin,
                 unique_id=transaction.unique_id,

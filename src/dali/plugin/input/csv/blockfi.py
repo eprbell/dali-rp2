@@ -55,18 +55,12 @@ class InputPlugin(AbstractInputPlugin):
         self,
         account_holder: str,
         csv_file: str,
-        addresses: Optional[str] = None,
         trade_csv_file: Optional[str] = None,
     ) -> None:
 
         super().__init__(account_holder)
         self.__csv_file: str = csv_file
         self.__trade_csv_file = trade_csv_file
-        self.__addresses = {}
-        if addresses:
-            for address in addresses.split(","):
-                (asset, addr) = address.split(":")
-                self.__addresses[asset.upper()] = addr
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")
 
     def load(self) -> List[AbstractTransaction]:
@@ -93,17 +87,17 @@ class InputPlugin(AbstractInputPlugin):
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
-                            self.__BLOCKFI,
-                            Keyword.UNKNOWN.value,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            line[self.__CURRENCY_INDEX],
-                            self.__BLOCKFI,
-                            self.account_holder,
-                            "Interest",
-                            Keyword.UNKNOWN.value,
-                            line[self.__AMOUNT_INDEX],
-                            "0",
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            exchange=self.__BLOCKFI,
+                            holder=self.account_holder,
+                            transaction_type="Interest",
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_in=line[self.__AMOUNT_INDEX],
+                            fiat_fee="0",
                         )
                     )
                 elif entry_type == _REFERRAL_BONUS:
@@ -145,7 +139,6 @@ class InputPlugin(AbstractInputPlugin):
                     )
                 elif entry_type == _ACH_WITHDRAWAL:
                     last_withdrawal_fee = None
-                    amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
                     result.append(
                         OutTransaction(
                             plugin=self.__BLOCKFI,
@@ -157,7 +150,7 @@ class InputPlugin(AbstractInputPlugin):
                             holder=self.account_holder,
                             transaction_type="Sell",
                             spot_price=Keyword.UNKNOWN.value,
-                            crypto_out_no_fee=str(-amount),
+                            crypto_out_no_fee=str(-RP2Decimal(line[self.__AMOUNT_INDEX])),
                             crypto_fee="0",
                             notes="ACH redrawal",
                         )
@@ -170,22 +163,21 @@ class InputPlugin(AbstractInputPlugin):
                     last_withdrawal_fee = None
                     result.append(
                         IntraTransaction(
-                            self.__BLOCKFI,
-                            Keyword.UNKNOWN.value,
-                            raw_data,
-                            f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            line[self.__CURRENCY_INDEX],
-                            self.__BLOCKFI,
-                            self.account_holder,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            Keyword.UNKNOWN.value,
-                            str(amount),
-                            Keyword.UNKNOWN.value,
+                            plugin=self.__BLOCKFI,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
+                            asset=line[self.__CURRENCY_INDEX],
+                            from_exchange=self.__BLOCKFI,
+                            from_holder=self.account_holder,
+                            to_exchange=Keyword.UNKNOWN.value,
+                            to_holder=Keyword.UNKNOWN.value,
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_sent=str(amount),
+                            crypto_received=Keyword.UNKNOWN.value,
                         )
                     )
                 elif entry_type == _ACH_DEPOSIT:
-                    amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
