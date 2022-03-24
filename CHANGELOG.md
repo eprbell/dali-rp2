@@ -15,7 +15,7 @@
 # RP2 Change Log
 
 ## 0.3.21
-* fixed bug reported in issue #10: https://github.com/eprbell/dali-rp2/issues/10
+* fixed bug reported in issue https://github.com/eprbell/dali-rp2/issues/10
 * added initial version of developer FAQ document: https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md
 * minor fixes to documentation
 
