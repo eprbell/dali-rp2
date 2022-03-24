@@ -38,6 +38,14 @@ _ACH_DEPOSIT: str = "Ach Deposit"
 _ACH_WITHDRAWAL: str = "Ach Withdrawal"
 _REFERRAL_BONUS: str = "Referral Bonus"
 
+_TYPE = "Type"
+_TRADE_ID = "Trade ID"
+_DATE = "Date"
+_SOLD_CURRENCY = "Sold Currency"
+_SOLD_QUANTITY = "Sold Quantity"
+_BUY_CURRENCY = "Buy Currency"
+_BUY_QUANTITY = "Buy Quantity"
+
 
 class InputPlugin(AbstractInputPlugin):
 
@@ -225,17 +233,17 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = self.__DELIMITER.join(line)
                 self.__logger.debug("Transaction: %s", raw_data)
 
-                trans_type = line[col_idx["Type"]]
-                if trans_type != "Trade":
-                    raise Exception(f"Internal error: unsupported transaction type: {trans_type}")
+                transaction_type = line[col_idx[_TYPE]]
+                if transaction_type != "Trade":
+                    raise Exception(f"Internal error: unsupported transaction type: {transaction_type}")
 
-                trade_id = line[col_idx["Trade ID"]]
-                date = line[col_idx["Date"]]
+                trade_id = line[col_idx[_TRADE_ID]]
+                date = line[col_idx[_DATE]]
                 timestamp = f"{date} -00:00"
-                from_currency = line[col_idx["Sold Currency"]].upper()
-                from_size = line[col_idx["Sold Quantity"]]
-                to_currency = line[col_idx["Buy Currency"]].upper()
-                to_size = line[col_idx["Buy Quantity"]]
+                from_currency = line[col_idx[_SOLD_CURRENCY]].upper()
+                from_size = line[col_idx[_SOLD_QUANTITY]]
+                to_currency = line[col_idx[_BUY_CURRENCY]].upper()
+                to_size = line[col_idx[_BUY_QUANTITY]]
 
                 result.append(
                     OutTransaction(
