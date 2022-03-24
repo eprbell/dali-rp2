@@ -31,7 +31,7 @@
 * **[Running](https://github.com/eprbell/dali-rp2/tree/main/README.md#running)**
   * [Linux, macOS, Windows 10 and Other Unix-like Systems](https://github.com/eprbell/dali-rp2/tree/main/README.md#running-on-linux-macos-windows-10-and-other-unix-like-systems)
   * [Windows 10](https://github.com/eprbell/dali-rp2/tree/main/README.md#running-on-windows-10)
-* **[Input and Output Files](https://github.com/eprbell/dali-rp2/tree/main/README.md#input-and-output-files)**
+* **[Configuration File](https://github.com/eprbell/dali-rp2/tree/main/README.md#configuration-file)**
 * **[Reporting Bugs](https://github.com/eprbell/dali-rp2/tree/main/README.md#reporting-bugs)**
 * **[Contributing](https://github.com/eprbell/dali-rp2/tree/main/README.md#contributing)**
 * **[Developer Documentation](https://github.com/eprbell/dali-rp2/tree/main/README.md#developer-documentation)**
