@@ -123,6 +123,10 @@ class InputPlugin(AbstractInputPlugin):
         self.__auth = CoinbaseProAuth(api_key, api_secret, api_passphrase)
         self.__session: Session = requests.Session()
         self.__logger: logging.Logger = create_logger(f"{self.__COINBASE_PRO}/{self.account_holder}")
+        self.__cache_key: str = f"coinbase_pro-{account_holder}"
+
+    def cache_key(self) -> Optional[str]:
+        return self.__cache_key
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []

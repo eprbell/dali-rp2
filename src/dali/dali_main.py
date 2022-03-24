@@ -91,7 +91,19 @@ def input_loader() -> None:
                 if not hasattr(input_plugin, "load"):
                     LOGGER.error("Plugin '%s' has no 'load' method. Exiting...", normalized_section_name)
                     sys.exit(1)
-                plugin_transactions: List[AbstractTransaction] = input_plugin.load()
+
+                plugin_transactions: List[AbstractTransaction]
+                if args.use_cache and input_plugin.cache_key() is not None:
+                    cache = input_plugin.load_cache()
+                    if cache:
+                        LOGGER.info("Reading plugin load result from cache")
+                        plugin_transactions = cache
+                    else:
+                        plugin_transactions = input_plugin.load()
+                        input_plugin.save_cache(plugin_transactions)
+                else:
+                    plugin_transactions = input_plugin.load()
+
                 for transaction in plugin_transactions:
                     if not isinstance(transaction, AbstractTransaction):
                         LOGGER.error("Plugin '%s' returned a non-transaction object: %s. Exiting...", normalized_section_name, str(transaction))  # type: ignore
@@ -168,6 +180,12 @@ def _setup_argument_parser() -> ArgumentParser:
         help="INI file",
         metavar="INI_FILE",
         type=str,
+    )
+    parser.add_argument(
+        "-c",
+        "--use-cache",
+        action="store_true",
+        help="Cache input plugin data load",
     )
 
     return parser
