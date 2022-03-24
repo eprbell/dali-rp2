@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## 0.3.21
+* fixed bug reported in issue #10: https://github.com/eprbell/dali-rp2/issues/10
+* added initial version of developer FAQ document: https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md
+* minor fixes to documentation
+
 ## 0.3.20
 * fixed a bug in transaction resolver: IN -> IN transaction hint was assigning wrong value to fiat_fee
 * fixed a bug in Coinbase plugin: receiving a crypto gift from another Coinbase user generated a transaction with wrong fiat_in_with_fee value
