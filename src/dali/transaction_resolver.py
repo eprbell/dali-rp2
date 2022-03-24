@@ -208,8 +208,12 @@ def _apply_transaction_hint(
     global_configuration: Dict[str, Any],
 ) -> AbstractTransaction:
     result: AbstractTransaction
+
+    if Keyword.TRANSACTION_HINTS.value not in global_configuration:
+        return transaction
     if transaction.unique_id not in global_configuration[Keyword.TRANSACTION_HINTS.value]:
         return transaction
+
     direction: str
     transaction_type: str
     notes: str
