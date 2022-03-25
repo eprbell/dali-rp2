@@ -63,11 +63,17 @@ class InputPlugin(AbstractInputPlugin):
         account_holder: str,
         transaction_csv_file: str,
         trade_csv_file: Optional[str] = None,
+        addresses: Optional[str] = None,
     ) -> None:
 
         super().__init__(account_holder)
         self.__transaction_csv_file: str = transaction_csv_file
         self.__trade_csv_file: Optional[str] = trade_csv_file
+        self.__addresses = {}
+        if addresses:
+            for address in addresses.split(","):
+                (asset, addr) = address.split(":")
+                self.__addresses[asset.upper()] = addr
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")
 
     def load(self) -> List[AbstractTransaction]:
@@ -87,6 +93,7 @@ class InputPlugin(AbstractInputPlugin):
                     raise Exception(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
 
                 transaction_type: str = line[self.__TYPE_INDEX]
+                asset: str = line[self.__CURRENCY_INDEX].upper()
                 if transaction_type == _INTEREST_PAYMENT:
                     last_withdrawal_fee = None
                     result.append(
@@ -95,7 +102,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            asset=line[self.__CURRENCY_INDEX],
+                            asset=asset,
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
                             transaction_type="Interest",
@@ -112,7 +119,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            asset=line[self.__CURRENCY_INDEX],
+                            asset=asset,
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
                             transaction_type="Income",
@@ -130,7 +137,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            asset=line[self.__CURRENCY_INDEX],
+                            asset=asset,
                             from_exchange=Keyword.UNKNOWN.value,
                             from_holder=Keyword.UNKNOWN.value,
                             to_exchange=self.__BLOCKFI,
@@ -138,6 +145,9 @@ class InputPlugin(AbstractInputPlugin):
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_sent=Keyword.UNKNOWN.value,
                             crypto_received=line[self.__AMOUNT_INDEX],
+                            # this will be used to match out transfer from
+                            # other exchanges
+                            to_address=self.__addresses.get(asset.upper()),
                         )
                     )
                 elif transaction_type == _ACH_WITHDRAWAL:
@@ -148,7 +158,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            asset=line[self.__CURRENCY_INDEX],
+                            asset=asset,
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
                             transaction_type="Sell",
@@ -170,7 +180,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            asset=line[self.__CURRENCY_INDEX],
+                            asset=asset,
                             from_exchange=self.__BLOCKFI,
                             from_holder=self.account_holder,
                             to_exchange=Keyword.UNKNOWN.value,
@@ -188,7 +198,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
-                            asset=line[self.__CURRENCY_INDEX],
+                            asset=asset,
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
                             transaction_type="Buy",
