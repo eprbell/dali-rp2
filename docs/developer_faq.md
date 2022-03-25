@@ -41,5 +41,5 @@ Read the [Internal Design](../README.dev.md#internal-design) section of the Deve
 Read about the [transaction_resolver](../src/dali/transaction_resolver.py) in the [Internal Design](../README.dev.md#internal-design) section of the Developer Documentation.
 
 ### Why the Strange Directory Structure with Src?
-Because RP2 is a [src](https://bskinn.github.io/My-How-Why-Pyproject-Src/)-[based](https://hynek.me/articles/testing-packaging/) [project](https://blog.ionelmc.ro/2014/05/25/python-packaging/).
+Because DaLI is a [src](https://bskinn.github.io/My-How-Why-Pyproject-Src/)-[based](https://hynek.me/articles/testing-packaging/) [project](https://blog.ionelmc.ro/2014/05/25/python-packaging/).
 
