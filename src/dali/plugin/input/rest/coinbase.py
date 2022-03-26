@@ -374,14 +374,16 @@ class InputPlugin(AbstractInputPlugin):
             return
 
         raw_data: str = json.dumps(transaction)
-        if transaction_type in {_BUY, _TRADE}:
-            spot_price = (native_amount - fiat_fee) / crypto_amount
+        if transaction_type == _BUY or (transaction_type == _TRADE and native_amount >= ZERO):
             if transaction_type == _BUY:
                 buy: Dict[str, Any] = id_2_buy[transaction[transaction_type][_ID]]
                 raw_data = f"{raw_data}//{json.dumps(buy)}"
                 fiat_fee = RP2Decimal(buy[_FEE][_AMOUNT])
                 self.__logger.debug("Buy: %s", json.dumps(buy))
                 spot_price = RP2Decimal(buy[_UNIT_PRICE][_AMOUNT])
+            else:
+                # swap in transaction
+                spot_price = (native_amount - fiat_fee) / crypto_amount
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.__COINBASE,
@@ -401,12 +403,17 @@ class InputPlugin(AbstractInputPlugin):
                     notes=None,  # Add notes
                 )
             )
-        elif transaction_type == _SELL:
-            sell = id_2_sell[transaction[transaction_type][_ID]]
-            raw_data = f"{raw_data}//{json.dumps(sell)}"
-            fiat_fee = RP2Decimal(sell[_FEE][_AMOUNT])
-            spot_price = RP2Decimal(sell[_UNIT_PRICE][_AMOUNT])
-            self.__logger.debug("Sell: %s", json.dumps(sell))
+        elif transaction_type == _SELL or (transaction_type == _TRADE and native_amount < ZERO):
+            if transaction_type == _SELL:
+                sell = id_2_sell[transaction[transaction_type][_ID]]
+                fiat_fee = RP2Decimal(sell[_FEE][_AMOUNT])
+                self.__logger.debug("Sell: %s", json.dumps(sell))
+                spot_price = RP2Decimal(sell[_UNIT_PRICE][_AMOUNT])
+                raw_data = f"{raw_data}//{json.dumps(sell)}"
+            else:
+                # swap out transaction
+                spot_price = native_amount / crypto_amount
+
             out_transaction_list.append(
                 OutTransaction(
                     plugin=self.__COINBASE,
