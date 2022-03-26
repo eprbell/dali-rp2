@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## 0.3.22
+* fixed issue #16: added support for Coinbase inflation reward transaction
+* added error log for unknown transaction type in all plugins, so they are easy to identify and report
+* added FAQ on supported exchanges/wallets
+
 ## 0.3.21
 * fixed bug reported in issue https://github.com/eprbell/dali-rp2/issues/10
 * added initial version of developer FAQ document: https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md
