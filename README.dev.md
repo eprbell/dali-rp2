@@ -48,7 +48,7 @@ DaLI is released under the terms of Apache License Version 2.0. For more informa
 The latest DaLI source can be downloaded at: <https://github.com/eprbell/dali-rp2>.
 
 ## Setup
-DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.7.0 or greater. Virtualenv is recommended for DaLI development. Note that requirements.txt contains `-e .`, which installs the DaLI package in editable mode.
+DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.7.0 or greater. Virtualenv is recommended for DaLI development.
 
 ### Setup on Ubuntu Linux
 First make sure Python, pip and virtualenv are installed. If not, open a terminal window and enter the following commands:
@@ -62,7 +62,7 @@ Then install DaLI Python package requirements:
 cd <rp2_directory>
 virtualenv -p python3 .venv
 . .venv/bin/activate
-.venv/bin/pip3 install -r requirements.txt
+.venv/bin/pip3 install -e '.[dev]'
 ```
 ### Setup on macOS
 First make sure [Homebrew](https://brew.sh) is installed, then open a terminal window and enter the following commands:
@@ -76,7 +76,7 @@ Then install DaLI Python package requirements:
 cd <rp2_directory>
 virtualenv -p python3 .venv
 . .venv/bin/activate
-.venv/bin/pip3 install -r requirements.txt
+.venv/bin/pip3 install -e '.[dev]'
 ```
 ### Setup on Windows 10
 First make sure [Python](https://python.org) 3.7 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH"), then open a PowerShell window and enter the following commands:
@@ -89,7 +89,7 @@ Then install DaLI Python package requirements:
 cd <rp2_directory>
 virtualenv -p python .venv
 .venv\Scripts\activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install -e ".[dev]"
 ```
 ### Setup on Other Unix-like Systems
 * install python 3.7 or greater
@@ -97,7 +97,7 @@ python -m pip install -r requirements.txt
 * install virtualenv
 * cd _<dali_directory>_
 * `virtualenv -p python3 .venv`
-* `.venv/bin/pip3 install -r requirements.txt`
+* `.venv/bin/pip3 install -e '.[dev]'`
 
 ## Source Code
 The RP2 source tree is organized as follows:
@@ -121,7 +121,6 @@ The RP2 source tree is organized as follows:
 * `pyproject.toml`: packaging configuration;
 * `README.dev.md`: developer documentation;
 * `README.md`: user documentation;
-* `requirements.txt`: Python dependency file for development;
 * `setup.cfg`: static packaging configuration file;
 * `setup.py`: dynamic packaging configuration file;
 * `src/dali`: DaLI code, including classes for transactions, ODS and config genator, transaction resolver, etc.;

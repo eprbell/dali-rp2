@@ -323,12 +323,16 @@ class InputPlugin(AbstractInputPlugin):
                 from_currency_price = usd_volume / from_currency_size
                 to_currency_size = from_currency_size * RP2Decimal(fill[_PRICE])
                 to_currency_price = usd_volume / to_currency_size
+                out_crypto_fee = ZERO
+                in_crypto_fee = crypto_fee
             elif fill_side == _BUY:
                 (from_currency, to_currency) = (to_currency, from_currency)
                 to_currency_size = RP2Decimal(fill[_SIZE])
                 to_currency_price = usd_volume / to_currency_size
                 from_currency_size = to_currency_size * RP2Decimal(fill[_PRICE])
                 from_currency_price = usd_volume / from_currency_size
+                out_crypto_fee = crypto_fee
+                in_crypto_fee = ZERO
             else:
                 raise Exception(f"Internal error: unsupported fill side {transaction}\n{fill}")
             self.__append_transaction(
@@ -344,13 +348,16 @@ class InputPlugin(AbstractInputPlugin):
                     transaction_type="Sell",
                     spot_price=str(from_currency_price),
                     crypto_out_no_fee=str(from_currency_size),
-                    crypto_fee="0",
+                    crypto_fee=str(out_crypto_fee),
                     crypto_out_with_fee=None,
                     fiat_out_no_fee=None,
                     fiat_fee=None,
-                    notes=f"Sell side of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
+                    notes=f"Sell side of conversion from {fill_side} fill: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
                 ),
             )
+
+            if usd_volume != to_currency_price * to_currency_size:
+                raise Exception(f"USD volume ({usd_volume}) doesn't match In transaction crypto size ({to_currency_size}) and price ({to_currency_price}).")
             self.__append_transaction(
                 cast(List[AbstractTransaction], in_transaction_list),
                 InTransaction(
@@ -364,11 +371,11 @@ class InputPlugin(AbstractInputPlugin):
                     transaction_type="Buy",
                     spot_price=str(to_currency_price),
                     crypto_in=str(to_currency_size),
-                    crypto_fee=str(crypto_fee),
+                    crypto_fee=str(in_crypto_fee),
                     fiat_in_no_fee=None,
                     fiat_in_with_fee=None,
                     fiat_fee=None,
-                    notes=f"Buy side of conversion: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
+                    notes=f"Buy side of conversion from {fill_side} fill: {from_currency_size:.8f} {from_currency} -> {to_currency_size:.8f} {to_currency}",
                 ),
             )
 
