@@ -18,6 +18,7 @@
 * **[General Questions](#general-questions)**
   * [What Is the Timestamp Format?](#what-is-the-timestamp-format)
   * [Can I Avoid Writing a Config File from Scratch?](#can-i-avoid-writing-a-config-file-from-scratch)
+  * [What Exchanges/Wallets Are Supported?](#what-exchangeswallets-are-supported)
   * [Can You Add Support for a New Wallet or Exchange?](#can-you-add-support-for-a-new-wallet-or-exchange)
   * [How to Represent Transactions from Unsupported Exchanges and Wallets?](#how-to-represent-transactions-from-unsupported-exchanges-and-wallets)
   * [How to Represent a Transaction from/to a Supported Exchange/Wallet to/from an Unsupported One](#how-to-represent-a-transaction-fromto-a-supported-exchangewallet-tofrom-an-unsupported-one)
@@ -40,6 +41,9 @@ Timestamp format is [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) (see [exam
 
 ### Can I Avoid Writing a Config File from Scratch?
 You can use the [test_config.ini](../config/test_config.ini) as a starting point and the [configuration file](configuration_file.md) documentation as reference.
+
+### What Exchanges/Wallets Are Supported?
+Supported exchange and wallet plugin are listed in the [configuration_file](configuration_file.md#data-loader-plugin-sections) documentation.
 
 ### Can You Add Support for a New Wallet or Exchange?
 Since there are hundreds of CSV formats and REST APIs, it's not possible for DaLI's author to single-handedly add support for everything. For this reason DaLI has been imagined as a community effort and designed with a robust data loader plugin infrastructure, allowing people to contribute plugins for new exchanges and wallets with minimal work. The plugin API is encapsulated and well defined: this makes it easy for new coders to enter the project.
