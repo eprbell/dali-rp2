@@ -53,6 +53,7 @@ _FROM: str = "from"
 _HASH: str = "hash"
 _ID: str = "id"
 _INTEREST: str = "interest"
+_INFLATION_REWARD: str = "inflation_reward"
 _NATIVE_AMOUNT: str = "native_amount"
 _NETWORK: str = "network"
 _OFF_BLOCKCHAIN: str = "off_blockchain"
@@ -63,6 +64,7 @@ _SELL: str = "sell"
 _SEND: str = "send"
 _STATUS: str = "status"
 _SUBTITLE: str = "subtitle"
+_TITLE: str = "title"
 _TO: str = "to"
 _TRADE: str = "trade"
 _TYPE: str = "type"
@@ -139,7 +141,8 @@ class InputPlugin(AbstractInputPlugin):
                 if is_fiat(currency):
                     self.__logger.debug("Skipping fiat transaction: %s", json.dumps(transaction))
                     continue
-                self.__logger.debug("Transaction: %s", json.dumps(transaction))
+                raw_data: str = json.dumps(transaction)
+                self.__logger.debug("Transaction: %s", raw_data)
                 transaction_type: str = transaction[_TYPE]
                 if transaction_type in {_PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
                     self._process_transfer(transaction, currency, in_transaction_list, out_transaction_list, intra_transaction_list)
@@ -147,8 +150,10 @@ class InputPlugin(AbstractInputPlugin):
                     self._process_fill(transaction, currency, in_transaction_list, out_transaction_list, id_2_buy, id_2_sell)
                 elif transaction_type in {_INTEREST}:
                     self._process_interest(transaction, currency, in_transaction_list)
+                elif transaction_type in {_INFLATION_REWARD}:
+                    self._process_income(transaction, currency, in_transaction_list, transaction[_DETAILS][_TITLE])
                 else:
-                    self.__logger.debug("Unsupported transaction type (skipping): %s", transaction_type)
+                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
             if in_transaction_list:
                 result.extend(in_transaction_list)
@@ -295,25 +300,7 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     elif transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
                         # Coinbase Earn transactions
-                        in_transaction_list.append(
-                            InTransaction(
-                                plugin=self.__COINBASE,
-                                unique_id=transaction[_ID],
-                                raw_data=json.dumps(transaction),
-                                timestamp=transaction[_CREATED_AT],
-                                asset=currency,
-                                exchange=self.__COINBASE,
-                                holder=self.account_holder,
-                                transaction_type="Income",
-                                spot_price=str(native_amount / amount),
-                                crypto_in=transaction[_AMOUNT][_AMOUNT],
-                                crypto_fee=None,
-                                fiat_in_no_fee=str(native_amount),
-                                fiat_in_with_fee=str(native_amount),
-                                fiat_fee="0",
-                                notes="Coinbase EARN",
-                            )
-                        )
+                        self._process_income(transaction, currency, in_transaction_list, "Coinbase EARN")
                 else:
                     intra_transaction_list.append(
                         IntraTransaction(
@@ -426,6 +413,30 @@ class InputPlugin(AbstractInputPlugin):
                 notes=None,
             )
         )
+
+    def _process_income(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: str) -> None:
+        amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
+        native_amount: RP2Decimal = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
+        in_transaction_list.append(
+            InTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=json.dumps(transaction),
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type="Income",
+                spot_price=str(native_amount / amount),
+                crypto_in=str(amount),
+                crypto_fee=None,
+                fiat_in_no_fee=str(native_amount),
+                fiat_in_with_fee=str(native_amount),
+                fiat_fee="0",
+                notes=notes,
+            )
+        )
+
 
     def __get_accounts(self) -> Any:
         return self.__send_request_with_pagination("/v2/accounts")
