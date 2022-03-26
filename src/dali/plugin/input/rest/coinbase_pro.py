@@ -45,6 +45,7 @@ from dali.transaction_resolver import AssetAndUniqueId
 _AMOUNT: str = "amount"
 _BUY: str = "buy"
 _COINBASE_TRANSACTION_ID: str = "coinbase_transaction_id"
+_CONVERSION: str = "conversion"
 _CREATED_AT: str = "created_at"
 _CRYPTO_TRANSACTION_HASH: str = "crypto_transaction_hash"
 _CURRENCY: str = "currency"
@@ -138,7 +139,8 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.debug("Account: %s", json.dumps(account))
             for transaction in self.__get_transactions(account_id):
                 transaction_type: str = transaction[_TYPE]
-                self.__logger.debug("Transaction: %s", json.dumps(transaction))
+                raw_data: str = json.dumps(transaction)
+                self.__logger.debug("Transaction: %s", raw_data)
                 if transaction_type == _TRANSFER:
                     self._process_transfer(transaction, currency, intra_transaction_list)
                 elif transaction_type == _MATCH:
@@ -154,6 +156,14 @@ class InputPlugin(AbstractInputPlugin):
                         out_transaction_list,
                         product_id_2_trade_id_2_fill[product_id][f"{transaction[_DETAILS][_ORDER_ID]}/{transaction[_DETAILS][_TRADE_ID]}"],
                     )
+                elif transaction_type == _FEE:
+                    # The fees are already deduced while processing other transactions
+                    self.__logger.debug("Redundant fee transaction (skipping): %s", raw_data)
+                elif transaction_type == _CONVERSION:
+                    # It's not clear what the conversion transaction is used for: it doesn't seem to contain information that affects the final outcome
+                    self.__logger.debug("Conversion transaction (skipping): %s", raw_data)
+                else:
+                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
             if in_transaction_list:
                 result.extend(in_transaction_list)
