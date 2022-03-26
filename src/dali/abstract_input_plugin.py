@@ -20,6 +20,8 @@ from dali.abstract_transaction import AbstractTransaction
 
 
 class AbstractInputPlugin:
+    ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
+
     def __init__(
         self,
         account_holder: str,
