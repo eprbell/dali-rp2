@@ -81,22 +81,25 @@ class InputPlugin(AbstractInputPlugin):
                 transaction_type: str = line[self.__TYPE_INDEX]
                 spot_price: str = Keyword.UNKNOWN.value
                 crypto_hash: str = line[self.__TRANSACTION_ID_INDEX]
-                result.append(
-                    IntraTransaction(
-                        plugin=self.__TREZOR_OLD,
-                        unique_id=crypto_hash,
-                        raw_data=raw_data,
-                        timestamp=f"{timestamp_value}",
-                        asset=self.__currency,
-                        from_exchange=self.__account_nickname if transaction_type == _OUT else Keyword.UNKNOWN.value,
-                        from_holder=self.account_holder if transaction_type == _OUT else Keyword.UNKNOWN.value,
-                        to_exchange=self.__account_nickname if transaction_type == _IN else Keyword.UNKNOWN.value,
-                        to_holder=self.account_holder if transaction_type == _IN else Keyword.UNKNOWN.value,
-                        spot_price=spot_price,
-                        crypto_sent=str(-RP2Decimal(line[self.__TOTAL_INDEX])) if transaction_type == _OUT else Keyword.UNKNOWN.value,
-                        crypto_received=line[self.__TOTAL_INDEX] if transaction_type == _IN else Keyword.UNKNOWN.value,
-                        notes=None,
+                if transaction_type in {_IN, _OUT}:
+                    result.append(
+                        IntraTransaction(
+                            plugin=self.__TREZOR_OLD,
+                            unique_id=crypto_hash,
+                            raw_data=raw_data,
+                            timestamp=f"{timestamp_value}",
+                            asset=self.__currency,
+                            from_exchange=self.__account_nickname if transaction_type == _OUT else Keyword.UNKNOWN.value,
+                            from_holder=self.account_holder if transaction_type == _OUT else Keyword.UNKNOWN.value,
+                            to_exchange=self.__account_nickname if transaction_type == _IN else Keyword.UNKNOWN.value,
+                            to_holder=self.account_holder if transaction_type == _IN else Keyword.UNKNOWN.value,
+                            spot_price=spot_price,
+                            crypto_sent=str(-RP2Decimal(line[self.__TOTAL_INDEX])) if transaction_type == _OUT else Keyword.UNKNOWN.value,
+                            crypto_received=line[self.__TOTAL_INDEX] if transaction_type == _IN else Keyword.UNKNOWN.value,
+                            notes=None,
+                        )
                     )
-                )
+                else:
+                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result

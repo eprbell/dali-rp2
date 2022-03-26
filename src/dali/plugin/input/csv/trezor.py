@@ -86,7 +86,8 @@ class InputPlugin(AbstractInputPlugin):
 
                 if total_number == ZERO and fee_number > ZERO:
                     self.__logger.warning("Possible dusting attack (fee > 0, total = 0): %s", raw_data)
-                else:
+                    continue
+                if transaction_type in {_SENT, _RECV}:
                     result.append(
                         IntraTransaction(
                             plugin=self.__TREZOR,
@@ -104,5 +105,7 @@ class InputPlugin(AbstractInputPlugin):
                             notes=None,
                         )
                     )
+                else:
+                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result
