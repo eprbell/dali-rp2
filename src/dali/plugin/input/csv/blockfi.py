@@ -29,22 +29,21 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
-_CRYPTO_TRANSFER: str = "Crypto Transfer"
-_INTEREST_PAYMENT: str = "Interest Payment"
-_WITHDRAWAL: str = "Withdrawal"
-_WITHDRAWAL_FEE: str = "Withdrawal Fee"
-_TRADE: str = "Trade"
 _ACH_DEPOSIT: str = "Ach Deposit"
 _ACH_WITHDRAWAL: str = "Ach Withdrawal"
+_BUY_CURRENCY: str = "Buy Currency"
+_BUY_QUANTITY: str = "Buy Quantity"
+_CRYPTO_TRANSFER: str = "Crypto Transfer"
+_DATE: str = "Date"
+_INTEREST_PAYMENT: str = "Interest Payment"
 _REFERRAL_BONUS: str = "Referral Bonus"
-
-_TYPE = "Type"
-_TRADE_ID = "Trade ID"
-_DATE = "Date"
-_SOLD_CURRENCY = "Sold Currency"
-_SOLD_QUANTITY = "Sold Quantity"
-_BUY_CURRENCY = "Buy Currency"
-_BUY_QUANTITY = "Buy Quantity"
+_SOLD_CURRENCY: str = "Sold Currency"
+_SOLD_QUANTITY: str = "Sold Quantity"
+_TRADE: str = "Trade"
+_TRADE_ID: str = "Trade ID"
+_TYPE: str = "Type"
+_WITHDRAWAL: str = "Withdrawal"
+_WITHDRAWAL_FEE: str = "Withdrawal Fee"
 
 
 class InputPlugin(AbstractInputPlugin):
@@ -68,7 +67,7 @@ class InputPlugin(AbstractInputPlugin):
 
         super().__init__(account_holder)
         self.__transaction_csv_file: str = transaction_csv_file
-        self.__trade_csv_file = trade_csv_file
+        self.__trade_csv_file: Optional[str] = trade_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")
 
     def load(self) -> List[AbstractTransaction]:
@@ -77,21 +76,18 @@ class InputPlugin(AbstractInputPlugin):
         last_withdrawal_fee: Optional[RP2Decimal] = None
         with open(self.__transaction_csv_file, mode="r", encoding="utf-8") as transaction_csv_file:
             lines = reader(transaction_csv_file)
-            header_found: bool = False
+            # Skip header line
+            header = next(lines)
+            self.__logger.debug("Header: %s", header)
             for line in lines:
                 raw_data: str = self.__DELIMITER.join(line)
-                if not header_found:
-                    # Skip header line
-                    header_found = True
-                    self.__logger.debug("Header: %s", raw_data)
-                    continue
                 self.__logger.debug("Transaction: %s", raw_data)
 
                 if last_withdrawal_fee is not None and line[self.__TYPE_INDEX] != _WITHDRAWAL:
                     raise Exception(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
 
-                entry_type: str = line[self.__TYPE_INDEX]
-                if entry_type == _INTEREST_PAYMENT:
+                transaction_type: str = line[self.__TYPE_INDEX]
+                if transaction_type == _INTEREST_PAYMENT:
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
@@ -108,7 +104,7 @@ class InputPlugin(AbstractInputPlugin):
                             fiat_fee="0",
                         )
                     )
-                elif entry_type == _REFERRAL_BONUS:
+                elif transaction_type == _REFERRAL_BONUS:
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
@@ -126,7 +122,7 @@ class InputPlugin(AbstractInputPlugin):
                             notes="Referral Bonus"
                         )
                     )
-                elif entry_type == _CRYPTO_TRANSFER:
+                elif transaction_type == _CRYPTO_TRANSFER:
                     last_withdrawal_fee = None
                     result.append(
                         IntraTransaction(
@@ -144,7 +140,7 @@ class InputPlugin(AbstractInputPlugin):
                             crypto_received=line[self.__AMOUNT_INDEX],
                         )
                     )
-                elif entry_type == _ACH_WITHDRAWAL:
+                elif transaction_type == _ACH_WITHDRAWAL:
                     last_withdrawal_fee = None
                     result.append(
                         OutTransaction(
@@ -162,7 +158,7 @@ class InputPlugin(AbstractInputPlugin):
                             notes="ACH withdrawal",
                         )
                     )
-                elif entry_type == _WITHDRAWAL:
+                elif transaction_type == _WITHDRAWAL:
                     amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
                     amount = -amount  # type: ignore
                     if last_withdrawal_fee is not None:
@@ -184,7 +180,7 @@ class InputPlugin(AbstractInputPlugin):
                             crypto_received=Keyword.UNKNOWN.value,
                         )
                     )
-                elif entry_type == _ACH_DEPOSIT:
+                elif transaction_type == _ACH_DEPOSIT:
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
@@ -202,15 +198,15 @@ class InputPlugin(AbstractInputPlugin):
                             notes="Ach deposit",
                         )
                     )
-                elif entry_type == _TRADE:
+                elif transaction_type == _TRADE:
                     # Trades will be handled by parsing trade_report_all.csv
                     # export
                     continue
-                elif entry_type == _WITHDRAWAL_FEE:
+                elif transaction_type == _WITHDRAWAL_FEE:
                     last_withdrawal_fee = RP2Decimal(line[self.__AMOUNT_INDEX])
                     last_withdrawal_fee = -last_withdrawal_fee  # type: ignore
                 else:
-                    self.__logger.error("Unsupported transaction type (skipping): %s", raw_data)
+                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         if self.__trade_csv_file:
             result += self.parse_trade_report(self.__trade_csv_file)
@@ -225,25 +221,25 @@ class InputPlugin(AbstractInputPlugin):
             header = next(lines)
             self.__logger.debug("Header: %s", header)
 
-            col_idx: Dict[str, int] = {}
-            for (idx, name) in enumerate(header):
-                col_idx[name] = idx
+            column_index: Dict[str, int] = {}
+            for (index, name) in enumerate(header):
+                column_index[name] = index
 
             for line in lines:
                 raw_data: str = self.__DELIMITER.join(line)
                 self.__logger.debug("Transaction: %s", raw_data)
 
-                transaction_type = line[col_idx[_TYPE]]
+                transaction_type: str = line[column_index[_TYPE]]
                 if transaction_type != "Trade":
                     raise Exception(f"Internal error: unsupported transaction type: {transaction_type}")
 
-                trade_id = line[col_idx[_TRADE_ID]]
-                date = line[col_idx[_DATE]]
-                timestamp = f"{date} -00:00"
-                from_currency = line[col_idx[_SOLD_CURRENCY]].upper()
-                from_size = line[col_idx[_SOLD_QUANTITY]]
-                to_currency = line[col_idx[_BUY_CURRENCY]].upper()
-                to_size = line[col_idx[_BUY_QUANTITY]]
+                trade_id: str = line[column_index[_TRADE_ID]]
+                date: str = line[column_index[_DATE]]
+                timestamp: str = f"{date} -00:00"
+                from_currency: str = line[column_index[_SOLD_CURRENCY]].upper()
+                from_size: str = line[column_index[_SOLD_QUANTITY]]
+                to_currency: str = line[column_index[_BUY_CURRENCY]].upper()
+                to_size: str = line[column_index[_BUY_QUANTITY]]
 
                 result.append(
                     OutTransaction(
