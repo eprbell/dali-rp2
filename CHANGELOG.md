@@ -14,13 +14,21 @@
 
 # RP2 Change Log
 
+## 0.3.23
+* fixed PR #14: in Coinbase Pro plugin crypto fee is now modeled correctly both for buy and sell-side fills
+* fixed issue #16: added support for inflation_reward transaction in Coinbase plugin
+* added load caching to speed up development (PR #12)
+* added parallelism to Coinbase plugin (PR #12)
+
 ## 0.3.22
 * fixed issue #16: added support for Coinbase inflation reward transaction
 * added error log for unknown transaction type in all plugins, so they are easy to identify and report
 * added FAQ on supported exchanges/wallets
+* added support for more transaction types in BlockFi plugin (PR #11)
 
 ## 0.3.21
 * fixed bug reported in issue https://github.com/eprbell/dali-rp2/issues/10
+* fixed from/to_currency detection in Coinbase Pro plugin (PR #9)
 * added initial version of developer FAQ document: https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md
 * minor fixes to documentation
 
