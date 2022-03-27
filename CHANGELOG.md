@@ -14,7 +14,7 @@
 
 # RP2 Change Log
 
-## 0.3.24
+## 0.3.25
 * merged PR #18: Coinbase plugin wasn't handling crypto conversions correctly and generated negative amounts.
 
 ## 0.3.23
