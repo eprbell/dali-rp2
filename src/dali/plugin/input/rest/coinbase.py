@@ -57,6 +57,7 @@ _INFLATION_REWARD: str = "inflation_reward"
 _NATIVE_AMOUNT: str = "native_amount"
 _NETWORK: str = "network"
 _OFF_BLOCKCHAIN: str = "off_blockchain"
+_PRIME_WITHDRAWAL: str = "prime_withdrawal"
 _PRO_DEPOSIT: str = "pro_deposit"
 _PRO_WITHDRAWAL: str = "pro_withdrawal"
 _RESOURCE: str = "resource"
@@ -144,7 +145,7 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = json.dumps(transaction)
                 self.__logger.debug("Transaction: %s", raw_data)
                 transaction_type: str = transaction[_TYPE]
-                if transaction_type in {_PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
+                if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
                     self._process_transfer(transaction, currency, in_transaction_list, out_transaction_list, intra_transaction_list)
                 elif transaction_type in {_BUY, _SELL, _TRADE}:
                     self._process_fill(transaction, currency, in_transaction_list, out_transaction_list, id_2_buy, id_2_sell)
@@ -177,7 +178,7 @@ class InputPlugin(AbstractInputPlugin):
         native_amount: RP2Decimal = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
         transaction_type: str = transaction[_TYPE]
 
-        if transaction_type == _PRO_WITHDRAWAL:
+        if transaction_type in {_PRIME_WITHDRAWAL, _PRO_WITHDRAWAL}:
             intra_transaction_list.append(
                 IntraTransaction(
                     plugin=self.__COINBASE,
