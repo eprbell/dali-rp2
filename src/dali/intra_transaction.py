@@ -43,6 +43,7 @@ class IntraTransaction(AbstractTransaction):
         crypto_received: str,
         notes: Optional[str] = None,
         is_spot_price_from_web: Optional[bool] = None,
+        to_address: Optional[str] = None,
     ) -> None:
         super().__init__(plugin, unique_id, raw_data, timestamp, asset, notes, is_spot_price_from_web)
 
@@ -59,6 +60,7 @@ class IntraTransaction(AbstractTransaction):
         self.__crypto_received: str = self._validate_numeric_field(
             Keyword.CRYPTO_RECEIVED.value, crypto_received, raw_data, disallow_empty=True, disallow_unknown=False
         )
+        self.__to_address: Optional[str] = to_address
         self.__constructor_parameter_dictionary: Dict[str, Union[str, bool, Optional[str], Optional[bool]]] = {}
         self.__is_unresolved: bool = self._setup_constructor_parameter_dictionary(self.__constructor_parameter_dictionary)
 
@@ -77,6 +79,7 @@ class IntraTransaction(AbstractTransaction):
             f"{Keyword.CRYPTO_SENT.value}={self.crypto_sent}",
             f"{Keyword.CRYPTO_RECEIVED.value}={self.crypto_received}",
             f"{Keyword.NOTES.value}={self.notes}",
+            f"{Keyword.TO_ADDRESS.value}={self.to_address}",
         ]
         if extra_data:
             class_specific_data.extend(extra_data)
@@ -90,6 +93,10 @@ class IntraTransaction(AbstractTransaction):
     @property
     def from_holder(self) -> str:
         return self.__from_holder
+
+    @property
+    def to_address(self) -> Optional[str]:
+        return self.__to_address
 
     @property
     def to_exchange(self) -> str:

@@ -60,6 +60,7 @@ class Keyword(Enum):
     TIMESTAMP: str = "timestamp"
     TO_EXCHANGE: str = "to_exchange"
     TO_HOLDER: str = "to_holder"
+    TO_ADDRESS: str = "to_address"
     TRANSACTION_HINTS: str = "transaction_hints"
     TRANSACTION_TYPE: str = "transaction_type"
     UNIQUE_ID: str = "unique_id"
@@ -102,6 +103,7 @@ _INTERNAL_FIELD_SET: Set[str] = {
     Keyword.IS_SPOT_PRICE_FROM_WEB.value,
     Keyword.PLUGIN.value,
     Keyword.RAW_DATA.value,
+    Keyword.TO_ADDRESS.value,
 }
 
 DIRECTION_SET: Set[str] = {
@@ -178,6 +180,7 @@ DEFAULT_CONFIGURATION: Dict[str, Dict[str, int]] = {
         Keyword.CRYPTO_RECEIVED.value: 8,
         Keyword.UNIQUE_ID.value: 12,
         Keyword.NOTES.value: 13,
+        Keyword.TO_ADDRESS.value: 14,
     },
 }
 

@@ -16,6 +16,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional
 
+import json
 import yfinance as yf  # type: ignore
 from rp2.rp2_decimal import RP2Decimal, ZERO
 from rp2.rp2_error import RP2TypeError, RP2ValueError
@@ -28,6 +29,19 @@ from dali.logger import LOGGER
 from dali.out_transaction import OutTransaction
 
 __RESOLVER: str = "DaLI Resolver"
+_COINBASE: str = "Coinbase"
+_TO: str = "to"
+_ADDRESS: str = "address"
+_CURRENCY: str = "currency"
+_NETWORK: str = "network"
+_TRANSACTION_FEE: str = "transaction_fee"
+_AMOUNT: str = "amount"
+
+
+class AssetAddrAmount(NamedTuple):
+    asset: str
+    address: str
+    amount: str
 
 
 class AssetAndUniqueId(NamedTuple):
@@ -143,6 +157,7 @@ def resolve_transactions(
     if not isinstance(transactions, List):
         raise Exception(f"Internal error: parameter 'transactions' is not of type List. {transactions}")
 
+    unmatched_transfer_by_address: Dict[AssetAddrAmount, List[IntraTransaction]] = {}
     resolved_transactions: List[AbstractTransaction] = []
     unique_id_2_transactions: Dict[AssetAndUniqueId, List[AbstractTransaction]] = {}
     transaction: AbstractTransaction
@@ -151,7 +166,34 @@ def resolve_transactions(
         if not isinstance(transaction, AbstractTransaction):
             raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
 
+        if isinstance(transaction, IntraTransaction) and is_unknown(transaction.to_exchange):
+            # transfer out to unknown destination, record out address and
+            # amount for matching
+            if transaction.from_exchange == _COINBASE:
+                raw_data = json.loads(transaction.raw_data)
+                to_address = raw_data[_TO][_ADDRESS]
+                to_currency = raw_data[_TO][_CURRENCY]
+                trans_fee = raw_data[_NETWORK][_TRANSACTION_FEE][_AMOUNT]
+                to_amount = RP2Decimal(transaction.crypto_sent) - RP2Decimal(trans_fee)
+                # assert(raw_data["to"]["currency"] == raw_data["network"]["currency"])
+                key = AssetAddrAmount(to_currency, to_address, str(to_amount))
+                trans = unmatched_transfer_by_address.setdefault(key, [])
+                trans.append(transaction)
+                continue
+
         if is_unknown(transaction.unique_id):
+            # transfer in from unknown source, record from address and amount
+            # for matching
+            if isinstance(transaction, IntraTransaction) and transaction.to_exchange == "BlockFi":
+                if is_unknown(transaction.from_exchange) and is_unknown(transaction.from_holder) and transaction.to_address:
+                    asset = transaction.asset.upper()
+                    address = transaction.to_address
+                    from_amount = RP2Decimal(transaction.crypto_received)
+                    key = AssetAddrAmount(asset, address, str(from_amount))
+                    trans = unmatched_transfer_by_address.setdefault(key, [])
+                    trans.append(transaction)
+                    continue
+
             # Cannot resolve further if unique_id is not known
             if read_spot_price_from_web:
                 transaction = _update_spot_price_from_web(transaction)
@@ -161,6 +203,24 @@ def resolve_transactions(
             transaction_list: List[AbstractTransaction] = unique_id_2_transactions.setdefault(AssetAndUniqueId(transaction.asset, transaction.unique_id), [])
             transaction_list.append(transaction)
             unique_id_2_transactions[AssetAndUniqueId(transaction.asset, transaction.unique_id)] = transaction_list
+
+    for (key, transfers) in unmatched_transfer_by_address.items():
+        if len(transfers) > 2:
+            raise Exception(f"More than 2 unknown transfers matched: {transfers}")
+        if len(transfers) == 1:
+            # transaction not sent to myself, try to apply transaction hint on
+            # it in case it's a gift
+            transaction = _apply_transaction_hint(transfers[0], global_configuration)
+            if read_spot_price_from_web:
+                transaction = _update_spot_price_from_web(transaction)
+            LOGGER.debug("Self-contained transaction: %s", transaction)
+            resolved_transactions.append(transaction)
+            continue
+
+        transaction = _resolve_intra_intra_transaction(transfers[0], transfers[1], None)
+
+        LOGGER.debug("Resolved transaction: %s", transaction)
+        resolved_transactions.append(transaction)
 
     for transaction_list in unique_id_2_transactions.values():
         if len(transaction_list) > 2:
@@ -211,13 +271,14 @@ def _apply_transaction_hint(
 
     if Keyword.TRANSACTION_HINTS.value not in global_configuration:
         return transaction
-    if transaction.unique_id not in global_configuration[Keyword.TRANSACTION_HINTS.value]:
+    transaction_hints = global_configuration[Keyword.TRANSACTION_HINTS.value]
+    if transaction.unique_id not in transaction_hints:
         return transaction
 
     direction: str
     transaction_type: str
     notes: str
-    (direction, transaction_type, notes) = global_configuration[Keyword.TRANSACTION_HINTS.value][transaction.unique_id]
+    (direction, transaction_type, notes) = transaction_hints[transaction.unique_id]
     transaction_type = transaction_type.capitalize()
     notes = f"{notes}; {transaction.notes if transaction.notes else ''}"
     if direction == Keyword.IN.value:
