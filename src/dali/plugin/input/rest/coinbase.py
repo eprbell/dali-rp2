@@ -42,6 +42,7 @@ from dali.out_transaction import OutTransaction
 
 # Native format keywords
 _AMOUNT: str = "amount"
+_BALANCE: str = "balance"
 _BUY: str = "buy"
 _CODE: str = "code"
 _CREATED_AT: str = "created_at"
@@ -73,13 +74,12 @@ _TYPE: str = "type"
 _UNIT_PRICE: str = "unit_price"
 _UPDATED_AT: str = "updated_at"
 _USER: str = "user"
-_BALANCE: str = "balance"
 
 
 class TransactionList(NamedTuple):
-    In: List[InTransaction]
-    Out: List[OutTransaction]
-    Intra: List[IntraTransaction]
+    in_transactions: List[InTransaction]
+    out_transactions: List[OutTransaction]
+    intra_transactions: List[IntraTransaction]
 
 
 class CoinbaseAuth(AuthBase):
@@ -142,12 +142,12 @@ class InputPlugin(AbstractInputPlugin):
         for transaction_list in transaction_lists:
             if transaction_list is None:
                 continue
-            if transaction_list.In:
-                result.extend(transaction_list.In)
-            if transaction_list.Out:
-                result.extend(transaction_list.Out)
-            if transaction_list.Intra:
-                result.extend(transaction_list.Intra)
+            if transaction_list.in_transactions:
+                result.extend(transaction_list.in_transactions)
+            if transaction_list.out_transactions:
+                result.extend(transaction_list.out_transactions)
+            if transaction_list.intra_transactions:
+                result.extend(transaction_list.intra_transactions)
 
         return result
 
@@ -192,9 +192,9 @@ class InputPlugin(AbstractInputPlugin):
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return TransactionList(
-            In=in_transaction_list,
-            Out=out_transaction_list,
-            Intra=intra_transaction_list,
+            in_transactions=in_transaction_list,
+            out_transactions=out_transaction_list,
+            intra_transactions=intra_transaction_list,
         )
 
     def _process_transfer(
