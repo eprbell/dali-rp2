@@ -195,7 +195,7 @@ class InputPlugin(AbstractInputPlugin):
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_in=line[self.__AMOUNT_INDEX],
                             fiat_fee="0",
-                            notes="Ach deposit",
+                            notes="ACH deposit",
                         )
                     )
                 elif transaction_type == _TRADE:

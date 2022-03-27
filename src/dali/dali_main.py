@@ -144,6 +144,12 @@ def _setup_argument_parser() -> ArgumentParser:
     )
 
     parser.add_argument(
+        "-c",
+        "--use-cache",
+        action="store_true",
+        help="Cache input plugin data load",
+    )
+    parser.add_argument(
         "-o",
         "--output_dir",
         action="store",
@@ -180,12 +186,6 @@ def _setup_argument_parser() -> ArgumentParser:
         help="INI file",
         metavar="INI_FILE",
         type=str,
-    )
-    parser.add_argument(
-        "-c",
-        "--use-cache",
-        action="store_true",
-        help="Cache input plugin data load",
     )
 
     return parser
