@@ -14,8 +14,11 @@
 
 # RP2 Change Log
 
+## 0.3.24
+* merged PR #18: Coinbase plugin wasn't handling crypto conversions correctly and generated negative amounts.
+
 ## 0.3.23
-* fixed PR #14: in Coinbase Pro plugin crypto fee is now modeled correctly both for buy and sell-side fills
+* merged PR #14: in Coinbase Pro plugin crypto fee is now modeled correctly both for buy and sell-side fills
 * fixed issue #16: added support for inflation_reward transaction in Coinbase plugin
 * added load caching to speed up development (PR #12)
 * added parallelism to Coinbase plugin (PR #12)
