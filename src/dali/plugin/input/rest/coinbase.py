@@ -209,13 +209,14 @@ class InputPlugin(AbstractInputPlugin):
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         native_amount: RP2Decimal = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
         transaction_type: str = transaction[_TYPE]
+        raw_data: str = json.dumps(transaction)
 
         if transaction_type in {_PRIME_WITHDRAWAL, _PRO_WITHDRAWAL}:
             intra_transaction_list.append(
                 IntraTransaction(
                     plugin=self.__COINBASE,
                     unique_id=transaction[_ID],
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=transaction[_CREATED_AT],
                     asset=currency,
                     from_exchange=self.__COINBASE_PRO,
@@ -232,7 +233,7 @@ class InputPlugin(AbstractInputPlugin):
                 IntraTransaction(
                     plugin=self.__COINBASE,
                     unique_id=transaction[_ID],
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=transaction[_CREATED_AT],
                     asset=currency,
                     from_exchange=self.__COINBASE,
@@ -249,7 +250,7 @@ class InputPlugin(AbstractInputPlugin):
                 IntraTransaction(
                     plugin=self.__COINBASE,
                     unique_id=transaction[_ID],
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=transaction[_CREATED_AT],
                     asset=currency,
                     from_exchange=self.__COINBASE,
@@ -276,7 +277,7 @@ class InputPlugin(AbstractInputPlugin):
                         OutTransaction(
                             plugin=self.__COINBASE,
                             unique_id=transaction[_ID],
-                            raw_data=json.dumps(transaction),
+                            raw_data=raw_data,
                             timestamp=transaction[_CREATED_AT],
                             asset=currency,
                             exchange=self.__COINBASE,
@@ -296,7 +297,7 @@ class InputPlugin(AbstractInputPlugin):
                         IntraTransaction(
                             plugin=self.__COINBASE,
                             unique_id=crypto_hash,
-                            raw_data=json.dumps(transaction),
+                            raw_data=raw_data,
                             timestamp=transaction[_CREATED_AT],
                             asset=currency,
                             from_exchange=self.__COINBASE,
@@ -316,7 +317,7 @@ class InputPlugin(AbstractInputPlugin):
                             InTransaction(
                                 plugin=self.__COINBASE,
                                 unique_id=transaction[_ID],
-                                raw_data=json.dumps(transaction),
+                                raw_data=raw_data,
                                 timestamp=transaction[_CREATED_AT],
                                 asset=currency,
                                 exchange=self.__COINBASE,
@@ -339,7 +340,7 @@ class InputPlugin(AbstractInputPlugin):
                         IntraTransaction(
                             plugin=self.__COINBASE,
                             unique_id=crypto_hash,
-                            raw_data=json.dumps(transaction),
+                            raw_data=raw_data,
                             timestamp=transaction[_CREATED_AT],
                             asset=currency,
                             from_exchange=Keyword.UNKNOWN.value,
@@ -372,10 +373,12 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.warning("Swap transaction encountered (swaps not supported yet by Coinbase plugin): %s", json.dumps(transaction))
             return
 
+        raw_data: str = json.dumps(transaction)
         if transaction_type in {_BUY, _TRADE}:
             spot_price = (native_amount - fiat_fee) / crypto_amount
             if transaction_type == _BUY:
                 buy: Dict[str, Any] = id_2_buy[transaction[transaction_type][_ID]]
+                raw_data = f"{raw_data}//{json.dumps(buy)}"
                 fiat_fee = RP2Decimal(buy[_FEE][_AMOUNT])
                 self.__logger.debug("Buy: %s", json.dumps(buy))
                 spot_price = RP2Decimal(buy[_UNIT_PRICE][_AMOUNT])
@@ -383,7 +386,7 @@ class InputPlugin(AbstractInputPlugin):
                 InTransaction(
                     plugin=self.__COINBASE,
                     unique_id=transaction[_ID],
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=transaction[_CREATED_AT],
                     asset=currency,
                     exchange=self.__COINBASE,
@@ -400,6 +403,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         elif transaction_type == _SELL:
             sell = id_2_sell[transaction[transaction_type][_ID]]
+            raw_data = f"{raw_data}//{json.dumps(sell)}"
             fiat_fee = RP2Decimal(sell[_FEE][_AMOUNT])
             spot_price = RP2Decimal(sell[_UNIT_PRICE][_AMOUNT])
             self.__logger.debug("Sell: %s", json.dumps(sell))
@@ -407,7 +411,7 @@ class InputPlugin(AbstractInputPlugin):
                 OutTransaction(
                     plugin=self.__COINBASE,
                     unique_id=transaction[_ID],
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=transaction[_CREATED_AT],
                     asset=currency,
                     exchange=self.__COINBASE,
@@ -423,7 +427,7 @@ class InputPlugin(AbstractInputPlugin):
                 )
             )
         else:
-            self.__logger.debug("Unsupported transaction type (skipping): %s", json.dumps(transaction_type))
+            self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
     def _process_interest(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction]) -> None:
 

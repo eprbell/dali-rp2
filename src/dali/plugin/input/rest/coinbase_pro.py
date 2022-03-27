@@ -193,6 +193,7 @@ class InputPlugin(AbstractInputPlugin):
         transfer: Any = self.__get_transfer(transfer_id)
         transfer_details: Any = transfer[_DETAILS]
         crypto_hash: str = Keyword.UNKNOWN.value
+        raw_data: str = f"{json.dumps(transaction)}//{json.dumps(transfer)}"
 
         self.__logger.debug("Transfer: %s", json.dumps(transfer))
         if _CRYPTO_TRANSACTION_HASH not in transfer_details:
@@ -210,7 +211,7 @@ class InputPlugin(AbstractInputPlugin):
                 IntraTransaction(
                     plugin=self.__COINBASE_PRO,
                     unique_id=crypto_hash,
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=transaction[_CREATED_AT],
                     asset=currency,
                     from_exchange=Keyword.UNKNOWN.value,
@@ -228,7 +229,7 @@ class InputPlugin(AbstractInputPlugin):
                 IntraTransaction(
                     plugin=self.__COINBASE_PRO,
                     unique_id=crypto_hash,
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=transaction[_CREATED_AT],
                     asset=currency,
                     from_exchange=self.__COINBASE_PRO,
@@ -242,7 +243,7 @@ class InputPlugin(AbstractInputPlugin):
                 )
             )
         else:
-            self.__logger.debug("Unsupported transaction type (skipping): %s", transaction_details[_TRANSFER_TYPE])
+            self.__logger.error("Unsupported transfer type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
     def _process_fills(self, transaction: Any, in_transaction_list: List[InTransaction], out_transaction_list: List[OutTransaction], fill: Any) -> None:
         product_id: str = transaction[_DETAILS][_PRODUCT_ID]
@@ -261,6 +262,7 @@ class InputPlugin(AbstractInputPlugin):
         spot_price: RP2Decimal = RP2Decimal(fill[_PRICE])
         crypto_amount: RP2Decimal = RP2Decimal(fill[_SIZE])
         fiat_fee: RP2Decimal = RP2Decimal(fill[_FEE])
+        raw_data: str = f"{json.dumps(transaction)}//{json.dumps(fill)}"
 
         from_currency, to_currency = self._parse_product_id(fill[_PRODUCT_ID])
         is_from_currency_fiat: bool = is_fiat(from_currency)
@@ -276,7 +278,7 @@ class InputPlugin(AbstractInputPlugin):
                     InTransaction(
                         plugin=self.__COINBASE_PRO,
                         unique_id=unique_id,
-                        raw_data=json.dumps(transaction),
+                        raw_data=raw_data,
                         timestamp=fill[_CREATED_AT],
                         asset=to_currency if is_from_currency_fiat else from_currency,
                         exchange=self.__COINBASE_PRO,
@@ -302,7 +304,7 @@ class InputPlugin(AbstractInputPlugin):
                     OutTransaction(
                         plugin=self.__COINBASE_PRO,
                         unique_id=unique_id,
-                        raw_data=json.dumps(transaction),
+                        raw_data=raw_data,
                         timestamp=fill[_CREATED_AT],
                         asset=from_currency if is_to_currency_fiat else from_currency,
                         exchange=self.__COINBASE_PRO,
@@ -344,7 +346,7 @@ class InputPlugin(AbstractInputPlugin):
                 OutTransaction(
                     plugin=self.__COINBASE_PRO,
                     unique_id=unique_id,
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=fill[_CREATED_AT],
                     asset=from_currency,
                     exchange=self.__COINBASE_PRO,
@@ -367,7 +369,7 @@ class InputPlugin(AbstractInputPlugin):
                 InTransaction(
                     plugin=self.__COINBASE_PRO,
                     unique_id=f"{unique_id}/buy",
-                    raw_data=json.dumps(transaction),
+                    raw_data=raw_data,
                     timestamp=fill[_CREATED_AT],
                     asset=to_currency,
                     exchange=self.__COINBASE_PRO,
@@ -384,7 +386,7 @@ class InputPlugin(AbstractInputPlugin):
             )
 
         else:
-            self.__logger.debug("Unsupported transaction (skipping): %s", json.dumps(transaction))
+            self.__logger.error("Unsupported fill type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
     def __append_transaction(self, transaction_list: List[AbstractTransaction], transaction: AbstractTransaction) -> None:
         if AssetAndUniqueId(transaction.asset, transaction.unique_id) not in self.__fill_cache:
