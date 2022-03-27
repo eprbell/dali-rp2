@@ -22,7 +22,8 @@ import hmac
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, NamedTuple
+from multiprocessing.pool import ThreadPool
 
 import requests
 from requests import PreparedRequest
@@ -70,7 +71,15 @@ _TO: str = "to"
 _TRADE: str = "trade"
 _TYPE: str = "type"
 _UNIT_PRICE: str = "unit_price"
+_UPDATED_AT: str = "updated_at"
 _USER: str = "user"
+_BALANCE: str = "balance"
+
+
+class TransactionList(NamedTuple):
+    In: List[InTransaction]
+    Out: List[OutTransaction]
+    Intra: List[IntraTransaction]
 
 
 class CoinbaseAuth(AuthBase):
@@ -100,6 +109,7 @@ class CoinbaseAuth(AuthBase):
 class InputPlugin(AbstractInputPlugin):
 
     __API_URL: str = "https://api.coinbase.com"
+    __THREAD_COUNT: int = 3
     __TIMEOUT: int = 30
 
     __COINBASE: str = "Coinbase"
@@ -117,53 +127,75 @@ class InputPlugin(AbstractInputPlugin):
         self.__auth: CoinbaseAuth = CoinbaseAuth(api_key, api_secret)
         self.__session: Session = requests.Session()
         self.__logger: logging.Logger = create_logger(f"{self.__COINBASE}/{self.account_holder}")
+        self.__cache_key: str = f"{self.__COINBASE.lower()}-{account_holder}"
+
+    def cache_key(self) -> Optional[str]:
+        return self.__cache_key
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
+        accounts = self.__get_accounts()
+        transaction_lists: List[Optional[TransactionList]]
+        with ThreadPool(self.__THREAD_COUNT) as pool:
+            transaction_lists = pool.map(self._process_account, accounts)
 
-        for account in self.__get_accounts():
-            currency: str = account[_CURRENCY][_CODE]
-            account_id: str = account[_ID]
-            in_transaction_list: List[InTransaction] = []
-            out_transaction_list: List[OutTransaction] = []
-            intra_transaction_list: List[IntraTransaction] = []
-
-            self.__logger.debug("Account: %s", json.dumps(account))
-
-            id_2_buy: Dict[str, Any] = {}
-            for buy in self.__get_buys(account_id):
-                id_2_buy[buy[_ID]] = buy
-
-            id_2_sell: Dict[str, Any] = {}
-            for sell in self.__get_sells(account_id):
-                id_2_sell[sell[_ID]] = sell
-
-            for transaction in self.__get_transactions(account_id):
-                if is_fiat(currency):
-                    self.__logger.debug("Skipping fiat transaction: %s", json.dumps(transaction))
-                    continue
-                raw_data: str = json.dumps(transaction)
-                self.__logger.debug("Transaction: %s", raw_data)
-                transaction_type: str = transaction[_TYPE]
-                if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
-                    self._process_transfer(transaction, currency, in_transaction_list, out_transaction_list, intra_transaction_list)
-                elif transaction_type in {_BUY, _SELL, _TRADE}:
-                    self._process_fill(transaction, currency, in_transaction_list, out_transaction_list, id_2_buy, id_2_sell)
-                elif transaction_type in {_INTEREST}:
-                    self._process_interest(transaction, currency, in_transaction_list)
-                elif transaction_type in {_INFLATION_REWARD}:
-                    self._process_income(transaction, currency, in_transaction_list, transaction[_DETAILS][_TITLE])
-                else:
-                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
-
-            if in_transaction_list:
-                result.extend(in_transaction_list)
-            if out_transaction_list:
-                result.extend(out_transaction_list)
-            if intra_transaction_list:
-                result.extend(intra_transaction_list)
+        for transaction_list in transaction_lists:
+            if transaction_list is None:
+                continue
+            if transaction_list.In:
+                result.extend(transaction_list.In)
+            if transaction_list.Out:
+                result.extend(transaction_list.Out)
+            if transaction_list.Intra:
+                result.extend(transaction_list.Intra)
 
         return result
+
+    def _process_account(self, account: Dict[str, Any]) -> Optional[TransactionList]:
+        currency: str = account[_CURRENCY][_CODE]
+        account_id: str = account[_ID]
+        in_transaction_list: List[InTransaction] = []
+        out_transaction_list: List[OutTransaction] = []
+        intra_transaction_list: List[IntraTransaction] = []
+
+        self.__logger.debug("Account: %s", json.dumps(account))
+
+        if account[_CREATED_AT] == account[_UPDATED_AT] and RP2Decimal(account[_BALANCE][_AMOUNT]) == ZERO:
+            # skip account without activity to avoid unnecessary API calls
+            return None
+
+        id_2_buy: Dict[str, Any] = {}
+        for buy in self.__get_buys(account_id):
+            id_2_buy[buy[_ID]] = buy
+
+        id_2_sell: Dict[str, Any] = {}
+        for sell in self.__get_sells(account_id):
+            id_2_sell[sell[_ID]] = sell
+
+        for transaction in self.__get_transactions(account_id):
+            if is_fiat(currency):
+                self.__logger.debug("Skipping fiat transaction: %s", json.dumps(transaction))
+                continue
+
+            raw_data: str = json.dumps(transaction)
+            self.__logger.debug("Transaction: %s", raw_data)
+            transaction_type: str = transaction[_TYPE]
+            if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
+                self._process_transfer(transaction, currency, in_transaction_list, out_transaction_list, intra_transaction_list)
+            elif transaction_type in {_BUY, _SELL, _TRADE}:
+                self._process_fill(transaction, currency, in_transaction_list, out_transaction_list, id_2_buy, id_2_sell)
+            elif transaction_type in {_INTEREST}:
+                self._process_interest(transaction, currency, in_transaction_list)
+            elif transaction_type in {_INFLATION_REWARD}:
+                self._process_income(transaction, currency, in_transaction_list, transaction[_DETAILS][_TITLE])
+            else:
+                self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
+
+        return TransactionList(
+            In=in_transaction_list,
+            Out=out_transaction_list,
+            Intra=intra_transaction_list,
+        )
 
     def _process_transfer(
         self,
@@ -438,7 +470,6 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-
     def __get_accounts(self) -> Any:
         return self.__send_request_with_pagination("/v2/accounts")
 
@@ -468,7 +499,7 @@ class InputPlugin(AbstractInputPlugin):
             json_response: Any = response.json()
             for result in json_response["data"]:
                 yield result
-            if not "pagination" in json_response or not "next_uri" in json_response["pagination"] or not json_response["pagination"]["next_uri"]:
+            if "pagination" not in json_response or "next_uri" not in json_response["pagination"] or not json_response["pagination"]["next_uri"]:
                 break
             current_url = f"{self.__api_url}{json_response['pagination']['next_uri']}"
 
