@@ -13,6 +13,7 @@
 # limitations under the License.
 
 build/
+.cache
 dist/
 .DS_Store
 log/*.log
