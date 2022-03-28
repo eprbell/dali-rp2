@@ -17,7 +17,7 @@
 
 import logging
 from csv import reader
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
