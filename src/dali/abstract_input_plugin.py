@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional
+from typing import List, Optional, cast
 
-import os
-import pickle  # nosec
 from rp2.rp2_error import RP2TypeError
 
 from dali.abstract_transaction import AbstractTransaction
+from dali.cache import load_from_cache, save_to_cache
 
 
 class AbstractInputPlugin:
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
-    __CACHE_DIR = ".cache"
 
     def __init__(
         self,
@@ -40,25 +38,21 @@ class AbstractInputPlugin:
     def load(self) -> List[AbstractTransaction]:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
-    def load_cache(self) -> Optional[List[AbstractTransaction]]:
+    def load_from_cache(self) -> Optional[List[AbstractTransaction]]:
         cache_key = self.cache_key()  # pylint: disable=assignment-from-none
         if cache_key is None:
             raise Exception("Plugin doesn't support load cache")
-        cache_path = os.path.join(self.__CACHE_DIR, cache_key)
-        if not os.path.exists(cache_path):
-            return None
-        with open(cache_path, "rb") as cache_file:
-            result: List[AbstractTransaction] = pickle.load(cache_file)  # nosec
-            return result
+        if not isinstance(cache_key, str):
+            raise Exception("Plugin cache_key() doesn't return a string")
+        return cast(Optional[List[AbstractTransaction]], load_from_cache(cache_key))
 
-    def save_cache(self, transactions: List[AbstractTransaction]) -> None:
+    def save_to_cache(self, transactions: List[AbstractTransaction]) -> None:
         cache_key = self.cache_key()  # pylint: disable=assignment-from-none
         if cache_key is None:
             raise Exception("Plugin doesn't support load cache")
-        if not os.path.exists(self.__CACHE_DIR):
-            os.mkdir(self.__CACHE_DIR)
-        with open(os.path.join(self.__CACHE_DIR, cache_key), "wb") as cache_file:
-            cache_file.write(pickle.dumps(transactions))
+        if not isinstance(cache_key, str):
+            raise Exception("Plugin cache_key() doesn't return a string")
+        save_to_cache(cache_key, transactions)
 
     @property
     def account_holder(self) -> str:

@@ -94,13 +94,13 @@ def input_loader() -> None:
 
                 plugin_transactions: List[AbstractTransaction]
                 if args.use_cache and input_plugin.cache_key() is not None:
-                    cache = input_plugin.load_cache()
+                    cache = input_plugin.load_from_cache()
                     if cache:
                         LOGGER.info("Reading plugin load result from cache")
                         plugin_transactions = cache
                     else:
                         plugin_transactions = input_plugin.load()
-                        input_plugin.save_cache(plugin_transactions)
+                        input_plugin.save_to_cache(plugin_transactions)
                 else:
                     plugin_transactions = input_plugin.load()
 
