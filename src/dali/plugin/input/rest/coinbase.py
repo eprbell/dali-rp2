@@ -22,8 +22,8 @@ import hmac
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, NamedTuple
 from multiprocessing.pool import ThreadPool
+from typing import Any, Dict, List, NamedTuple, Optional
 
 import requests
 from requests import PreparedRequest
@@ -109,7 +109,7 @@ class CoinbaseAuth(AuthBase):
 class InputPlugin(AbstractInputPlugin):
 
     __API_URL: str = "https://api.coinbase.com"
-    __THREAD_COUNT: int = 3
+    __THREAD_COUNT: int = 4
     __TIMEOUT: int = 30
 
     __COINBASE: str = "Coinbase"
