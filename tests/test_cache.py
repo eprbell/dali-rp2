@@ -35,7 +35,10 @@ class TestCache(unittest.TestCase):
 
     def test_list_cache(self) -> None:
         cache_name: str = "test_list_cache"
-        (ROOT_PATH / CACHE_DIR / cache_name).unlink(missing_ok=True)
+        try:
+            (ROOT_PATH / CACHE_DIR / cache_name).unlink()
+        except FileNotFoundError:
+            pass
         transaction_list: List[AbstractTransaction] = [
             InTransaction(
                 plugin="my plugin 1",
@@ -88,7 +91,10 @@ class TestCache(unittest.TestCase):
 
     def test_dict_cache(self) -> None:
         cache_name: str = "test_dict_cache"
-        (ROOT_PATH / CACHE_DIR / cache_name).unlink(missing_ok=True)
+        try:
+            (ROOT_PATH / CACHE_DIR / cache_name).unlink()
+        except FileNotFoundError:
+            pass
         dictionary: Dict[str, int] = {
             "abc": 12,
             "def": 87,
