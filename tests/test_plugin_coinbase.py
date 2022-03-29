@@ -19,14 +19,14 @@ from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
 
 
-class TestTrade():
+class TestTrade:
 
     # pylint: disable=no-self-use
     def test_eth2_stake(self, mocker: Any) -> None:
         plugin = InputPlugin(
-            account_holder='tester',
-            api_key='a',
-            api_secret='b',
+            account_holder="tester",
+            api_key="a",
+            api_secret="b",
         )
 
         eth_account_id = "bbbbbbbb-dddd-4444-8888-000000000000"
@@ -71,9 +71,7 @@ class TestTrade():
                 "resource_path": f"/v2/accounts/{eth2_account_id}",
                 "allow_deposits": False,
                 "allow_withdrawals": False,
-                "rewards": {
-                    "apy": "0.03675", "formatted_apy": "3.68%", "label": "3.68% APR"
-                },
+                "rewards": {"apy": "0.03675", "formatted_apy": "3.68%", "label": "3.68% APR"},
             },
         ]
 
@@ -124,10 +122,7 @@ class TestTrade():
                         "resource": "transaction",
                         "resource_path": f"/v2/accounts/{eth2_account_id}/transactions/{transaction_id}",
                         "instant_exchange": False,
-                        "trade": {
-                            "id": trade_id,
-                            "resource": "trade",
-                            "resource_path": f"/v2/accounts/{eth2_account_id}/trades/{trade_id}"},
+                        "trade": {"id": trade_id, "resource": "trade", "resource_path": f"/v2/accounts/{eth2_account_id}/trades/{trade_id}"},
                         "details": {
                             "title": "Converted to Ethereum 2",
                             "subtitle": "Using ETH Wallet",

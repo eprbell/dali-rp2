@@ -30,6 +30,7 @@ INPUT_PATH: Path = ROOT_PATH / Path("input")
 GOLDEN_PATH: Path = INPUT_PATH / Path("golden")
 OUTPUT_PATH: Path = ROOT_PATH / Path("output")
 
+
 class TestODSOutputDiff(unittest.TestCase):
 
     output_dir: Path

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-
 import os
 from pathlib import Path
 from typing import Dict, List
@@ -28,8 +27,8 @@ from dali.out_transaction import OutTransaction
 ROOT_PATH: Path = Path(os.path.dirname(__file__)).parent.absolute()
 OUTPUT_PATH: Path = ROOT_PATH / Path("output")
 
-class TestCache(unittest.TestCase):
 
+class TestCache(unittest.TestCase):
     def setUp(self) -> None:  # pylint: disable=invalid-name
         self.maxDiff = None  # pylint: disable=invalid-name
 
@@ -68,7 +67,7 @@ class TestCache(unittest.TestCase):
                 crypto_out_no_fee="2.2",
                 crypto_fee="0.01",
                 notes="my notes 2",
-            )
+            ),
         ]
         save_to_cache(cache_name, transaction_list)
         loaded_transaction_list: List[AbstractTransaction] = load_from_cache(cache_name)
@@ -103,6 +102,7 @@ class TestCache(unittest.TestCase):
         save_to_cache(cache_name, dictionary)
         loaded_dictionary: Dict[str, int] = load_from_cache(cache_name)
         self.assertEqual(dictionary, loaded_dictionary)
+
 
 if __name__ == "__main__":
     unittest.main()

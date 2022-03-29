@@ -19,15 +19,15 @@ from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
 
 
-class TestSwapFill():
+class TestSwapFill:
 
     # pylint: disable=no-self-use
     def test_buy_side(self, mocker: Any) -> None:
         plugin = InputPlugin(
-            account_holder='tester',
-            api_key='a',
-            api_secret='b',
-            api_passphrase='c',
+            account_holder="tester",
+            api_key="a",
+            api_secret="b",
+            api_passphrase="c",
         )
 
         btc_account_id = "bbbbbbbb-dddd-4444-8888-000000000000"
