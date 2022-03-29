@@ -119,7 +119,7 @@ class InputPlugin(AbstractInputPlugin):
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_in=line[self.__AMOUNT_INDEX],
                             fiat_fee="0",
-                            notes="Referral Bonus"
+                            notes="Referral Bonus",
                         )
                     )
                 elif transaction_type == _CRYPTO_TRANSFER:
