@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## 0,3.26
+* -s CLI option to read missing spot prices from Web: rewrote implementation from Yahoo Finance (daily granularity) to Coinbase Pro (minute granularity)
+* moved cache logic to its own module, so it can be used in multiple places: plugins, transaction_resolver, etc.
+* fixed issue #19: the user needs to pass -s to read highly granular price data from Coinbase Pro, when it's missing (or computed as 0)
+
 ## 0.3.25
 * merged PR #18: Coinbase plugin wasn't handling crypto conversions correctly and generated negative amounts.
 
