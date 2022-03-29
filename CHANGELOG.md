@@ -14,6 +14,12 @@
 
 # RP2 Change Log
 
+# In Progress
+* added threading support to Coinbase Pro
+* thread count can now be specified in the plugin configuration section of the .ini file
+* additional fix in missing fiat_fee issue in crypto swaps on Coinbase (issue #15)
+* updated documentation
+
 ## 0.3.27
 * fix for missing fiat_fee issue in crypto swaps on Coinbase (issue #15)
 
