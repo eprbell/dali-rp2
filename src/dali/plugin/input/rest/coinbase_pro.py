@@ -75,6 +75,7 @@ class TransactionLists(NamedTuple):
     out_transactions: List[OutTransaction]
     intra_transactions: List[IntraTransaction]
 
+
 class CoinbaseProAuth(AuthBase):
     def __init__(self, api_key: str, api_secret: str, api_passphrase: str) -> None:
         self.__api_key: str = api_key
@@ -124,7 +125,7 @@ class InputPlugin(AbstractInputPlugin):
         api_key: str,
         api_secret: str,
         api_passphrase: str,
-        thread_count: Optional[int]=None,
+        thread_count: Optional[int] = None,
     ) -> None:
 
         super().__init__(account_holder)
