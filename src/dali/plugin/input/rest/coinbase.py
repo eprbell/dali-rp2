@@ -76,11 +76,11 @@ _UPDATED_AT: str = "updated_at"
 _USER: str = "user"
 
 
-class TransactionList(NamedTuple):
+class TransactionLists(NamedTuple):
     in_transactions: List[InTransaction]
     out_transactions: List[OutTransaction]
     intra_transactions: List[IntraTransaction]
-
+    out_swaps: Dict[str, OutTransaction] # out-side of crypto swap
 
 class CoinbaseAuth(AuthBase):
 
@@ -134,29 +134,63 @@ class InputPlugin(AbstractInputPlugin):
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
+        out_swaps: Dict[str, OutTransaction] = {}
         accounts = self.__get_accounts()
-        transaction_lists: List[Optional[TransactionList]]
+        transaction_lists_list: List[Optional[TransactionLists]]
         with ThreadPool(self.__THREAD_COUNT) as pool:
-            transaction_lists = pool.map(self._process_account, accounts)
+            transaction_lists_list = pool.map(self._process_account, accounts)
 
-        for transaction_list in transaction_lists:
-            if transaction_list is None:
+        for transaction_lists in transaction_lists_list:
+            if transaction_lists is None:
                 continue
-            if transaction_list.in_transactions:
-                result.extend(transaction_list.in_transactions)
-            if transaction_list.out_transactions:
-                result.extend(transaction_list.out_transactions)
-            if transaction_list.intra_transactions:
-                result.extend(transaction_list.intra_transactions)
+            if transaction_lists.in_transactions:
+                result.extend(transaction_lists.in_transactions)
+            if transaction_lists.out_transactions:
+                result.extend(transaction_lists.out_transactions)
+            if transaction_lists.intra_transactions:
+                result.extend(transaction_lists.intra_transactions)
+            if transaction_lists.out_swaps:
+                out_swaps.update(transaction_lists.out_swaps)
+
+        # Update fiat fee in crypto swaps
+        for index, transaction in enumerate(result):
+            if isinstance(transaction, InTransaction) and transaction.unique_id in out_swaps:
+                out_transaction: OutTransaction = out_swaps[transaction.unique_id]
+                if transaction.asset == out_transaction.asset:
+                    raise Exception(f"Internal error: detected a crypto swap with same asset ({transaction.asset}): {transaction} // {out_transaction}")
+                if not transaction.fiat_in_no_fee or not transaction.fiat_in_with_fee or not out_transaction.fiat_out_no_fee:
+                    raise Exception(f"Internal error: swap transactions have incomplete fiat data: {transaction} // {out_transaction}")
+                fiat_in_no_fee: RP2Decimal = RP2Decimal(transaction.fiat_in_no_fee)
+                fiat_in_with_fee: RP2Decimal = RP2Decimal(transaction.fiat_in_with_fee)
+                fiat_out_no_fee: RP2Decimal = RP2Decimal(out_transaction.fiat_out_no_fee)
+                if fiat_in_with_fee < fiat_out_no_fee:
+                    result[index] = InTransaction(
+                        plugin=self.__COINBASE,
+                        unique_id=transaction.unique_id,
+                        raw_data=transaction.raw_data,
+                        timestamp=transaction.timestamp,
+                        asset=transaction.asset,
+                        exchange=transaction.exchange,
+                        holder=transaction.holder,
+                        transaction_type=transaction.transaction_type,
+                        spot_price=transaction.spot_price,
+                        crypto_in=transaction.crypto_in,
+                        crypto_fee=transaction.crypto_fee,
+                        fiat_in_no_fee=transaction.fiat_in_no_fee,
+                        fiat_in_with_fee=str(fiat_out_no_fee),
+                        fiat_fee=str(fiat_out_no_fee - fiat_in_no_fee),
+                        notes=transaction.notes,
+                    )
 
         return result
 
-    def _process_account(self, account: Dict[str, Any]) -> Optional[TransactionList]:
+    def _process_account(self, account: Dict[str, Any]) -> Optional[TransactionLists]:
         currency: str = account[_CURRENCY][_CODE]
         account_id: str = account[_ID]
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
         intra_transaction_list: List[IntraTransaction] = []
+        out_swaps: Dict[str, OutTransaction] = {}
 
         self.__logger.debug("Account: %s", json.dumps(account))
 
@@ -183,7 +217,7 @@ class InputPlugin(AbstractInputPlugin):
             if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
                 self._process_transfer(transaction, currency, in_transaction_list, out_transaction_list, intra_transaction_list)
             elif transaction_type in {_BUY, _SELL, _TRADE}:
-                self._process_fill(transaction, currency, in_transaction_list, out_transaction_list, id_2_buy, id_2_sell)
+                self._process_fill(transaction, currency, in_transaction_list, out_transaction_list, out_swaps, id_2_buy, id_2_sell)
             elif transaction_type in {_INTEREST}:
                 self._process_interest(transaction, currency, in_transaction_list)
             elif transaction_type in {_INFLATION_REWARD}:
@@ -191,10 +225,11 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
-        return TransactionList(
+        return TransactionLists(
             in_transactions=in_transaction_list,
             out_transactions=out_transaction_list,
             intra_transactions=intra_transaction_list,
+            out_swaps=out_swaps,
         )
 
     def _process_transfer(
@@ -359,6 +394,7 @@ class InputPlugin(AbstractInputPlugin):
         currency: str,
         in_transaction_list: List[InTransaction],
         out_transaction_list: List[OutTransaction],
+        out_swaps: Dict[str, OutTransaction],
         id_2_buy: Dict[str, Any],
         id_2_sell: Dict[str, Any],
     ) -> None:
@@ -414,25 +450,25 @@ class InputPlugin(AbstractInputPlugin):
                 # swap out transaction
                 spot_price = native_amount / crypto_amount
 
-            out_transaction_list.append(
-                OutTransaction(
-                    plugin=self.__COINBASE,
-                    unique_id=transaction[_ID],
-                    raw_data=raw_data,
-                    timestamp=transaction[_CREATED_AT],
-                    asset=currency,
-                    exchange=self.__COINBASE,
-                    holder=self.account_holder,
-                    transaction_type="Sell",
-                    spot_price=str(spot_price),
-                    crypto_out_no_fee=str(-crypto_amount - fiat_fee / spot_price),
-                    crypto_fee=str(fiat_fee / spot_price),
-                    crypto_out_with_fee=str(-crypto_amount),
-                    fiat_out_no_fee=str(-native_amount),
-                    fiat_fee=str(fiat_fee),
-                    notes=None,
-                )
+            out_transaction: OutTransaction = OutTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=raw_data,
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type="Sell",
+                spot_price=str(spot_price),
+                crypto_out_no_fee=str(-crypto_amount - fiat_fee / spot_price),
+                crypto_fee=str(fiat_fee / spot_price),
+                crypto_out_with_fee=str(-crypto_amount),
+                fiat_out_no_fee=str(-native_amount),
+                fiat_fee=str(fiat_fee),
+                notes=None,
             )
+            out_transaction_list.append(out_transaction)
+            out_swaps[out_transaction.unique_id] = out_transaction
         else:
             self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
