@@ -22,6 +22,7 @@ import hashlib
 import hmac
 import json
 import logging
+from multiprocessing.pool import ThreadPool
 import time
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
@@ -69,6 +70,11 @@ _USD_VOLUME: str = "usd_volume"
 _WITHDRAW: str = "withdraw"
 
 
+class TransactionLists(NamedTuple):
+    in_transactions: List[InTransaction]
+    out_transactions: List[OutTransaction]
+    intra_transactions: List[IntraTransaction]
+
 class CoinbaseProAuth(AuthBase):
     def __init__(self, api_key: str, api_secret: str, api_passphrase: str) -> None:
         self.__api_key: str = api_key
@@ -102,6 +108,8 @@ class FromToCurrencyPair(NamedTuple):
 class InputPlugin(AbstractInputPlugin):
 
     __API_URL: str = "https://api.pro.coinbase.com/"
+    __DEFAULT_THREAD_COUNT: int = 2
+    __MAX_THREAD_COUNT: int = 4
     __TIMEOUT: int = 30
 
     __COINBASE_PRO: str = "Coinbase Pro"
@@ -116,6 +124,7 @@ class InputPlugin(AbstractInputPlugin):
         api_key: str,
         api_secret: str,
         api_passphrase: str,
+        thread_count: Optional[int]=None,
     ) -> None:
 
         super().__init__(account_holder)
@@ -124,59 +133,74 @@ class InputPlugin(AbstractInputPlugin):
         self.__session: Session = requests.Session()
         self.__logger: logging.Logger = create_logger(f"{self.__COINBASE_PRO}/{self.account_holder}")
         self.__cache_key: str = f"coinbase_pro-{account_holder}"
+        self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
+        if self.__thread_count > self.__MAX_THREAD_COUNT:
+            raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
+        transaction_lists_list: List[Optional[TransactionLists]]
 
-        product_id_2_trade_id_2_fill: Dict[str, Dict[str, Any]] = {}
+        with ThreadPool(self.__thread_count) as pool:
+            transaction_lists_list = pool.map(self._process_account, self.__get_accounts())
 
-        for account in self.__get_accounts():
-            currency: str = account[_CURRENCY]
-            account_id: str = account[_ID]
-            in_transaction_list: List[InTransaction] = []
-            out_transaction_list: List[OutTransaction] = []
-            intra_transaction_list: List[IntraTransaction] = []
-
-            self.__logger.debug("Account: %s", json.dumps(account))
-            for transaction in self.__get_transactions(account_id):
-                transaction_type: str = transaction[_TYPE]
-                raw_data: str = json.dumps(transaction)
-                self.__logger.debug("Transaction: %s", raw_data)
-                if transaction_type == _TRANSFER:
-                    self._process_transfer(transaction, currency, intra_transaction_list)
-                elif transaction_type == _MATCH:
-                    product_id: str = transaction[_DETAILS][_PRODUCT_ID]
-                    if product_id not in product_id_2_trade_id_2_fill:
-                        trade_id_2_fill: Dict[str, Any] = {}
-                        for fill in self.__get_fills(product_id):
-                            trade_id_2_fill[f"{fill[_ORDER_ID]}/{fill[_TRADE_ID]}"] = fill
-                        product_id_2_trade_id_2_fill[product_id] = trade_id_2_fill
-                    self._process_fills(
-                        transaction,
-                        in_transaction_list,
-                        out_transaction_list,
-                        product_id_2_trade_id_2_fill[product_id][f"{transaction[_DETAILS][_ORDER_ID]}/{transaction[_DETAILS][_TRADE_ID]}"],
-                    )
-                elif transaction_type == _FEE:
-                    # The fees are already deduced while processing other transactions
-                    self.__logger.debug("Redundant fee transaction (skipping): %s", raw_data)
-                elif transaction_type == _CONVERSION:
-                    # It's not clear what the conversion transaction is used for: it doesn't seem to contain information that affects the final outcome
-                    self.__logger.debug("Conversion transaction (skipping): %s", raw_data)
-                else:
-                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
-
-            if in_transaction_list:
-                result.extend(in_transaction_list)
-            if out_transaction_list:
-                result.extend(out_transaction_list)
-            if intra_transaction_list:
-                result.extend(intra_transaction_list)
+        for transaction_lists in transaction_lists_list:
+            if transaction_lists is None:
+                continue
+            if transaction_lists.in_transactions:
+                result.extend(transaction_lists.in_transactions)
+            if transaction_lists.out_transactions:
+                result.extend(transaction_lists.out_transactions)
+            if transaction_lists.intra_transactions:
+                result.extend(transaction_lists.intra_transactions)
 
         return result
+
+    def _process_account(self, account: Dict[str, Any]) -> Optional[TransactionLists]:
+        currency: str = account[_CURRENCY]
+        account_id: str = account[_ID]
+        product_id_2_trade_id_2_fill: Dict[str, Dict[str, Any]] = {}
+        in_transaction_list: List[InTransaction] = []
+        out_transaction_list: List[OutTransaction] = []
+        intra_transaction_list: List[IntraTransaction] = []
+
+        self.__logger.debug("Account: %s", json.dumps(account))
+        for transaction in self.__get_transactions(account_id):
+            transaction_type: str = transaction[_TYPE]
+            raw_data: str = json.dumps(transaction)
+            self.__logger.debug("Transaction: %s", raw_data)
+            if transaction_type == _TRANSFER:
+                self._process_transfer(transaction, currency, intra_transaction_list)
+            elif transaction_type == _MATCH:
+                product_id: str = transaction[_DETAILS][_PRODUCT_ID]
+                if product_id not in product_id_2_trade_id_2_fill:
+                    trade_id_2_fill: Dict[str, Any] = {}
+                    for fill in self.__get_fills(product_id):
+                        trade_id_2_fill[f"{fill[_ORDER_ID]}/{fill[_TRADE_ID]}"] = fill
+                    product_id_2_trade_id_2_fill[product_id] = trade_id_2_fill
+                self._process_fills(
+                    transaction,
+                    in_transaction_list,
+                    out_transaction_list,
+                    product_id_2_trade_id_2_fill[product_id][f"{transaction[_DETAILS][_ORDER_ID]}/{transaction[_DETAILS][_TRADE_ID]}"],
+                )
+            elif transaction_type == _FEE:
+                # The fees are already deduced while processing other transactions
+                self.__logger.debug("Redundant fee transaction (skipping): %s", raw_data)
+            elif transaction_type == _CONVERSION:
+                # It's not clear what the conversion transaction is used for: it doesn't seem to contain information that affects the final outcome
+                self.__logger.debug("Conversion transaction (skipping): %s", raw_data)
+            else:
+                self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
+
+        return TransactionLists(
+            in_transactions=in_transaction_list,
+            out_transactions=out_transaction_list,
+            intra_transactions=intra_transaction_list,
+        )
 
     @staticmethod
     def _parse_product_id(product_id: str) -> FromToCurrencyPair:

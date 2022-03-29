@@ -109,7 +109,8 @@ class CoinbaseAuth(AuthBase):
 class InputPlugin(AbstractInputPlugin):
 
     __API_URL: str = "https://api.coinbase.com"
-    __THREAD_COUNT: int = 4
+    __DEFAULT_THREAD_COUNT: int = 3
+    __MAX_THREAD_COUNT: int = 4
     __TIMEOUT: int = 30
 
     __COINBASE: str = "Coinbase"
@@ -120,6 +121,7 @@ class InputPlugin(AbstractInputPlugin):
         account_holder: str,
         api_key: str,
         api_secret: str,
+        thread_count: Optional[int]=None,
     ) -> None:
 
         super().__init__(account_holder)
@@ -128,6 +130,9 @@ class InputPlugin(AbstractInputPlugin):
         self.__session: Session = requests.Session()
         self.__logger: logging.Logger = create_logger(f"{self.__COINBASE}/{self.account_holder}")
         self.__cache_key: str = f"{self.__COINBASE.lower()}-{account_holder}"
+        self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
+        if self.__thread_count > self.__MAX_THREAD_COUNT:
+            raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
@@ -135,10 +140,10 @@ class InputPlugin(AbstractInputPlugin):
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
         out_swaps: Dict[str, OutTransaction] = {}
-        accounts = self.__get_accounts()
         transaction_lists_list: List[Optional[TransactionLists]]
-        with ThreadPool(self.__THREAD_COUNT) as pool:
-            transaction_lists_list = pool.map(self._process_account, accounts)
+
+        with ThreadPool(self.__thread_count) as pool:
+            transaction_lists_list = pool.map(self._process_account, self.__get_accounts())
 
         for transaction_lists in transaction_lists_list:
             if transaction_lists is None:
