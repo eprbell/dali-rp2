@@ -19,6 +19,7 @@ from typing import Any
 
 CACHE_DIR: str = ".cache"
 
+
 def load_from_cache(cache_name: str) -> Any:
     cache_path = os.path.join(CACHE_DIR, cache_name)
     if not os.path.exists(cache_path):
@@ -26,6 +27,7 @@ def load_from_cache(cache_name: str) -> Any:
     with open(cache_path, "rb") as cache_file:
         result: Any = pickle.load(cache_file)  # nosec
         return result
+
 
 def save_to_cache(cache_name: str, data: Any) -> None:
     if not os.path.exists(CACHE_DIR):
