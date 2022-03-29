@@ -191,8 +191,9 @@ class InputPlugin(AbstractInputPlugin):
                         fiat_in_with_fee=str(fiat_out_no_fee),
                         fiat_fee=str(fiat_out_no_fee - fiat_in_no_fee),
                         notes=(
-                            f"{transaction.notes + '; ' if transaction.notes else ''} Buy side of conversion from {out_transaction.crypto_out_with_fee} {out_transaction.asset} "
-                            f"-> {transaction.crypto_in} {transaction.asset} (out transaction unique id: {out_transaction.unique_id})"
+                            f"{transaction.notes + '; ' if transaction.notes else ''} Buy side of conversion from "
+                            f"{out_transaction.crypto_out_with_fee} {out_transaction.asset} -> "
+                            f"{transaction.crypto_in} {transaction.asset} (out transaction unique id: {out_transaction.unique_id})"
                         ),
                     )
 
