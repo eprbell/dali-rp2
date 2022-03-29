@@ -16,5 +16,4 @@ from typing import Any
 
 class HistoricalData:
     def __init__(self, ticker: str, granularity: int, start_date: str, end_data: str, verbose: bool) -> None: ...
-
     def retrieve_data(self) -> Any: ...  # type: ignore

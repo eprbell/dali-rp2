@@ -31,6 +31,7 @@ from dali.out_transaction import OutTransaction
 __RESOLVER: str = "DaLI Resolver"
 __HISTORICAL_PRICE_CACHE: str = "coinbase_pro_historical_prices"
 
+
 class AssetAndTimestamp(NamedTuple):
     asset: str
     timestamp: datetime
@@ -111,12 +112,15 @@ def _resolve_optional_fields(
         if_conflict_override_second_parameter,
     )
 
+
 def _load_from_historical_price_cache() -> Dict[AssetAndTimestamp, str]:
     result = load_from_cache(__HISTORICAL_PRICE_CACHE)
     return cast(Dict[AssetAndTimestamp, str], result) if result is not None else {}
 
+
 def _save_to_historical_price_cache(historical_prices: Dict[AssetAndTimestamp, str]) -> None:
     save_to_cache(__HISTORICAL_PRICE_CACHE, historical_prices)
+
 
 def _update_spot_price_from_web(transaction: AbstractTransaction, historical_price_cache: Dict[AssetAndTimestamp, str]) -> AbstractTransaction:
     init_parameters: Dict[str, Any] = transaction.constructor_parameter_dictionary
@@ -142,13 +146,7 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
                     seconds = time_granularity[retry_count]
                     to_timestamp: str = (transaction.timestamp_value + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
                     spot_price = str(
-                        HistoricalData(
-                            f"{transaction.asset}-USD",
-                            seconds,
-                            from_timestamp,
-                            to_timestamp,
-                            verbose=False
-                        ).retrieve_data()["high"][0]
+                        HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()["high"][0]
                     )
                     break
                 except ValueError:
