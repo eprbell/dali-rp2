@@ -18,27 +18,29 @@ import unittest
 from pathlib import Path
 from subprocess import run
 from typing import List
+from dali.cache import CACHE_DIR
 
 from ods_diff import ods_diff
 
 ROOT_PATH: Path = Path(os.path.dirname(__file__)).parent.absolute()
 
+CACHE_PATH: Path = ROOT_PATH / CACHE_DIR
 CONFIG_PATH: Path = ROOT_PATH / Path("config")
 INPUT_PATH: Path = ROOT_PATH / Path("input")
 GOLDEN_PATH: Path = INPUT_PATH / Path("golden")
 OUTPUT_PATH: Path = ROOT_PATH / Path("output")
 
-# Unit test are NYI: this is a placeholder class
 class TestODSOutputDiff(unittest.TestCase):
 
     output_dir: Path
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.output_dir = ROOT_PATH / Path("output") / Path(cls.__module__)
+        cls.output_dir = OUTPUT_PATH / Path(__file__[:-3]).name
         shutil.rmtree(cls.output_dir, ignore_errors=True)
+        shutil.rmtree(CACHE_PATH, ignore_errors=True)
 
-        cls._generate(OUTPUT_PATH, "test", "test_config")
+        cls._generate(cls.output_dir, "test", "test_config")
 
     def setUp(self) -> None:  # pylint: disable=invalid-name
         self.maxDiff = None  # pylint: disable=invalid-name
@@ -71,42 +73,42 @@ class TestODSOutputDiff(unittest.TestCase):
                 str(output_dir),
                 "-p",
                 f"{test_name}_",
-                str(OUTPUT_PATH / Path(f"{test_name}_crypto_data.config")),
-                str(OUTPUT_PATH / Path(f"{test_name}_crypto_data.ods")),
+                str(output_dir / Path(f"{test_name}_crypto_data.config")),
+                str(output_dir / Path(f"{test_name}_crypto_data.ods")),
             ]
             run(arguments, check=True)
 
     def test_crypto_data_ods(self) -> None:
         file_name: str = "test_crypto_data.ods"
-        full_output_file_name: Path = OUTPUT_PATH / file_name
+        full_output_file_name: Path = self.output_dir / file_name
         full_golden_file_name: Path = GOLDEN_PATH / file_name
         diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
         self.assertFalse(diff, msg=diff)
 
     def test_fifo_tax_report_us_ods(self) -> None:
         file_name: str = "test_fifo_tax_report_us.ods"
-        full_output_file_name: Path = OUTPUT_PATH / file_name
+        full_output_file_name: Path = self.output_dir / file_name
         full_golden_file_name: Path = GOLDEN_PATH / file_name
         diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
         self.assertFalse(diff, msg=diff)
 
     def test_fifo_rp2_full_report_ods(self) -> None:
         file_name: str = "test_fifo_rp2_full_report.ods"
-        full_output_file_name: Path = OUTPUT_PATH / file_name
+        full_output_file_name: Path = self.output_dir / file_name
         full_golden_file_name: Path = GOLDEN_PATH / file_name
         diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
         self.assertFalse(diff, msg=diff)
 
     def test_lifo_tax_report_us_ods(self) -> None:
         file_name: str = "test_lifo_tax_report_us.ods"
-        full_output_file_name: Path = OUTPUT_PATH / file_name
+        full_output_file_name: Path = self.output_dir / file_name
         full_golden_file_name: Path = GOLDEN_PATH / file_name
         diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
         self.assertFalse(diff, msg=diff)
 
     def test_lifo_rp2_full_report_ods(self) -> None:
         file_name: str = "test_lifo_rp2_full_report.ods"
-        full_output_file_name: Path = OUTPUT_PATH / file_name
+        full_output_file_name: Path = self.output_dir / file_name
         full_golden_file_name: Path = GOLDEN_PATH / file_name
         diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
         self.assertFalse(diff, msg=diff)
