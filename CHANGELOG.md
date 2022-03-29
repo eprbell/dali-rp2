@@ -14,6 +14,9 @@
 
 # RP2 Change Log
 
+## 0.3.27
+* fix for missing fiat_fee issue in crypto swaps on Coinbase (issue #15)
+
 ## 0.3.26
 * -s CLI option to read missing spot prices from Web: rewrote implementation from Yahoo Finance (daily granularity) to Coinbase Pro (minute granularity)
 * moved cache logic to its own module, so it can be used in multiple places: plugins, transaction_resolver, etc.
