@@ -65,6 +65,7 @@ _PRO_WITHDRAWAL: str = "pro_withdrawal"
 _RESOURCE: str = "resource"
 _SELL: str = "sell"
 _SEND: str = "send"
+_STAKING_REWARD: str = "staking_reward"
 _STATUS: str = "status"
 _SUBTITLE: str = "subtitle"
 _TITLE: str = "title"
@@ -113,6 +114,11 @@ class InputPlugin(AbstractInputPlugin):
     __API_URL: str = "https://api.coinbase.com"
     __DEFAULT_THREAD_COUNT: int = 3
     __MAX_THREAD_COUNT: int = 4
+    # Coinbase returns very low precision fiat data (only 2 decimal digits): if the value is less than 1c Coinbase
+    # rounds it to zero, which causes various computation problems (spot_price, etc.). As a workaround, when this
+    # condition is detected the plugin sets affected fields to UNKNOWN or None (depending on their nature), so that
+    # they can be filled later by the transaction resolver and RP2.
+    __MINIMUM_FIAT_PRECISION: RP2Decimal = RP2Decimal("0.01")
     __TIMEOUT: int = 30
 
     __COINBASE: str = "Coinbase"
@@ -193,7 +199,7 @@ class InputPlugin(AbstractInputPlugin):
                         notes=(
                             f"{transaction.notes + '; ' if transaction.notes else ''} Buy side of conversion from "
                             f"{out_transaction.crypto_out_with_fee} {out_transaction.asset} -> "
-                            f"{transaction.crypto_in} {transaction.asset} (out transaction unique id: {out_transaction.unique_id})"
+                            f"{transaction.crypto_in} {transaction.asset} ({out_transaction.asset} out-transaction unique id: {out_transaction.unique_id})"
                         ),
                     )
 
@@ -244,9 +250,11 @@ class InputPlugin(AbstractInputPlugin):
                     id_2_sell=id_2_sell,
                 )
             elif transaction_type in {_INTEREST}:
-                self._process_interest(transaction, currency, in_transaction_list)
+                self._process_gain(transaction, currency, Keyword.INTEREST, in_transaction_list)
+            elif transaction_type in {_STAKING_REWARD}:
+                self._process_gain(transaction, currency, Keyword.STAKING, in_transaction_list)
             elif transaction_type in {_INFLATION_REWARD}:
-                self._process_income(transaction, currency, in_transaction_list, transaction[_DETAILS][_TITLE])
+                self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list)
             else:
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
@@ -373,29 +381,12 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 if transaction[_FROM][_RESOURCE] == _USER and transaction_network[_STATUS] == _OFF_BLOCKCHAIN and _SUBTITLE in transaction[_DETAILS]:
                     if _EMAIL in transaction[_FROM]:
-                        # Incoming gift from another Coinbase user
-                        in_transaction_list.append(
-                            InTransaction(
-                                plugin=self.__COINBASE,
-                                unique_id=transaction[_ID],
-                                raw_data=raw_data,
-                                timestamp=transaction[_CREATED_AT],
-                                asset=currency,
-                                exchange=self.__COINBASE,
-                                holder=self.account_holder,
-                                transaction_type="Income",
-                                spot_price=str(native_amount / amount),
-                                crypto_in=transaction[_AMOUNT][_AMOUNT],
-                                crypto_fee=None,
-                                fiat_in_no_fee=str(native_amount),
-                                fiat_in_with_fee=str(native_amount),
-                                fiat_fee="0",
-                                notes=f"From: {transaction[_FROM][_EMAIL]}",
-                            )
-                        )
+                        # Incoming money from another Coinbase user. Marking it as income conservatively, but it could be
+                        # a gift or other type: if so the user needs to explicitly recast it with a transaction hint
+                        self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, f"From: {transaction[_FROM][_EMAIL]}")
                     elif transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
                         # Coinbase Earn transactions
-                        self._process_income(transaction, currency, in_transaction_list, "Coinbase EARN")
+                        self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, "Coinbase EARN")
                 else:
                     intra_transaction_list.append(
                         IntraTransaction(
@@ -430,6 +421,7 @@ class InputPlugin(AbstractInputPlugin):
         crypto_amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         fiat_fee: RP2Decimal = ZERO
         spot_price: RP2Decimal
+        spot_price_string: str
 
         if transaction[_NATIVE_AMOUNT][_CURRENCY] != "USD":
             # This is probably a coin swap: TBD (for now just return)
@@ -442,11 +434,20 @@ class InputPlugin(AbstractInputPlugin):
                 buy: Dict[str, Any] = id_2_buy[transaction[transaction_type][_ID]]
                 raw_data = f"{raw_data}//{json.dumps(buy)}"
                 fiat_fee = RP2Decimal(buy[_FEE][_AMOUNT])
-                self.__logger.debug("Buy: %s", json.dumps(buy))
                 spot_price = RP2Decimal(buy[_UNIT_PRICE][_AMOUNT])
+                spot_price_string = str(spot_price)
+                self.__logger.debug("Buy: %s", json.dumps(buy))
             else:
                 # swap in transaction
-                spot_price = (native_amount - fiat_fee) / crypto_amount
+                spot_price_string = Keyword.UNKNOWN.value
+                if native_amount >= self.__MINIMUM_FIAT_PRECISION:
+                    spot_price_string = str((native_amount - fiat_fee) / crypto_amount)
+
+            fiat_in_no_fee: Optional[str] = None
+            fiat_in_with_fee: Optional[str] = None
+            if native_amount >= self.__MINIMUM_FIAT_PRECISION:
+                fiat_in_no_fee = str(native_amount - fiat_fee)
+                fiat_in_with_fee = str(native_amount)
 
             in_transaction: InTransaction = InTransaction(
                 plugin=self.__COINBASE,
@@ -457,11 +458,11 @@ class InputPlugin(AbstractInputPlugin):
                 exchange=self.__COINBASE,
                 holder=self.account_holder,
                 transaction_type="Buy",
-                spot_price=str(spot_price),
+                spot_price=spot_price_string,
                 crypto_in=str(crypto_amount),
                 crypto_fee=None,
-                fiat_in_no_fee=str(native_amount - fiat_fee),
-                fiat_in_with_fee=str(native_amount),
+                fiat_in_no_fee=fiat_in_no_fee,
+                fiat_in_with_fee=fiat_in_with_fee,
                 fiat_fee=str(fiat_fee),
                 notes=None,
             )
@@ -472,10 +473,10 @@ class InputPlugin(AbstractInputPlugin):
         elif transaction_type == _SELL or (transaction_type == _TRADE and native_amount < ZERO):
             if transaction_type == _SELL:
                 sell = id_2_sell[transaction[transaction_type][_ID]]
-                fiat_fee = RP2Decimal(sell[_FEE][_AMOUNT])
-                self.__logger.debug("Sell: %s", json.dumps(sell))
-                spot_price = RP2Decimal(sell[_UNIT_PRICE][_AMOUNT])
                 raw_data = f"{raw_data}//{json.dumps(sell)}"
+                fiat_fee = RP2Decimal(sell[_FEE][_AMOUNT])
+                spot_price = RP2Decimal(sell[_UNIT_PRICE][_AMOUNT])
+                self.__logger.debug("Sell: %s", json.dumps(sell))
             else:
                 # swap out transaction
                 spot_price = native_amount / crypto_amount
@@ -495,7 +496,7 @@ class InputPlugin(AbstractInputPlugin):
                 crypto_out_with_fee=str(-crypto_amount),
                 fiat_out_no_fee=str(-native_amount),
                 fiat_fee=str(fiat_fee),
-                notes=None,
+                notes=f"Sell side of conversion of {str(-crypto_amount)} {currency}",
             )
             out_transaction_list.append(out_transaction)
             if transaction_type == _TRADE:
@@ -503,31 +504,19 @@ class InputPlugin(AbstractInputPlugin):
         else:
             self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
-    def _process_interest(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction]) -> None:
-
-        in_transaction_list.append(
-            InTransaction(
-                plugin=self.__COINBASE,
-                unique_id=transaction[_ID],
-                raw_data=json.dumps(transaction),
-                timestamp=transaction[_CREATED_AT],
-                asset=currency,
-                exchange=self.__COINBASE,
-                holder=self.account_holder,
-                transaction_type="Interest",
-                spot_price=Keyword.UNKNOWN.value,
-                crypto_in=transaction[_AMOUNT][_AMOUNT],
-                crypto_fee=None,
-                fiat_in_no_fee=None,
-                fiat_in_with_fee=None,
-                fiat_fee="0",
-                notes=None,
-            )
-        )
-
-    def _process_income(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: str) -> None:
+    def _process_gain(
+        self, transaction: Any, currency: str, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None
+    ) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         native_amount: RP2Decimal = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
+        notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}"
+        spot_price: str = Keyword.UNKNOWN.value
+        fiat_in_no_fee: Optional[str] = None
+        fiat_in_with_fee: Optional[str] = None
+        if native_amount >= self.__MINIMUM_FIAT_PRECISION:
+            spot_price = str(native_amount / amount)
+            fiat_in_no_fee = str(native_amount)
+            fiat_in_with_fee = str(native_amount)
         in_transaction_list.append(
             InTransaction(
                 plugin=self.__COINBASE,
@@ -537,12 +526,12 @@ class InputPlugin(AbstractInputPlugin):
                 asset=currency,
                 exchange=self.__COINBASE,
                 holder=self.account_holder,
-                transaction_type="Income",
-                spot_price=str(native_amount / amount),
+                transaction_type=transaction_type.value.capitalize(),
+                spot_price=spot_price,
                 crypto_in=str(amount),
                 crypto_fee=None,
-                fiat_in_no_fee=str(native_amount),
-                fiat_in_with_fee=str(native_amount),
+                fiat_in_no_fee=fiat_in_no_fee,
+                fiat_in_with_fee=fiat_in_with_fee,
                 fiat_fee="0",
                 notes=notes,
             )
