@@ -171,7 +171,7 @@ def _setup_argument_parser() -> ArgumentParser:
         "-s",
         "--read-spot-price-from-web",
         action="store_true",
-        help="Read spot price from Yahoo historical data (highest daily value), for transactions where it's missing",
+        help="Read spot price from Coinbase Pro historical data, for transactions where it's missing",
     )
     parser.add_argument(
         "-v",

@@ -118,7 +118,7 @@ Let's call `<download_directory>` the location of the downloaded files. To gener
   mv *.csv input
   dali -s -o output -p test_ test_config.ini
   ```
-The `-s` option allows DaLI to retrieve spot price information from Yahoo Finance (highest daily value), when it's not available from the CSV files or REST services.
+The `-s` option allows DaLI to retrieve spot price information from Coinbase Pro, when it's not available from the CSV files or REST services.
 
 The ODS output file is generated in the output directory (or wherever specified with the -o option).
 
