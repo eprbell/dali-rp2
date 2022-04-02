@@ -31,6 +31,7 @@ class Keyword(Enum):
     CRYPTO_SENT: str = "crypto_sent"
     DONATE: str = "donate"
     EXCHANGE: str = "exchange"
+    FEE: str = "fee"
     FIAT_FEE: str = "fiat_fee"
     FIAT_IN_NO_FEE: str = "fiat_in_no_fee"
     FIAT_IN_WITH_FEE: str = "fiat_in_with_fee"
@@ -126,6 +127,7 @@ DIRECTION_2_TRANSACTION_TYPE_SET: Dict[str, Set[str]] = {
     Keyword.OUT.value: {
         Keyword.DONATE.value,
         Keyword.GIFT.value,
+        Keyword.FEE.value,
         Keyword.SELL.value,
     },
     Keyword.INTRA.value: {
