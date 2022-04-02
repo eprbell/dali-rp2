@@ -228,7 +228,7 @@ When submitting a new data loader plugin open a [PR](https://github.com/eprbell/
     ```
 10. the plugin uses `self.__logger.debug()` throughout its code to capture all native-format data (which is is useful for debugging). Note that `logger.debug()` calls only occur if the user sets `LOG_LEVEL=DEBUG`;
 11. CSV plugins have one or more [unit test](tests/);
-12. REST plugins have one or more [unit tests](tests/): use pytest-mock to simulate network calls (see [test_plugin_coinbase.py](../tests/test_plugin_coinbase.py) for an example of this);
+12. REST plugins have one or more [unit tests](tests/): use pytest-mock to simulate network calls (see [test_plugin_coinbase.py](tests/test_plugin_coinbase.py) for an example of this);
 13. the plugin and its initialization parameters are documented in s section in [docs/configuration_file.md](docs/configuration_file.md#data-loader-plugin-sections).
 
 ## Frequently Asked Developer Questions
