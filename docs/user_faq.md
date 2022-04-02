@@ -69,14 +69,15 @@ In some cases exchange reports don't have spot price information. In such situat
 
 ### What if I and My Spouse File Taxes Jointly?
 Suppose Alice and Bob are filing together and they both have a Coinbase account and a Trezor wallet each. They can configure 4 plugin sections in the configuration file:
-* Coinbase / Bob
-* Coinbase / Alice
-* Trezor / Bob
-* Trezor / Alice
+* Coinbase / Bob;
+* Coinbase / Alice;
+* Trezor / Bob;
+* Trezor / Alice.
+
 See the [configuration file](configuration_file.md) section of the documentation for more details.
 
 ### What if a Transaction Is Generated Differently Than I Expect?
-In certain cases DaLI doesn't know the user's intentions and it needs hints to generate a transaction correctly. For example an out transaction could be represented either as a partial intra transaction (as described above) or as a normal out transaction (perhaps a gift to another person): only the user knows the correct meaning of the transaction. In such cases [transaction_hints](configuration_file.md#transaction-hints-section) in the configuration file can be used to resolve the problem.
+In certain cases DaLI doesn't know the user's intentions and it needs hints to generate a transaction correctly. For example an out transaction could be represented either as a partial intra transaction or as a normal out transaction (perhaps a gift to another person): only the user knows the correct meaning of the transaction. In such cases [transaction_hints](configuration_file.md#transaction-hints-section) in the configuration file can be used to solve the problem.
 
 ### How to Report a DaLI Bug Without Sharing Personal Information?
 See the Reporting Bugs section in the [CONTRIBUTING](../CONTRIBUTING.md#reporting-bugs) document.
@@ -104,5 +105,5 @@ Selling, swapping, donating, mining, staking, earning cryptocurrency are some co
 No. The IRS has made it clear that [crypto taxes must be paid](https://www.irs.gov/newsroom/irs-reminds-taxpayers-to-report-virtual-currency-transactions).
 
 ### Which Resources Can I Use to Learn About Crypto Taxes?
-A good starting point is the [Cryptocurrency Tax FAQ](https://www.reddit.com/r/CryptoTax/comments/re6jal/cryptocurrency_tax_faq/) on Reddit. Also read the question on [which tax forms to file](#which-crypto-tax-forms-to-file) and consult with your tax professional.
+A good starting point is the [Cryptocurrency Tax FAQ](https://www.reddit.com/r/CryptoTax/comments/re6jal/cryptocurrency_tax_faq/) on Reddit. Also read the RP2 FAQ question on [which tax forms to file](https://github.com/eprbell/rp2/blob/main/docs/user_faq.md#which-crypto-tax-forms-to-file) and consult with your tax professional.
 

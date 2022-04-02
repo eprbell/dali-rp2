@@ -38,8 +38,7 @@ Read the [contribution guidelines](../CONTRIBUTING.md#contributing-to-the-reposi
 Read the [Internal Design](../README.dev.md#internal-design) section of the Developer Documentation (and in particular the Plugin subsections).
 
 ### How Does DaLI Merge Transactions Between Different Exchanges/Wallets?
-Read about the [transaction_resolver](../src/dali/transaction_resolver.py) in the [Internal Design](../README.dev.md#internal-design) section of the Developer Documentation.
+Read about the [transaction_resolver](../src/dali/transaction_resolver.py) in the [Internal Design](../README.dev.md#the-transaction-resolver) section of the Developer Documentation.
 
 ### Why the Strange Directory Structure with Src?
 Because DaLI is a [src](https://bskinn.github.io/My-How-Why-Pyproject-Src/)-[based](https://hynek.me/articles/testing-packaging/) [project](https://blog.ionelmc.ro/2014/05/25/python-packaging/).
-
