@@ -14,6 +14,9 @@
 
 # RP2 Change Log
 
+## 0.4.1
+* Minor documentation fixes
+
 ## 0.4.0
 * Fixed issue #20: Coinbase plugin now supports the staking_reward transaction type
 * Fix for Coinbase reporting fiat with low precision (only 2 decimal digits): if the value is less than 1c Coinbase rounds it to zero, which caused various computation problems (spot_price, etc.). As a workaround, when this condition is detected the plugin sets affected fields to UNKNOWN or None (depending on their nature), so that they can be filled later by the transaction resolver and RP2
