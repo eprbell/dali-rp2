@@ -35,12 +35,11 @@ from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
-from dali.abstract_transaction import AbstractTransaction
+from dali.abstract_transaction import AbstractTransaction, AssetAndUniqueId
 from dali.dali_configuration import Keyword, is_fiat
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-from dali.transaction_resolver import AssetAndUniqueId
 
 # Native format keywords
 _AMOUNT: str = "amount"
@@ -70,13 +69,18 @@ _USD_VOLUME: str = "usd_volume"
 _WITHDRAW: str = "withdraw"
 
 
-class TransactionLists(NamedTuple):
+class _ProcessAccountResult(NamedTuple):
     in_transactions: List[InTransaction]
     out_transactions: List[OutTransaction]
     intra_transactions: List[IntraTransaction]
 
 
-class CoinbaseProAuth(AuthBase):
+class _FromToCurrencyPair(NamedTuple):
+    from_currency: str
+    to_currency: str
+
+
+class _CoinbaseProAuth(AuthBase):
     def __init__(self, api_key: str, api_secret: str, api_passphrase: str) -> None:
         self.__api_key: str = api_key
         self.__api_secret: str = api_secret
@@ -99,11 +103,6 @@ class CoinbaseProAuth(AuthBase):
             }
         )
         return request
-
-
-class FromToCurrencyPair(NamedTuple):
-    from_currency: str
-    to_currency: str
 
 
 class InputPlugin(AbstractInputPlugin):
@@ -130,7 +129,7 @@ class InputPlugin(AbstractInputPlugin):
 
         super().__init__(account_holder)
         self.__api_url: str = InputPlugin.__API_URL
-        self.__auth = CoinbaseProAuth(api_key, api_secret, api_passphrase)
+        self.__auth = _CoinbaseProAuth(api_key, api_secret, api_passphrase)
         self.__session: Session = requests.Session()
         self.__logger: logging.Logger = create_logger(f"{self.__COINBASE_PRO}/{self.account_holder}")
         self.__cache_key: str = f"coinbase_pro-{account_holder}"
@@ -143,24 +142,24 @@ class InputPlugin(AbstractInputPlugin):
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
-        transaction_lists_list: List[Optional[TransactionLists]]
+        process_account_result_list: List[Optional[_ProcessAccountResult]]
 
         with ThreadPool(self.__thread_count) as pool:
-            transaction_lists_list = pool.map(self._process_account, self.__get_accounts())
+            process_account_result_list = pool.map(self._process_account, self.__get_accounts())
 
-        for transaction_lists in transaction_lists_list:
-            if transaction_lists is None:
+        for process_account_result in process_account_result_list:
+            if process_account_result is None:
                 continue
-            if transaction_lists.in_transactions:
-                result.extend(transaction_lists.in_transactions)
-            if transaction_lists.out_transactions:
-                result.extend(transaction_lists.out_transactions)
-            if transaction_lists.intra_transactions:
-                result.extend(transaction_lists.intra_transactions)
+            if process_account_result.in_transactions:
+                result.extend(process_account_result.in_transactions)
+            if process_account_result.out_transactions:
+                result.extend(process_account_result.out_transactions)
+            if process_account_result.intra_transactions:
+                result.extend(process_account_result.intra_transactions)
 
         return result
 
-    def _process_account(self, account: Dict[str, Any]) -> Optional[TransactionLists]:
+    def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
         currency: str = account[_CURRENCY]
         account_id: str = account[_ID]
         product_id_2_trade_id_2_fill: Dict[str, Dict[str, Any]] = {}
@@ -197,16 +196,16 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
-        return TransactionLists(
+        return _ProcessAccountResult(
             in_transactions=in_transaction_list,
             out_transactions=out_transaction_list,
             intra_transactions=intra_transaction_list,
         )
 
     @staticmethod
-    def _parse_product_id(product_id: str) -> FromToCurrencyPair:
+    def _parse_product_id(product_id: str) -> _FromToCurrencyPair:
         split_product_id: List[str] = product_id.split("-")
-        return FromToCurrencyPair(from_currency=split_product_id[0], to_currency=split_product_id[1])
+        return _FromToCurrencyPair(from_currency=split_product_id[0], to_currency=split_product_id[1])
 
     def _process_transfer(self, transaction: Any, currency: str, intra_transaction_list: List[IntraTransaction]) -> None:
         # Ensure the amount is positive
@@ -388,7 +387,7 @@ class InputPlugin(AbstractInputPlugin):
             )
 
             if usd_volume != to_currency_price * to_currency_size:
-                raise Exception(f"USD volume ({usd_volume}) doesn't match In transaction crypto size ({to_currency_size}) and price ({to_currency_price}).")
+                raise Exception(f"USD volume ({usd_volume}) doesn't match in-transaction crypto size ({to_currency_size}) and price ({to_currency_price}).")
             self.__append_transaction(
                 cast(List[AbstractTransaction], in_transaction_list),
                 InTransaction(
