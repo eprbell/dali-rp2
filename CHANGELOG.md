@@ -14,6 +14,10 @@
 
 # RP2 Change Log
 
+## 0.4.3
+* rewrote Coinbase coin swap logic: it now handles correctly swaps from stable coins with a fee (previously it would ignore the fee)
+* various documentation fixes and some refactoring
+
 ## 0.4.2
 * fixed issue #21: fee-typed out-transactions in the manual plugin would cause an exception
 * reviewed all documentation
