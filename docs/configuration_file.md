@@ -186,7 +186,7 @@ The manual CSV plugin is typically used for two purposes:
 * add complete in/out/intra transactions for exchanges or wallets that are not yet supported by DaLI;
 * add partial in/out/intra transactions for exchanges or wallets that are not yet supported by DaLI.
 
-Partial transactions occur when an intra transaction is sent from a wallet or exchange supported by DaLI and is received at a wallet or exchange that is not yet supported by DaLI or viceversa. This causes DaLI to generate an incomplete transaction.
+Partial transactions occur when an intra transaction is sent from a wallet or exchange supported by DaLI and is received at a wallet or exchange that is not yet supported by DaLI or viceversa. This causes DaLI to generate an partial transaction. Partial transactions can be identified in the generated ODS file, because they have some fields marked with `__unknown`.
 
 For the case of supported origin and unsupported destination, DaLI models the source side of the transaction by generating either:
 1. a partial intra transaction with defined `from_exchange`/`from_holder`/`crypto_sent` and empty `to_exchange`/`to_holder`/`crypto_received` or
