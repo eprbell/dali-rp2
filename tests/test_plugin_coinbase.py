@@ -14,6 +14,8 @@
 
 from typing import List, Dict, Any
 
+from rp2.rp2_decimal import RP2Decimal
+
 from dali.plugin.input.rest.coinbase import InputPlugin
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
@@ -151,19 +153,19 @@ class TestTrade:
         assert out_transaction.asset == "ETH"
         assert out_transaction.timestamp == "2020-12-11 00:20:59 +0000"
         assert out_transaction.transaction_type == "Sell"
-        assert out_transaction.spot_price == "3E+3"
-        assert out_transaction.crypto_out_no_fee == "0.10000000"
-        assert out_transaction.crypto_fee == "0.000"
-        assert out_transaction.crypto_out_with_fee == "0.10000000"
-        assert out_transaction.fiat_out_no_fee == "300.00"
-        assert out_transaction.fiat_fee == "0"
+        assert RP2Decimal(out_transaction.spot_price) == RP2Decimal("3E+3")
+        assert RP2Decimal(out_transaction.crypto_out_no_fee) == RP2Decimal("0.10000000")
+        assert RP2Decimal(out_transaction.crypto_fee) == RP2Decimal("0.000")
+        assert RP2Decimal(out_transaction.crypto_out_with_fee) == RP2Decimal("0.10000000")  # type: ignore
+        assert RP2Decimal(out_transaction.fiat_out_no_fee) == RP2Decimal("300.00")  # type: ignore
+        assert RP2Decimal(out_transaction.fiat_fee) == RP2Decimal("0")  # type: ignore
 
         assert in_transaction.asset == "ETH2"
         assert in_transaction.timestamp == "2020-12-11 00:20:59 +0000"
         assert in_transaction.transaction_type == "Buy"
-        assert in_transaction.spot_price == "3E+3"
-        assert in_transaction.crypto_in == "0.10000000"
+        assert RP2Decimal(in_transaction.spot_price) == RP2Decimal("3E+3")
+        assert RP2Decimal(in_transaction.crypto_in) == RP2Decimal("0.10000000")
         assert in_transaction.crypto_fee is None
-        assert in_transaction.fiat_in_no_fee == "300.00"
-        assert in_transaction.fiat_in_with_fee == "300.00"
-        assert in_transaction.fiat_fee == "0"
+        assert RP2Decimal(in_transaction.fiat_in_no_fee) == RP2Decimal("300.00")  # type: ignore
+        assert RP2Decimal(in_transaction.fiat_in_with_fee) == RP2Decimal("300.00")  # type: ignore
+        assert RP2Decimal(in_transaction.fiat_fee) == RP2Decimal("0")  # type: ignore
