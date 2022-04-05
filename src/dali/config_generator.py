@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Set
 
 from dali.abstract_transaction import AbstractTransaction
-from dali.dali_configuration import Keyword
+from dali.dali_configuration import Keyword, is_fiat
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
@@ -61,6 +61,8 @@ def generate_config_file(
     holders: Set[str] = set()
     exchanges: Set[str] = set()
     for transaction in transactions:
+        if is_fiat(transaction.asset):
+            continue
         if isinstance(transaction, InTransaction):
             holders.add(transaction.holder)
             exchanges.add(transaction.exchange)

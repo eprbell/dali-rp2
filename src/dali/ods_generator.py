@@ -24,6 +24,7 @@ from dali.abstract_transaction import AbstractTransaction
 from dali.dali_configuration import (
     Keyword,
     is_crypto_field,
+    is_fiat,
     is_fiat_field,
     is_internal_field,
 )
@@ -161,6 +162,8 @@ def generate_input_file(
     for transaction in transactions:
         if not isinstance(transaction, AbstractTransaction):
             raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
+        if is_fiat(transaction.asset):
+            continue
         table_type: str = _TRANSACTION_CLASS_TO_TABLE[transaction.__class__]
         if transaction.asset != current_asset:
             if current_sheet:
