@@ -27,6 +27,22 @@ class StringAndDatetime(NamedTuple):
     value: datetime
 
 
+class AssetAndTimestamp(NamedTuple):
+    asset: str
+    timestamp: datetime
+
+
+class AssetAndUniqueId(NamedTuple):
+    asset: str
+    unique_id: str
+
+
+class DirectionTypeAndNotes(NamedTuple):
+    direction: str
+    transaction_type: str
+    notes: str
+
+
 class AbstractTransaction:
     @classmethod
     def _validate_string_field(cls, name: str, value: str, raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> str:

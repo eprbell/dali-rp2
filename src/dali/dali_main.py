@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Set, Type, Union
 from rp2.logger import LOG_FILE
 
 from dali.abstract_input_plugin import AbstractInputPlugin
-from dali.abstract_transaction import AbstractTransaction
+from dali.abstract_transaction import AbstractTransaction, DirectionTypeAndNotes
 from dali.config_generator import generate_config_file
 from dali.dali_configuration import (
     DEFAULT_CONFIGURATION,
@@ -40,7 +40,7 @@ from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
 from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
-from dali.transaction_resolver import DirectionTypeAndNotes, resolve_transactions
+from dali.transaction_resolver import resolve_transactions
 
 _VERSION: str = "0.4.2"
 
