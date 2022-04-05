@@ -177,7 +177,7 @@ def _setup_argument_parser() -> ArgumentParser:
         "-v",
         "--version",
         action="version",
-        version=f"DaLI {_VERSION} (https://pypi.org/project/dali_rp2/)",
+        version=f"DaLI {_VERSION} (https://github.com/eprbell/dali_rp2)",
         help="Print DaLI version",
     )
     parser.add_argument(
