@@ -14,13 +14,13 @@
 
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, NamedTuple, Optional, cast
+from typing import Any, Dict, List, Optional, cast
 
 from Historic_Crypto import HistoricalData
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2TypeError, RP2ValueError
 
-from dali.abstract_transaction import AbstractTransaction
+from dali.abstract_transaction import AbstractTransaction, AssetAndTimestamp, AssetAndUniqueId
 from dali.cache import load_from_cache, save_to_cache
 from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none
 from dali.in_transaction import InTransaction
@@ -30,22 +30,6 @@ from dali.out_transaction import OutTransaction
 
 __RESOLVER: str = "DaLI Resolver"
 __HISTORICAL_PRICE_CACHE: str = "coinbase_pro_historical_prices"
-
-
-class AssetAndTimestamp(NamedTuple):
-    asset: str
-    timestamp: datetime
-
-
-class AssetAndUniqueId(NamedTuple):
-    asset: str
-    unique_id: str
-
-
-class DirectionTypeAndNotes(NamedTuple):
-    direction: str
-    transaction_type: str
-    notes: str
 
 
 def _is_number(value: str) -> bool:
