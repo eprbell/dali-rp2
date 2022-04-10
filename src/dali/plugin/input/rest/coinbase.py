@@ -51,6 +51,8 @@ _DETAILS: str = "details"
 _EMAIL: str = "email"
 _EXCHANGE_DEPOSIT: str = "exchange_deposit"
 _FEE: str = "fee"
+_FIAT_DEPOSIT: str = "fiat_deposit"
+_FIAT_WITHDRAWAL: str = "fiat_withdrawal"
 _FROM: str = "from"
 _HASH: str = "hash"
 _ID: str = "id"
@@ -445,6 +447,10 @@ class InputPlugin(AbstractInputPlugin):
                 self._process_gain(transaction, currency, Keyword.STAKING, in_transaction_list)
             elif transaction_type in {_INFLATION_REWARD}:
                 self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list)
+            elif transaction_type in {_FIAT_DEPOSIT}:
+                self._process_fiat_deposit(transaction, currency, in_transaction_list)
+            elif transaction_type in {_FIAT_WITHDRAWAL}:
+                self._process_fiat_withdrawal(transaction, currency, out_transaction_list)
             else:
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
@@ -729,6 +735,56 @@ class InputPlugin(AbstractInputPlugin):
                 fiat_in_no_fee=fiat_in_no_fee,
                 fiat_in_with_fee=fiat_in_with_fee,
                 fiat_fee="0",
+                notes=notes,
+            )
+        )
+
+    def _process_fiat_deposit(
+        self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None
+    ) -> None:
+        amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
+        notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
+        in_transaction_list.append(
+            InTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=json.dumps(transaction),
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type=Keyword.BUY.value,
+                spot_price="1",
+                crypto_in=str(amount),
+                crypto_fee="0",
+                fiat_in_no_fee=None,
+                fiat_in_with_fee=None,
+                fiat_fee=None,
+                notes=notes,
+            )
+        )
+
+    def _process_fiat_withdrawal(
+        self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None
+    ) -> None:
+        amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
+        notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
+        out_transaction_list.append(
+            OutTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=json.dumps(transaction),
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type=Keyword.SELL.value,
+                spot_price="1",
+                crypto_out_no_fee=str(-amount),
+                crypto_fee="0",
+                crypto_out_with_fee=None,
+                fiat_out_no_fee=None,
+                fiat_fee=None,
                 notes=notes,
             )
         )
