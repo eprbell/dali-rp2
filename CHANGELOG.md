@@ -14,6 +14,13 @@
 
 # RP2 Change Log
 
+## 0.4.4
+* fixed a regression introduced recently: in certain cases, some fees related to conversions would no longer be generated (thus causing small deductions to be ignored)
+* added support for USDC: previously it was conflated into fiat and didn't generate a tab, now it does
+* Coinbase plugin: added support for fiat_withdrawal and fiat_deposit transactions. They are now tracked internally and no longer cause an unsupported transaction warning
+* Coinbase Pro plugin: added support for "conversion" native transactions (these seem to occur when CBPro converts from/to a stable coin)
+* minor changes to documentation
+
 ## 0.4.3
 * rewrote Coinbase coin swap logic: it now handles correctly swaps from stable coins with a fee (previously it would ignore the fee)
 * various documentation fixes and some refactoring
