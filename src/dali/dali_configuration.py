@@ -80,7 +80,7 @@ class Keyword(Enum):
 
 _keyword_values: Set[str] = {item.value for item in Keyword}
 
-_FIAT_SET: Set[str] = {"USD", "USDC"}
+_FIAT_SET: Set[str] = {"USD"}
 
 _FIAT_FIELD_SET: Set[str] = {
     Keyword.FIAT_FEE.value,
