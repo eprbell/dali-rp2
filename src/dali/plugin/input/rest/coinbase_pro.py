@@ -46,12 +46,14 @@ _AMOUNT: str = "amount"
 _BUY: str = "buy"
 _COINBASE_TRANSACTION_ID: str = "coinbase_transaction_id"
 _CONVERSION: str = "conversion"
+_CONVERSION_ID: str = "conversion_id"
 _CREATED_AT: str = "created_at"
 _CRYPTO_TRANSACTION_HASH: str = "crypto_transaction_hash"
 _CURRENCY: str = "currency"
 _DEPOSIT: str = "deposit"
 _DETAILS: str = "details"
 _FEE: str = "fee"
+_FROM_ACCOUNT_ID: str = "from_account_id"
 _ID: str = "id"
 _MATCH: str = "match"
 _ORDER_ID: str = "order_id"
@@ -60,6 +62,7 @@ _PRODUCT_ID: str = "product_id"
 _SELL: str = "sell"
 _SIDE: str = "side"
 _SIZE: str = "size"
+_TO_ACCOUNT_ID: str = "to_account_id"
 _TRADE_ID: str = "trade_id"
 _TRANSFER: str = "transfer"
 _TRANSFER_ID: str = "transfer_id"
@@ -136,6 +139,7 @@ class InputPlugin(AbstractInputPlugin):
         self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         if self.__thread_count > self.__MAX_THREAD_COUNT:
             raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
+        self.__account_id_2_account: Dict[str, Any] = {}
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
@@ -143,9 +147,13 @@ class InputPlugin(AbstractInputPlugin):
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
         process_account_result_list: List[Optional[_ProcessAccountResult]]
+        accounts = self.__get_accounts()
+
+        for account in accounts:
+            self.__account_id_2_account[account[_ID]] = account
 
         with ThreadPool(self.__thread_count) as pool:
-            process_account_result_list = pool.map(self._process_account, self.__get_accounts())
+            process_account_result_list = pool.map(self._process_account, accounts)
 
         for process_account_result in process_account_result_list:
             if process_account_result is None:
@@ -191,8 +199,7 @@ class InputPlugin(AbstractInputPlugin):
                 # The fees are already deduced while processing other transactions
                 self.__logger.debug("Redundant fee transaction (skipping): %s", raw_data)
             elif transaction_type == _CONVERSION:
-                # It's not clear what the conversion transaction is used for: it doesn't seem to contain information that affects the final outcome
-                self.__logger.debug("Conversion transaction (skipping): %s", raw_data)
+                self._process_conversion(transaction, in_transaction_list, out_transaction_list)
             else:
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
@@ -412,6 +419,64 @@ class InputPlugin(AbstractInputPlugin):
         else:
             self.__logger.error("Unsupported fill type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
+    # This seems to occur when converting fiat to stablecoins and viceversa
+    def _process_conversion(self, transaction: Any, in_transaction_list: List[InTransaction], out_transaction_list: List[OutTransaction]) -> None:
+        conversion_id: str = transaction[_DETAILS][_CONVERSION_ID]
+        conversion: Any = self.__get_conversion(conversion_id)
+        from_currency: str = self.__account_id_2_account[conversion[_FROM_ACCOUNT_ID]][_CURRENCY]
+        to_currency: str = self.__account_id_2_account[conversion[_TO_ACCOUNT_ID]][_CURRENCY]
+        self.__logger.debug("Conversion: %s", json.dumps(conversion))
+
+        unique_id: str = conversion_id
+        raw_data: str = f"{json.dumps(transaction)}//{json.dumps(conversion)}"
+        amount: str = conversion[_AMOUNT]
+
+        if not is_fiat(from_currency) and not is_fiat(to_currency):
+            raise Exception(f"Internal error: conversion without fiat currency ({from_currency} -> {to_currency}):{transaction}//{conversion}")
+
+        self.__append_transaction(
+            cast(List[AbstractTransaction], out_transaction_list),
+            OutTransaction(
+                plugin=self.__COINBASE_PRO,
+                unique_id=unique_id,
+                raw_data=raw_data,
+                timestamp=transaction[_CREATED_AT],
+                asset=from_currency,
+                exchange=self.__COINBASE_PRO,
+                holder=self.account_holder,
+                transaction_type="Sell",
+                spot_price="1",
+                crypto_out_no_fee=amount,
+                crypto_fee="0",
+                crypto_out_with_fee=None,
+                fiat_out_no_fee=None,
+                fiat_fee=None,
+                notes=f"Sell side of conversion: {amount} {from_currency} -> {amount} {to_currency}",
+            ),
+        )
+
+        self.__append_transaction(
+            cast(List[AbstractTransaction], in_transaction_list),
+            InTransaction(
+                plugin=self.__COINBASE_PRO,
+                unique_id=f"{unique_id}/buy",
+                raw_data=raw_data,
+                timestamp=transaction[_CREATED_AT],
+                asset=to_currency,
+                exchange=self.__COINBASE_PRO,
+                holder=self.account_holder,
+                transaction_type="Buy",
+                spot_price="1",
+                crypto_in=amount,
+                crypto_fee="0",
+                fiat_in_no_fee=None,
+                fiat_in_with_fee=None,
+                fiat_fee=None,
+                notes=f"Buy side of conversion: {amount} {from_currency} -> {amount} {to_currency}",
+            ),
+        )
+
+
     def __append_transaction(self, transaction_list: List[AbstractTransaction], transaction: AbstractTransaction) -> None:
         if AssetAndUniqueId(transaction.asset, transaction.unique_id) not in self.__fill_cache:
             transaction_list.append(transaction)
@@ -428,6 +493,9 @@ class InputPlugin(AbstractInputPlugin):
 
     def __get_transactions(self, account_id: str) -> Any:
         return self.__send_request_with_pagination(f"accounts/{account_id}/ledger")
+
+    def __get_conversion(self, conversion_id: str) -> Any:
+        return self.__send_request("get", f"conversions/{conversion_id}")
 
     def __send_request(self, method: str, endpoint: str, params: Any = None, data: Any = None) -> Any:
         full_url: str = f"{self.__api_url}{endpoint}"
