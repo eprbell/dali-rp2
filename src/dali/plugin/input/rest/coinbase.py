@@ -23,7 +23,7 @@ import json
 import logging
 import time
 from multiprocessing.pool import ThreadPool
-from typing import Any, cast, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
 from requests import PreparedRequest
@@ -816,8 +816,7 @@ class InputPlugin(AbstractInputPlugin):
             response: Response = self.__session.get(current_url, params=params, auth=self.__auth, timeout=self.__TIMEOUT)
             self._validate_response(response, "get", endpoint)
             json_response: Any = response.json()
-            for result in json_response["data"]:
-                yield result
+            yield from json_response["data"]
             if "pagination" not in json_response or "next_uri" not in json_response["pagination"] or not json_response["pagination"]["next_uri"]:
                 break
             current_url = f"{self.__api_url}{json_response['pagination']['next_uri']}"

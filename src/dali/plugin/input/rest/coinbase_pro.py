@@ -22,8 +22,8 @@ import hashlib
 import hmac
 import json
 import logging
-from multiprocessing.pool import ThreadPool
 import time
+from multiprocessing.pool import ThreadPool
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
@@ -510,8 +510,7 @@ class InputPlugin(AbstractInputPlugin):
             response: Response = self.__session.get(full_url, params=params, auth=self.__auth, timeout=self.__TIMEOUT)
             self._validate_response(response, "get", endpoint)
             json_response: Any = response.json()
-            for result in json_response:
-                yield result
+            yield from json_response
             if not response.headers.get("cb-after"):
                 break
             params["after"] = response.headers["cb-after"]

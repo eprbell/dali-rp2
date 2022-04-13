@@ -106,4 +106,3 @@ No. The IRS has made it clear that [crypto taxes must be paid](https://www.irs.g
 
 ### Which Resources Can I Use to Learn About Crypto Taxes?
 A good starting point is the [Cryptocurrency Tax FAQ](https://www.reddit.com/r/CryptoTax/comments/re6jal/cryptocurrency_tax_faq/) on Reddit. Also read the RP2 FAQ question on [which tax forms to file](https://github.com/eprbell/rp2/blob/main/docs/user_faq.md#which-crypto-tax-forms-to-file) and consult with your tax professional.
-

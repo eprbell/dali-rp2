@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from rp2.rp2_decimal import RP2Decimal
 
-from dali.plugin.input.rest.coinbase import InputPlugin
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
+from dali.plugin.input.rest.coinbase import InputPlugin
 
 
 class TestTrade:

@@ -74,7 +74,7 @@ class InputPlugin(AbstractInputPlugin):
         result: List[AbstractTransaction] = []
 
         last_withdrawal_fee: Optional[RP2Decimal] = None
-        with open(self.__transaction_csv_file, mode="r", encoding="utf-8") as transaction_csv_file:
+        with open(self.__transaction_csv_file, encoding="utf-8") as transaction_csv_file:
             lines = reader(transaction_csv_file)
             # Skip header line
             header = next(lines)
@@ -215,7 +215,7 @@ class InputPlugin(AbstractInputPlugin):
     def parse_trade_report(self, file_path: str) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
-        with open(file_path, mode="r", encoding="utf-8") as csv_file:
+        with open(file_path, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
             # skip csv header
             header = next(lines)

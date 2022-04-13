@@ -107,7 +107,7 @@ class InputPlugin(AbstractInputPlugin):
         if not self.__in_csv_file:
             return
 
-        with open(self.__in_csv_file, mode="r", encoding="utf-8") as csv_file:
+        with open(self.__in_csv_file, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
             header_found: bool = False
             for line in lines:
@@ -151,7 +151,7 @@ class InputPlugin(AbstractInputPlugin):
         if not self.__out_csv_file:
             return
 
-        with open(self.__out_csv_file, mode="r", encoding="utf-8") as csv_file:
+        with open(self.__out_csv_file, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
             header_found: bool = False
             for line in lines:
@@ -195,7 +195,7 @@ class InputPlugin(AbstractInputPlugin):
         if not self.__intra_csv_file:
             return
 
-        with open(self.__intra_csv_file, mode="r", encoding="utf-8") as csv_file:
+        with open(self.__intra_csv_file, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
             header_found: bool = False
             for line in lines:
