@@ -147,7 +147,7 @@ def _setup_argument_parser() -> ArgumentParser:
         "-c",
         "--use-cache",
         action="store_true",
-        help="Cache input plugin data load",
+        help="Cache input plugin data load (developers only)",
     )
     parser.add_argument(
         "-o",
