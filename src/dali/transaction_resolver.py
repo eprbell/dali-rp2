@@ -282,8 +282,8 @@ def _apply_transaction_hint(
         elif isinstance(transaction, IntraTransaction):
             if not is_unknown(transaction.from_holder) or not is_unknown(transaction.from_exchange):
                 raise RP2ValueError(
-                        f"Invalid conversion {Keyword.INTRA.value}->{Keyword.IN.value}: "
-                        f"{Keyword.FROM_HOLDER.value}/{Keyword.FROM_EXCHANGE.value} must be unknown: {transaction}"
+                    f"Invalid conversion {Keyword.INTRA.value}->{Keyword.IN.value}: "
+                    f"{Keyword.FROM_HOLDER.value}/{Keyword.FROM_EXCHANGE.value} must be unknown: {transaction}"
                 )
             result = InTransaction(
                 plugin=transaction.plugin,
@@ -322,8 +322,8 @@ def _apply_transaction_hint(
         elif isinstance(transaction, IntraTransaction):
             if not is_unknown(transaction.to_holder) or not is_unknown(transaction.to_exchange):
                 raise RP2ValueError(
-                        f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
-                        f"{Keyword.TO_HOLDER.value}/{Keyword.TO_EXCHANGE.value} must be unknown: {transaction}"
+                    f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
+                    f"{Keyword.TO_HOLDER.value}/{Keyword.TO_EXCHANGE.value} must be unknown: {transaction}"
                 )
             crypto_out_no_fee: RP2Decimal = RP2Decimal(transaction.crypto_sent)
             crypto_fee: RP2Decimal = ZERO
@@ -365,8 +365,8 @@ def _apply_transaction_hint(
         elif isinstance(transaction, OutTransaction):
             if is_unknown(transaction.crypto_out_no_fee) or is_unknown(transaction.crypto_fee):
                 raise RP2ValueError(
-                        f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
-                        f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} canot be unknown: {transaction}"
+                    f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
+                    f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} canot be unknown: {transaction}"
                 )
             result = IntraTransaction(
                 plugin=transaction.plugin,

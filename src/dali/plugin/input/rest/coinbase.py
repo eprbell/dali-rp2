@@ -739,9 +739,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-    def _process_fiat_deposit(
-        self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_fiat_deposit(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
         in_transaction_list.append(
@@ -764,9 +762,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-    def _process_fiat_withdrawal(
-        self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_fiat_withdrawal(self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
         out_transaction_list.append(

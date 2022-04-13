@@ -474,7 +474,6 @@ class InputPlugin(AbstractInputPlugin):
             ),
         )
 
-
     def __append_transaction(self, transaction_list: List[AbstractTransaction], transaction: AbstractTransaction) -> None:
         if AssetAndUniqueId(transaction.asset, transaction.unique_id) not in self.__fill_cache:
             transaction_list.append(transaction)
