@@ -356,20 +356,20 @@ class InputPlugin(AbstractInputPlugin):
             usd_volume = RP2Decimal(fill[_USD_VOLUME])
             crypto_fee = RP2Decimal(fill[_FEE])
             if fill_side == _SELL:
+                from_crypto_fee = ZERO
+                to_crypto_fee = crypto_fee
                 from_currency_size = RP2Decimal(fill[_SIZE])
                 from_currency_price = usd_volume / from_currency_size
                 to_currency_size = from_currency_size * RP2Decimal(fill[_PRICE])
-                to_currency_price = usd_volume / to_currency_size
-                out_crypto_fee = ZERO
-                in_crypto_fee = crypto_fee
+                to_currency_price = usd_volume / (to_currency_size + to_crypto_fee)
             elif fill_side == _BUY:
+                from_crypto_fee = crypto_fee
+                to_crypto_fee = ZERO
                 (from_currency, to_currency) = (to_currency, from_currency)
                 to_currency_size = RP2Decimal(fill[_SIZE])
                 to_currency_price = usd_volume / to_currency_size
                 from_currency_size = to_currency_size * RP2Decimal(fill[_PRICE])
                 from_currency_price = usd_volume / from_currency_size
-                out_crypto_fee = crypto_fee
-                in_crypto_fee = ZERO
             else:
                 raise Exception(f"Internal error: unsupported fill side {transaction}\n{fill}")
             self.__append_transaction(
@@ -385,7 +385,7 @@ class InputPlugin(AbstractInputPlugin):
                     transaction_type="Sell",
                     spot_price=str(from_currency_price),
                     crypto_out_no_fee=str(from_currency_size),
-                    crypto_fee=str(out_crypto_fee),
+                    crypto_fee=str(from_crypto_fee),
                     crypto_out_with_fee=None,
                     fiat_out_no_fee=None,
                     fiat_fee=None,
@@ -393,8 +393,6 @@ class InputPlugin(AbstractInputPlugin):
                 ),
             )
 
-            if usd_volume != to_currency_price * to_currency_size:
-                raise Exception(f"USD volume ({usd_volume}) doesn't match in-transaction crypto size ({to_currency_size}) and price ({to_currency_price}).")
             self.__append_transaction(
                 cast(List[AbstractTransaction], in_transaction_list),
                 InTransaction(
@@ -408,7 +406,7 @@ class InputPlugin(AbstractInputPlugin):
                     transaction_type="Buy",
                     spot_price=str(to_currency_price),
                     crypto_in=str(to_currency_size),
-                    crypto_fee=str(in_crypto_fee),
+                    crypto_fee=str(to_crypto_fee),
                     fiat_in_no_fee=None,
                     fiat_in_with_fee=None,
                     fiat_fee=None,
