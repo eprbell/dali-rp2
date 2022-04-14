@@ -23,7 +23,7 @@ import json
 import logging
 import time
 from multiprocessing.pool import ThreadPool
-from typing import Any, cast, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
 from requests import PreparedRequest
@@ -739,9 +739,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-    def _process_fiat_deposit(
-        self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_fiat_deposit(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
         in_transaction_list.append(
@@ -764,9 +762,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-    def _process_fiat_withdrawal(
-        self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_fiat_withdrawal(self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
         out_transaction_list.append(
@@ -816,8 +812,7 @@ class InputPlugin(AbstractInputPlugin):
             response: Response = self.__session.get(current_url, params=params, auth=self.__auth, timeout=self.__TIMEOUT)
             self._validate_response(response, "get", endpoint)
             json_response: Any = response.json()
-            for result in json_response["data"]:
-                yield result
+            yield from json_response["data"]
             if "pagination" not in json_response or "next_uri" not in json_response["pagination"] or not json_response["pagination"]["next_uri"]:
                 break
             current_url = f"{self.__api_url}{json_response['pagination']['next_uri']}"

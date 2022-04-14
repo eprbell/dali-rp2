@@ -14,6 +14,10 @@
 
 # RP2 Change Log
 
+## 0.4.5
+* Coinbase Pro: fixed a bug which caused the total fiat value (including fee) to be incorrect for certain crypto conversions
+* added developer FAQ
+
 ## 0.4.4
 * fixed a regression introduced recently: in certain cases, some fees related to conversions would no longer be generated (thus causing small deductions to be ignored)
 * added support for USDC: previously it was conflated into fiat and didn't generate a tab, now it does
