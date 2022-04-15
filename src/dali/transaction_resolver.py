@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, cast
 
 import pandas as pd
@@ -128,13 +128,15 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
             LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
         else:
             time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
-            from_timestamp: str = transaction.timestamp_value.strftime("%Y-%m-%d-%H-%M")
+            transaction_utc_timestamp = transaction.timestamp_value.astimezone(timezone.utc)  # Coinbase API expects UTC timestamps only
+            from_timestamp: str = transaction_utc_timestamp.strftime("%Y-%m-%d-%H-%M")
             retry_count: int = 0
             while retry_count < len(time_granularity):
                 try:
                     seconds = time_granularity[retry_count]
-                    to_timestamp: str = (transaction.timestamp_value + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
+                    to_timestamp: str = (transaction_utc_timestamp + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
                     df_quotes: pd.DataFrame = HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()
+                    df_quotes.index = df_quotes.index.tz_localize("UTC")  # The returned timestamps in the index are timezone naive
                     first_quote_bar: pd.Series = df_quotes.reset_index().iloc[0]
                     quote_field: str = "high"
                     spot_price = str(first_quote_bar[quote_field])
@@ -151,7 +153,7 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
                 key.timestamp,
                 key.asset,
                 seconds,
-                first_quote_bar.time,
+                first_quote_bar.time,  # type: ignore
             )
 
             historical_price_cache[key] = spot_price
