@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, cast
 
 from Historic_Crypto import HistoricalData
@@ -127,12 +127,15 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
             LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
         else:
             time_granularity: List[int] = [60, 300, 900, 3600, 21600, 84600]
-            from_timestamp: str = transaction.timestamp_value.strftime("%Y-%m-%d-%H-%M")
+            # Coinbase API expects UTC timestamps only, see the forum discussion here:
+            # https://forums.coinbasecloud.dev/t/invalid-end-on-product-candles-endpoint/320
+            transaction_utc_timestamp = transaction.timestamp_value.astimezone(timezone.utc)
+            from_timestamp: str = transaction_utc_timestamp.strftime("%Y-%m-%d-%H-%M")
             retry_count: int = 0
             while retry_count < len(time_granularity):
                 try:
                     seconds = time_granularity[retry_count]
-                    to_timestamp: str = (transaction.timestamp_value + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
+                    to_timestamp: str = (transaction_utc_timestamp + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
                     spot_price = str(
                         HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()["high"][0]
                     )
