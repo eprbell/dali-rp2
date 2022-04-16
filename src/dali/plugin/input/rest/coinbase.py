@@ -50,6 +50,7 @@ _CURRENCY: str = "currency"
 _DETAILS: str = "details"
 _EMAIL: str = "email"
 _EXCHANGE_DEPOSIT: str = "exchange_deposit"
+_EXCHANGE_WITHDRAWAL: str = "exchange_withdrawal"
 _FEE: str = "fee"
 _FIAT_DEPOSIT: str = "fiat_deposit"
 _FIAT_WITHDRAWAL: str = "fiat_withdrawal"
@@ -426,7 +427,7 @@ class InputPlugin(AbstractInputPlugin):
             raw_data: str = json.dumps(transaction)
             self.__logger.debug("Transaction: %s", raw_data)
             transaction_type: str = transaction[_TYPE]
-            if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
+            if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _EXCHANGE_WITHDRAWAL, _SEND}:
                 self._process_transfer(transaction, currency, in_transaction_list, out_transaction_list, intra_transaction_list)
             elif transaction_type in {_BUY, _SELL, _TRADE}:
                 self._process_fill(
@@ -478,7 +479,7 @@ class InputPlugin(AbstractInputPlugin):
         transaction_type: str = transaction[_TYPE]
         raw_data: str = json.dumps(transaction)
 
-        if transaction_type in {_PRIME_WITHDRAWAL, _PRO_WITHDRAWAL}:
+        if transaction_type in {_PRIME_WITHDRAWAL, _PRO_WITHDRAWAL, _EXCHANGE_WITHDRAWAL}:
             intra_transaction_list.append(
                 IntraTransaction(
                     plugin=self.__COINBASE,
