@@ -127,7 +127,9 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
             LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
         else:
             time_granularity: List[int] = [60, 300, 900, 3600, 21600, 84600]
-            transaction_utc_timestamp = transaction.timestamp_value.astimezone(timezone.utc)  # Coinbase API expects UTC timestamps only
+            # Coinbase API expects UTC timestamps only, see the forum discussion here:
+            # https://forums.coinbasecloud.dev/t/invalid-end-on-product-candles-endpoint/320
+            transaction_utc_timestamp = transaction.timestamp_value.astimezone(timezone.utc)
             from_timestamp: str = transaction_utc_timestamp.strftime("%Y-%m-%d-%H-%M")
             retry_count: int = 0
             while retry_count < len(time_granularity):
