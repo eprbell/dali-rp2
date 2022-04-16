@@ -68,28 +68,35 @@ DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on
 
 ### Installation on Ubuntu Linux
 Open a terminal window and enter the following commands:
-```
+
+```shell
 sudo apt-get update
 sudo apt-get install python3 python3-pip
 ```
 
 Then install DaLI:
-```
+
+```shell
 pip install dali-rp2
 ```
+
 ### Installation on macOS
 First make sure [Homebrew](https://brew.sh) is installed, then open a terminal window and enter the following commands:
-```
+
+```shell
 brew update
 brew install python3
 ```
 
 Then install DaLI:
-```
+
+```shell
 pip install dali-rp2
 ```
+
 ### Installation on Windows 10
 First make sure [Python](https://python.org) 3.7 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH"), then open a PowerShell window and enter the following:
+
 ```
 pip install dali-rp2
 ```
@@ -106,35 +113,45 @@ An example of a configuration file can be found in [test_config.ini](https://git
 
 After processing the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and a RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
 
-To try DaLI with the example configuration, download the following files:
-* [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini)
-* [test_manual_in.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_in.csv)
-* [test_manual_intra.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_intra.csv)
-* [test_trezor_alice.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_alice_btc.csv)
-* [test_trezor_bob.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_bob_btc.csv)
+## Quickstart
 
-Let's call `<download_directory>` the location of the downloaded files. To generate RP2 input files, open a terminal window (or PowerShell if on Windows) and enter the following commands:
-  ```
-  cd <download_directory>
-  mkdir input
-  mv *.csv input
-  dali -s -o output -p test_ test_config.ini
-  ```
-The `-s` option allows DaLI to retrieve spot price information from Coinbase Pro, when it's not available from the CSV files or REST services.
+Provided DaLI is installed, to generate RP2 input files, open a terminal window (or PowerShell if on Windows).
 
-The ODS output file is generated in the output directory (or wherever specified with the `-o` option).
+Create the directory structure and download the example input files.
+
+```shell
+mkdir -p dali/input
+cd dali/
+wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/config/test_config.ini -P input/
+wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_in.csv -P input/
+wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_intra.csv -P input/
+wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_alice_btc.csv -P input/
+wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_bob_btc.csv -P input/
+```
+
+Generate the output files for rp2
+
+```shell
+dali -s -o output -p test_ test_config.ini
+ ```
+
+* `-s` option allows DaLI to retrieve spot price information from Coinbase Pro, when it's not available from the CSV files or REST services.
+* `-o` option specifies the directory where the ODS output file is generated.
+* `-p` is the prefix of the output file.
+* `test_config.init` is the configuration that ties the inputs together.
 
 To print command usage information for the `dali` command:
-  ```
-  dali --help
-  ```
+
+```shell
+dali --help
+```
 
 To compute taxes with RP2 from the generated input files (using both FIFO and LIFO accounting methods):
-  ```
-  cd <download_directory>
-  rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
-  rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
-  ```
+
+```shell
+rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
+rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
+```
 
 ## Configuration File
 Read the [configuration file](https://github.com/eprbell/dali-rp2/tree/main/docs/configuration_file.md) documentation.
