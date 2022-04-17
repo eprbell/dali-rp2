@@ -14,6 +14,9 @@
 
 # RP2 Change Log
 
+## 0.4.6
+* fixed PRs #31 and #36: various improvements to the logic that reads prices from Web
+
 ## 0.4.5
 * Coinbase Pro: fixed a bug which caused the total fiat value (including fee) to be incorrect for certain crypto conversions
 * added developer FAQ
