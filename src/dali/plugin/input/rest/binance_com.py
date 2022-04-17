@@ -91,6 +91,10 @@ class InputPlugin(AbstractInputPlugin):
 		# We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
 		self.startTime = datetime.datetime(2017,7,13,0,0,0,0)
 
+	@staticmethod
+	def _rp2timestamp_from_ms_epoch(self, epoch_timestamp: str) -> str:
+		return datetime.datetime.fromtimestamp((int(epoch_timestamp) / 1000), datetime.timezone.utc)
+
 	def cache_key(self) -> Optional[str]:
 		return self.__cache_key
 
@@ -104,7 +108,7 @@ class InputPlugin(AbstractInputPlugin):
 
 		return result
 
-	def _process_deposits(self, in_transactions) -> None:
+	def _process_deposits(self, in_transactions: List[InTransaction]) -> None:
 		
 		# We need milliseconds for Binance
 		currentStart = int(self.startTime.timestamp()) * 1000
@@ -222,7 +226,7 @@ class InputPlugin(AbstractInputPlugin):
     			plugin=self.__BINANCE_COM,
     			unique_id=transaction_data[_ORDERNO],
     			raw_data=json.dumps(transaction),
-    			timestamp=transaction[_CREATETIME], # Currently in epoch timestamp, PR#37 might allow this
+    			timestamp=_rp2timestamp_from_ms_epoch(transaction[_CREATETIME]),
     			asset=transaction[_FIATCURRENCY],
     			exchange=self.__BINANCE_COM,
     			holder=self.account_holder,
@@ -236,6 +240,8 @@ class InputPlugin(AbstractInputPlugin):
     			notes=notes,
     		)
     	)
+
+    
 
 
 
