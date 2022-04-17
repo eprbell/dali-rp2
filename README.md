@@ -69,35 +69,35 @@ DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on
 ### Installation on Ubuntu Linux
 Open a terminal window and enter the following commands:
 
-```shell
+```console
 sudo apt-get update
 sudo apt-get install python3 python3-pip
 ```
 
 Then install DaLI:
 
-```shell
+```console
 pip install dali-rp2
 ```
 
 ### Installation on macOS
 First make sure [Homebrew](https://brew.sh) is installed, then open a terminal window and enter the following commands:
 
-```shell
+```console
 brew update
 brew install python3
 ```
 
 Then install DaLI:
 
-```shell
+```console
 pip install dali-rp2
 ```
 
 ### Installation on Windows 10
 First make sure [Python](https://python.org) 3.7 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH"), then open a PowerShell window and enter the following:
 
-```
+```console
 pip install dali-rp2
 ```
 
@@ -124,7 +124,7 @@ To try DaLI with the example configuration, download the following files:
 * [test_trezor_alice.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_alice_btc.csv)
 * [test_trezor_bob.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_bob_btc.csv)
 
-```shell
+```console
 # make the directory
 mkdir -p dali/input
 cd dali/
@@ -138,7 +138,7 @@ wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_b
 
 Generate the output files for rp2
 
-```shell
+```console
 dali -s -o output -p test_ test_config.ini
  ```
 
@@ -149,13 +149,13 @@ dali -s -o output -p test_ test_config.ini
 
 To print command usage information for the `dali` command:
 
-```shell
+```console
 dali --help
 ```
 
 To compute taxes with RP2 from the generated input files (using both FIFO and LIFO accounting methods):
 
-```shell
+```console
 rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
 rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
 ```
