@@ -16,6 +16,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, cast
 
+import pandas as pd
 from Historic_Crypto import HistoricalData
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2TypeError, RP2ValueError
@@ -126,7 +127,7 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
             spot_price = historical_price_cache[key]
             LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
         else:
-            time_granularity: List[int] = [60, 300, 900, 3600, 21600, 84600]
+            time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
             # Coinbase API expects UTC timestamps only, see the forum discussion here:
             # https://forums.coinbasecloud.dev/t/invalid-end-on-product-candles-endpoint/320
             transaction_utc_timestamp = transaction.timestamp_value.astimezone(timezone.utc)
@@ -136,23 +137,29 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
                 try:
                     seconds = time_granularity[retry_count]
                     to_timestamp: str = (transaction_utc_timestamp + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
-                    spot_price = str(
-                        HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()["high"][0]
-                    )
+                    df_quotes: pd.DataFrame = HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()
+                    df_quotes.index = df_quotes.index.tz_localize("UTC")  # The returned timestamps in the index are timezone naive
+                    first_quote_bar: pd.Series = df_quotes.reset_index().iloc[0]
+                    quote_field: str = "high"
+                    spot_price = str(first_quote_bar[quote_field])
                     break
                 except ValueError:
                     retry_count += 1
 
             if not spot_price:
                 raise Exception("Unable to read spot price from Coinbase Pro")
-
-            LOGGER.debug("Reading spot_price for %s/%s from Coinbase Pro: %s", key.timestamp, key.asset, spot_price)
+            LOGGER.debug(
+                "Fetched %s spot_price %s for %s/%s from Coinbase Pro %d second bar at %s",
+                quote_field,
+                spot_price,
+                key.timestamp,
+                key.asset,
+                seconds,
+                first_quote_bar.time,  # type: ignore
+            )
 
             historical_price_cache[key] = spot_price
-        notes: str = ""
-        if transaction.notes:
-            notes = f"{notes}; "
-        notes = f"spot_price read from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
+        notes: str = f"spot_price read from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
         init_parameters[Keyword.SPOT_PRICE.value] = spot_price
         init_parameters[Keyword.NOTES.value] = notes
         init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = True
