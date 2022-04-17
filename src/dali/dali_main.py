@@ -42,7 +42,7 @@ from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.4.6"
+_VERSION: str = "0.4.5"
 
 
 def input_loader() -> None:
