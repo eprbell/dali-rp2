@@ -73,7 +73,10 @@ class AbstractTransaction:
     def _validate_timestamp_field(cls, name: str, value: str, raw_data: str) -> StringAndDatetime:
         value = cls._validate_string_field(name, value, raw_data, disallow_empty=True, disallow_unknown=True)
         try:
-            result: datetime = parse(value)
+            if value.isdigit():
+                result: datetime = datetime.fromtimestamp(value)
+            else:
+                result: datetime = parse(value)
         except Exception as exc:
             raise Exception(f"Internal error parsing {name} as datetime: {value}\n{raw_data}\n{str(exc)}") from exc
         if result.tzinfo is None:
