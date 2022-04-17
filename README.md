@@ -113,16 +113,23 @@ An example of a configuration file can be found in [test_config.ini](https://git
 
 After processing the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and a RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
 
-## Quickstart
-
 Provided DaLI is installed, to generate RP2 input files, open a terminal window (or PowerShell if on Windows).
 
 Create the directory structure and download the example input files.
 
+To try DaLI with the example configuration, download the following files:
+* [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini)
+* [test_manual_in.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_in.csv)
+* [test_manual_intra.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_intra.csv)
+* [test_trezor_alice.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_alice_btc.csv)
+* [test_trezor_bob.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_bob_btc.csv)
+
 ```shell
+# make the directory
 mkdir -p dali/input
 cd dali/
-wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/config/test_config.ini -P input/
+# download the files using wget (or download manually)
+wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/config/test_config.ini
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_in.csv -P input/
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_intra.csv -P input/
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_alice_btc.csv -P input/
@@ -138,7 +145,7 @@ dali -s -o output -p test_ test_config.ini
 * `-s` option allows DaLI to retrieve spot price information from Coinbase Pro, when it's not available from the CSV files or REST services.
 * `-o` option specifies the directory where the ODS output file is generated.
 * `-p` is the prefix of the output file.
-* `test_config.init` is the configuration that ties the inputs together.
+* `test_config.ini` is the configuration that ties the inputs together.
 
 To print command usage information for the `dali` command:
 
