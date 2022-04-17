@@ -39,14 +39,22 @@ from dali.out_transaction import OutTransaction
 import ccxt
 
 # Native format keywords
+_AMOUNT: str = "amount"
+_BEGINTIME: str = "beginTime"
+_COIN: str = "coin"
 _CREATETIME: str = "createTime"
 _CRYPTOCURRENCY: str = "cryptoCurrency"
 _DATA: str = "data"
+_ENDTIME: str = "endTime"
 _FIATCURRENCY: str = "fiatCurrency"
 _INDICATEDAMOUNT: str = "indicatedAmount"
+_INSERTTIME: str = "insertTime"
 _ORDERNO: str = "orderNo"
+_STARTTIME: str = "startTime"
 _SOURCEAMOUNT: str = "sourceAmount"
+_TRANSACTIONTYPE: str = "transactionType"
 _TOTALFEE: str = "totalFee"
+_TXID: str = "txId"
 _UPDATETIME: str = "updateTime"
 
 class _ProcessAccountResult(NamedTuple):
@@ -108,7 +116,9 @@ class InputPlugin(AbstractInputPlugin):
 
 		return result
 
-	def _process_deposits(self, in_transactions: List[InTransaction]) -> None:
+	def _process_deposits(
+		self, in_transactions: List[InTransaction], intra_transactions: List[IntraTransaction],
+	) -> None:
 		
 		# We need milliseconds for Binance
 		currentStart = int(self.startTime.timestamp()) * 1000
@@ -121,9 +131,9 @@ class InputPlugin(AbstractInputPlugin):
 		# Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
 		# No limit on the date range
 		# fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
-		fiat_payments = self.client.sapiGetFiatPayments(params=({'transactionType':0, 
-			'beginTime':(int(startTime.timestamp()) * 1000), 
-			'endTime':nowTime}))
+		fiat_payments = self.client.sapiGetFiatPayments(params=({_TRANSACTIONTYPE:0, 
+			_BEGINTIME :(int(startTime.timestamp()) * 1000), 
+			_ENDTIME :nowTime}))
 		# {
 		#    "code": "000000",
 		#    "message": "success",
@@ -145,13 +155,13 @@ class InputPlugin(AbstractInputPlugin):
 		#    "success": true
 		# }
 		for payment in fiat_payments:
-			self._process_fiat_payments(payment, in_transactions)
+			self._process_fiat_payment(payment, in_transactions)
 
 		
 		# Process crypto deposits (limited to 90 day windows)
 		while currentStart < nowTime:
 			# The CCXT function only retrieves fiat deposits if you provide a valid 'legalMoney' code as variable.
-			crypto_deposits = self.client.fetch_deposits(params=({'startTime':currentStart, 'endTime':currentEnd}))
+			crypto_deposits = self.client.fetch_deposits(params=({_STARTTIME:currentStart, _ENDTIME:currentEnd}))
             #     [
             #       {
             #         "amount": "0.01844487",
@@ -179,12 +189,12 @@ class InputPlugin(AbstractInputPlugin):
             #     }
             #   ]
             for deposit in crypto_deposits:			
-				self._process_crypto_deposit(deposit, in_transactions)
+				self._process_transfer(deposit, intra_transactions)
 			currentStart += 7776000000
 			currentEnd += 7776000000
 
 		# Process actual fiat deposits (no limit on the date range)
-		fiat_deposits = self.client.sapiGetFiatOrders(params=({'startTime':currentStart, 'endTime':nowTime}))
+		fiat_deposits = self.client.sapiGetFiatOrders(params=({_STARTTIME:currentStart, _ENDTIME:nowTime}))
         #     {
         #       "code": "000000",
         #       "message": "success",
@@ -207,11 +217,14 @@ class InputPlugin(AbstractInputPlugin):
         for deposit in fiat_deposits:
         	self._process_fiat_deposit(deposit, in_transactions)
 
+    def _process_buy(self)
+    	pass
+    	# if fiatCurrency then fiat payment
 
-    def _process_fiat_deposit(
+
+    def _process_deposit(
     	self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None
     ) -> None:
-    	transaction_data = transaction[_DATA]
 
     	# Is this a fiat payment?
     	if [_CRYPTOCURRENCY] in transaction_data:
@@ -241,7 +254,39 @@ class InputPlugin(AbstractInputPlugin):
     		)
     	)
 
-    
+    def _process_transfer(
+    	self, transaction: Any, intra_transaction_list: List[IntraTransaction]
+    ) -> None:
+    	amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT])
+
+    	intra_transaction_list.append(
+    		IntraTransaction(
+    			plugin=self.__BINANCE_COM,
+    			unique_id=transaction[_TXID],
+    			raw_data=json.dumps(transaction),
+    			timestamp=_rp2timestamp_from_ms_epoch(transaction[_INSERTTIME]),
+    			asset=transaction[_COIN],
+    			from_exchange=Keyword.UNKNOWN.value,
+    			from_holder=Keyword.UNKNOWN.value,
+    			to_exchange=self.__BINANCE_COM,
+    			to_holder=self.account_holder,
+    			spot_price=Keyword.UNKNOWN.value,
+    			crypto_sent=Keyword.UNKNOWN.value,
+    			crypto_received=str(amount),
+    		)
+    	)
+
+
+    def _process_fiat_payment(
+    	self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None 
+    ) -> None:
+    	transaction_data = transaction[_DATA]
+    	_process_fiat_deposit(transaction, in_transactions, notes)
+    	_process_buy(transaction_data, in_transactions, notes)
+
+
+
+
 
 
 
