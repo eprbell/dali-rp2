@@ -14,6 +14,10 @@
 
 # RP2 Change Log
 
+## 0.4.7
+* fixed issue #34: sometimes Coinbase returns bad fiat data for crypto conversions (fiat amount of sale < fiat amount of buy). DaLI used to raise an exception: now it issues a warning and sets the fiat fee to 0
+* Coinbase plugin: _process_transfer() refactoring
+
 ## 0.4.6
 * fixed PRs #31 and #36: various improvements to the logic that reads prices from Web
 
