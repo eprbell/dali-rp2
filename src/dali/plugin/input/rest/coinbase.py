@@ -326,7 +326,9 @@ class InputPlugin(AbstractInputPlugin):
                     # but the Coinbase API sometimes provides imprecise fiat data (see also
                     # https://github.com/eprbell/dali-rp2/issues/20 for more on this problem).
                     self.__logger.warning(
-                        "Coinbase returned imprecise data: fiat_in_with_fee > fiat_out_no_fee: artificially setting fiat fee to 0: %s // %s", str(in_transaction), str(out_transaction)
+                        "Coinbase returned imprecise data: fiat_in_with_fee > fiat_out_no_fee: artificially setting fiat fee to 0: %s // %s",
+                        str(in_transaction),
+                        str(out_transaction),
                     )
                     fiat_in_fee = ZERO  # Set fiat_fee to ZERO, otherwise it would be negative
 
