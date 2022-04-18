@@ -182,6 +182,7 @@ The `intra_csv_file` contains transactions describing crypto being moved across 
 
 Note that empty (separator) lines are allowed in all three CSV files to increase readability.
 
+#### Partial Transactions and Transaction Resolution
 The manual CSV plugin is typically used for two purposes:
 * add complete in/out/intra transactions for exchanges or wallets that are not yet supported by DaLI;
 * add partial in/out/intra transactions for exchanges or wallets that are not yet supported by DaLI.

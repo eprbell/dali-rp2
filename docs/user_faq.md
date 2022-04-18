@@ -25,6 +25,7 @@
   * [What if the Spot Price Is Missing for Some Transactions?](#what-if-the-spot-price-is-missing-for-some-transactions)
   * [What if I and My Spouse File Taxes Jointly?](#what-if-i-and-my-spouse-file-taxes-jointly)
   * [What if a Transaction Is Generated Differently Than I Expect?](#what-if-a-transaction-is-generated-differently-than-i-expect)
+  * [What if a Transaction Is Generated With Some Fields Set to __UNKNOWN?](#what-if-a-transaction-is-generated-with-some-fields-set-to-unknown)
   * [How to Report a DaLI Bug Without Sharing Personal Information?](#how-to-report-a-dali-bug-without-sharing-personal-information)
   * [What if I Don't Trust DaLI With My Crypto Data?](#what-if-i-dont-trust-dali-with-my-crypto-data)
   * [Who is the Author of DaLI?](#who-is-the-author-of-dali)
@@ -78,6 +79,9 @@ See the [configuration file](configuration_file.md) section of the documentation
 
 ### What if a Transaction Is Generated Differently Than I Expect?
 In certain cases DaLI doesn't know the user's intentions and it needs hints to generate a transaction correctly. For example an out transaction could be represented either as a partial intra transaction or as a normal out transaction (perhaps a gift to another person): only the user knows the correct meaning of the transaction. In such cases [transaction_hints](configuration_file.md#transaction-hints-section) in the configuration file can be used to solve the problem.
+
+### What if a Transaction Is Generated With Some Fields Set to __UNKNOWN?
+Such a transaction is called "unresolved" and occurs when DaLI doesn't have enough information to complete it. The user can provide the missing information using the Manual Plugin: read about transaction resolution (and how to fix such issues) in the [Manual Plugin](configuration_file.md#manual-section-csv) section of the documentation.
 
 ### How to Report a DaLI Bug Without Sharing Personal Information?
 See the Reporting Bugs section in the [CONTRIBUTING](../CONTRIBUTING.md#reporting-bugs) document.
