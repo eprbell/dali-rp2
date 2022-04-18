@@ -25,7 +25,7 @@
   * [What if the Spot Price Is Missing for Some Transactions?](#what-if-the-spot-price-is-missing-for-some-transactions)
   * [What if I and My Spouse File Taxes Jointly?](#what-if-i-and-my-spouse-file-taxes-jointly)
   * [What if a Transaction Is Generated Differently Than I Expect?](#what-if-a-transaction-is-generated-differently-than-i-expect)
-  * [What if a Transaction Is Generated With Some Fields Set to __UNKNOWN?](#what-if-a-transaction-is-generated-with-some-fields-set-to-unknown)
+  * [What if a Transaction Is Generated With Some Fields Set to __UNKNOWN?](#what-if-a-transaction-is-generated-with-some-fields-set-to-__unknown)
   * [How to Report a DaLI Bug Without Sharing Personal Information?](#how-to-report-a-dali-bug-without-sharing-personal-information)
   * [What if I Don't Trust DaLI With My Crypto Data?](#what-if-i-dont-trust-dali-with-my-crypto-data)
   * [Who is the Author of DaLI?](#who-is-the-author-of-dali)
