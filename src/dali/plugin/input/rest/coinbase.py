@@ -495,24 +495,7 @@ class InputPlugin(AbstractInputPlugin):
                     crypto_received=str(amount),
                 )
             )
-        elif transaction_type == _PRO_DEPOSIT:
-            intra_transaction_list.append(
-                IntraTransaction(
-                    plugin=self.__COINBASE,
-                    unique_id=transaction[_ID],
-                    raw_data=raw_data,
-                    timestamp=transaction[_CREATED_AT],
-                    asset=currency,
-                    from_exchange=self.__COINBASE,
-                    from_holder=self.account_holder,
-                    to_exchange=self.__COINBASE_PRO,
-                    to_holder=self.account_holder,
-                    spot_price=None,
-                    crypto_sent=str(-amount),
-                    crypto_received=str(-amount),
-                )
-            )
-        elif transaction_type == _EXCHANGE_DEPOSIT:
+        elif transaction_type in [_PRO_DEPOSIT, _EXCHANGE_DEPOSIT]:
             intra_transaction_list.append(
                 IntraTransaction(
                     plugin=self.__COINBASE,
