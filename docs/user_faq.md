@@ -66,7 +66,7 @@ The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be
 The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be used for this purpose.
 
 ### What if the Spot Price Is Missing for Some Transactions?
-In some cases exchange reports don't have spot price information. In such situations spot price information can be retrieved automatically from Coinbase Pro by passing the `-s` option to DaLI.
+In some cases exchange reports don't have spot price information. In such situations spot price information can be retrieved automatically from Coinbase Pro by passing the `-s` option to DaLI. If spot price information is still missing even after using `-s`, read about transaction resolution in the [Manual Plugin](configuration_file.md#manual-section-csv) section of the documentation.
 
 ### What if I and My Spouse File Taxes Jointly?
 Suppose Alice and Bob are filing together and they both have a Coinbase account and a Trezor wallet each. They can configure 4 plugin sections in the configuration file:
