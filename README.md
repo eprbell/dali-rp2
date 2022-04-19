@@ -113,14 +113,12 @@ An example of a configuration file can be found in [test_config.ini](https://git
 
 After processing the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and a RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
 
-Provided DaLI is installed, to generate RP2 input files, open a terminal window (or PowerShell if on Windows).
+Provided [DaLI is installed](#installation), to generate RP2 input files from the example configuration, open a terminal window (or PowerShell if on Windows).
 
 Create the directory structure and download the example input files.
 
 ```console
-# make the directory
-mkdir -p dali/input
-cd dali/
+mkdir -p input
 ```
 
 If your system has wget:
@@ -134,17 +132,19 @@ wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_a
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_bob_btc.csv -P input/
 ```
 
-If your system doesn't have wget:
-
-To try DaLI with the example configuration, download the following files:
+If your system doesn't have wget, manually download the following files:
 * [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini)
 * [test_manual_in.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_in.csv)
 * [test_manual_intra.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_intra.csv)
 * [test_trezor_alice.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_alice_btc.csv)
 * [test_trezor_bob.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_bob_btc.csv)
 
-Generate the output files for rp2
+And move the csv files to the input directory:
+```console
+mv *.csv input
+```
 
+Then generate the output files for rp2:
 ```console
 dali -s -o output -p test_ test_config.ini
  ```
@@ -160,7 +160,7 @@ To print command usage information for the `dali` command:
 dali --help
 ```
 
-To compute taxes with RP2 from the generated input files (using both FIFO and LIFO accounting methods):
+Finally compute taxes with RP2 using the generated input files (using both FIFO and LIFO accounting methods):
 
 ```console
 rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
