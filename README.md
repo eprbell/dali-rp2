@@ -117,17 +117,15 @@ Provided DaLI is installed, to generate RP2 input files, open a terminal window 
 
 Create the directory structure and download the example input files.
 
-To try DaLI with the example configuration, download the following files:
-* [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini)
-* [test_manual_in.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_in.csv)
-* [test_manual_intra.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_intra.csv)
-* [test_trezor_alice.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_alice_btc.csv)
-* [test_trezor_bob.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_bob_btc.csv)
-
 ```console
 # make the directory
 mkdir -p dali/input
 cd dali/
+```
+
+If your system has wget:
+
+```console
 # download the files using wget (or download manually)
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/config/test_config.ini
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_in.csv -P input/
@@ -135,6 +133,15 @@ wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_i
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_alice_btc.csv -P input/
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_bob_btc.csv -P input/
 ```
+
+If your system doesn't have wget:
+
+To try DaLI with the example configuration, download the following files:
+* [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini)
+* [test_manual_in.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_in.csv)
+* [test_manual_intra.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_intra.csv)
+* [test_trezor_alice.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_alice_btc.csv)
+* [test_trezor_bob.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_trezor_bob_btc.csv)
 
 Generate the output files for rp2
 
