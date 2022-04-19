@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## 0.4.8
+* fixed PR #35: added exchange_withdrawal transaction type to Coinbase plugin
+* various documentation improvements
+* updated RP2 dependency to 1.0.0
+
 ## 0.4.7
 * fixed issue #34: sometimes Coinbase returns bad fiat data for crypto conversions (fiat amount of sale < fiat amount of buy). DaLI used to raise an exception: now it issues a warning and sets the fiat fee to 0
 * Coinbase plugin: _process_transfer() refactoring
