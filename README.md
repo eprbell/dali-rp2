@@ -115,7 +115,7 @@ After processing the configuration file, DaLI reads crypto data from native sour
 
 Provided [DaLI is installed](#installation), to generate RP2 input files from the example configuration, open a terminal window (or PowerShell if on Windows).
 
-Create the directory structure and download the example input files.
+Create the directory structure and download the example input files using wget or manually.
 
 ```console
 mkdir -p input
@@ -124,7 +124,6 @@ mkdir -p input
 If your system has wget:
 
 ```console
-# download the files using wget (or download manually)
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/config/test_config.ini
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_in.csv -P input/
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_manual_intra.csv -P input/
@@ -132,7 +131,7 @@ wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_a
 wget https://raw.githubusercontent.com/eprbell/dali-rp2/main/input/test_trezor_bob_btc.csv -P input/
 ```
 
-If your system doesn't have wget, manually download the following files:
+If your system doesn't have wget, download the following files manually:
 * [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini)
 * [test_manual_in.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_in.csv)
 * [test_manual_intra.csv](https://github.com/eprbell/dali-rp2/tree/main/input/test_manual_intra.csv)
