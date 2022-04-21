@@ -144,7 +144,7 @@ The `in_csv_file` contains transactions describing crypto being acquired. Line 1
 * `exchange`: exchange or wallet on which the transaction occurred;
 * `holder`: exchange account or wallet owner;
 * `transaction_type`: AIRDROP, BUY, DONATE, GIFT, HARDFORK, INCOME, INTEREST, MINING, STAKING or WAGES;
-* `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred;
+* `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_in`: how much of the given cryptocurrency was acquired with the transaction;
 * `crypto_fee`: transaction fee (if it was paid in crypto). This is mutually exclusive with `fiat_fee`;
 * `fiat_in_no_fee` (optional): fiat value of the transaction without fee;
@@ -159,7 +159,7 @@ The `out_csv_file` contains transactions describing crypto being disposed of. Li
 * `exchange`: exchange or wallet on which the transaction occurred;
 * `holder`: exchange account or wallet owner;
 * `transaction_type`: DONATE, GIFT or SELL;
-* `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred;
+* `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_out_no_fee`: how much of the given cryptocurrency was sold or sent with the transaction (excluding fee);
 * `crypto_fee`: crypto value of the transaction fee;
 * `crypto_out_with_fee` (optional): how much of the given cryptocurrency was sold or sent with the transaction (including fee);
@@ -175,7 +175,7 @@ The `intra_csv_file` contains transactions describing crypto being moved across 
 * `from_holder` (optional): owner of the exchange account or wallet from which the transfer of cryptocurrency occurred;
 * `to_exchange` (optional): exchange or wallet to which the transfer of cryptocurrency occurred;
 * `to_holder` (optional): owner of the exchange account or wallet to which the transfer of cryptocurrency occurred;
-* `spot_price` (optional): value of 1 unit of the given cryptocurrency at the time the transaction occurred;
+* `spot_price` (optional): value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_sent` (optional): how much of the given cryptocurrency was sent with the transaction;
 * `crypto_received` (optional): how much of the given cryptocurrency was received with the transaction;
 * `notes` (optional): user-provided description of the transaction.
