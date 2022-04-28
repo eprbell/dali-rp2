@@ -28,6 +28,7 @@ class TestSwapFill:
             api_key="a",
             api_secret="b",
             api_passphrase="c",
+            thread_count=1,
         )
 
         btc_account_id = "bbbbbbbb-dddd-4444-8888-000000000000"

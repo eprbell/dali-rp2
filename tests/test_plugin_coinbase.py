@@ -29,6 +29,7 @@ class TestTrade:
             account_holder="tester",
             api_key="a",
             api_secret="b",
+            thread_count=1,
         )
 
         eth_account_id = "bbbbbbbb-dddd-4444-8888-000000000000"
