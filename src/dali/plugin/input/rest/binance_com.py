@@ -121,9 +121,6 @@ class InputPlugin(AbstractInputPlugin):
 		super().__init__(account_holder)
 		self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM}/{self.account_holder}")
 		self.__cache_key: str = f"{self.__BINANCE_COM.lower()}-{account_holder}"
-		self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
-		if self.__thread_count > self.__MAX_THREAD_COUNT:
-			raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
 		self.client = ccxt.binance({
 			'apiKey': api_key,
 			'secret': api_secret,
