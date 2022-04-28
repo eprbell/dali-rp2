@@ -43,7 +43,7 @@ from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.4.7"
+_VERSION: str = "0.4.8"
 
 
 def input_loader() -> None:
@@ -57,6 +57,11 @@ def input_loader() -> None:
     args = parser.parse_args()
 
     _setup_paths(parser=parser, output_dir=args.output_dir)
+
+    if not Path(args.ini_file).exists():
+        print(f"Configuration file '{args.ini_file}' not found")
+        parser.print_help()
+        sys.exit(1)
 
     transactions: List[AbstractTransaction] = []
 

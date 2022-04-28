@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.4.7 Developer Guide
+# DaLI for RP2 v0.4.8 Developer Guide
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -136,10 +136,13 @@ Read the [Contributing](CONTRIBUTING.md) document on pull requests guidelines.
 
 ### Design Guidelines
 DaLI code adheres to these principles:
-* immutability: generally data structures are read-only (the only exceptions are for data structures that would incur a major complexity increase without write permission: e.g. AVL tree node).
-  * class fields are private (prepended with double-underscore). Fields that need public access have a read-only property. Write-properties are not used;
-  * @dataclass classes have `frozen=True`
-* runtime checks: parameters of public functions are type-checked at runtime
+* all identifiers have [descriptive names](https://realpython.com/python-pep8/#how-to-choose-names);
+* immutability:
+  * global variables have upper case names, are initialized where declared and are never modified afterwards;
+  * generally data structures are read-only (the only exceptions are for data structures that would incur a major complexity increase without write permission: e.g. AVL tree node):
+    * class fields are private (prepended with double-underscore). Fields that need public access have a read-only property. Write-properties are not used;
+    * @dataclass classes have `frozen=True`;
+* runtime checks: parameters of public functions are type-checked at runtime;
 * type hints: all variables and functions have Python type hints;
 * no id-based hashing: classes that are added to dictionaries and sets redefine `__eq__()`, `__neq__()` and `__hash__()`;
 * encapsulated math: all high-precision math is done via `RP2Decimal` (a subclass of Decimal), to ensure the correct precision is used throughout the code. `RP2Decimal` instances are never mixed with other types in expressions;
@@ -148,7 +151,7 @@ DaLI code adheres to these principles:
 * no unnamed tuples: dataclasses or named tuples are used instead;
 * one class per file (with exceptions for trivial classes);
 * files containing a class must have the same name as the class (but lowercase with underscores): e.g. class AbstractEntry lives in file abstract_entry.py;
-* abstract classes' name starts with `Abstract`
+* abstract classes' name starts with `Abstract`;
 * no imports with `*`.
 
 ### Development Workflow
