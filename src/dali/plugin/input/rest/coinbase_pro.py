@@ -22,8 +22,8 @@ import hashlib
 import hmac
 import json
 import logging
-from multiprocessing.pool import ThreadPool
 import time
+from multiprocessing.pool import ThreadPool
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
@@ -356,20 +356,20 @@ class InputPlugin(AbstractInputPlugin):
             usd_volume = RP2Decimal(fill[_USD_VOLUME])
             crypto_fee = RP2Decimal(fill[_FEE])
             if fill_side == _SELL:
+                from_crypto_fee = ZERO
+                to_crypto_fee = crypto_fee
                 from_currency_size = RP2Decimal(fill[_SIZE])
                 from_currency_price = usd_volume / from_currency_size
                 to_currency_size = from_currency_size * RP2Decimal(fill[_PRICE])
-                to_currency_price = usd_volume / to_currency_size
-                out_crypto_fee = ZERO
-                in_crypto_fee = crypto_fee
+                to_currency_price = usd_volume / (to_currency_size + to_crypto_fee)
             elif fill_side == _BUY:
+                from_crypto_fee = crypto_fee
+                to_crypto_fee = ZERO
                 (from_currency, to_currency) = (to_currency, from_currency)
                 to_currency_size = RP2Decimal(fill[_SIZE])
                 to_currency_price = usd_volume / to_currency_size
                 from_currency_size = to_currency_size * RP2Decimal(fill[_PRICE])
                 from_currency_price = usd_volume / from_currency_size
-                out_crypto_fee = crypto_fee
-                in_crypto_fee = ZERO
             else:
                 raise Exception(f"Internal error: unsupported fill side {transaction}\n{fill}")
             self.__append_transaction(
@@ -385,7 +385,7 @@ class InputPlugin(AbstractInputPlugin):
                     transaction_type="Sell",
                     spot_price=str(from_currency_price),
                     crypto_out_no_fee=str(from_currency_size),
-                    crypto_fee=str(out_crypto_fee),
+                    crypto_fee=str(from_crypto_fee),
                     crypto_out_with_fee=None,
                     fiat_out_no_fee=None,
                     fiat_fee=None,
@@ -393,8 +393,6 @@ class InputPlugin(AbstractInputPlugin):
                 ),
             )
 
-            if usd_volume != to_currency_price * to_currency_size:
-                raise Exception(f"USD volume ({usd_volume}) doesn't match in-transaction crypto size ({to_currency_size}) and price ({to_currency_price}).")
             self.__append_transaction(
                 cast(List[AbstractTransaction], in_transaction_list),
                 InTransaction(
@@ -408,7 +406,7 @@ class InputPlugin(AbstractInputPlugin):
                     transaction_type="Buy",
                     spot_price=str(to_currency_price),
                     crypto_in=str(to_currency_size),
-                    crypto_fee=str(in_crypto_fee),
+                    crypto_fee=str(to_crypto_fee),
                     fiat_in_no_fee=None,
                     fiat_in_with_fee=None,
                     fiat_fee=None,
@@ -476,7 +474,6 @@ class InputPlugin(AbstractInputPlugin):
             ),
         )
 
-
     def __append_transaction(self, transaction_list: List[AbstractTransaction], transaction: AbstractTransaction) -> None:
         if AssetAndUniqueId(transaction.asset, transaction.unique_id) not in self.__fill_cache:
             transaction_list.append(transaction)
@@ -512,8 +509,7 @@ class InputPlugin(AbstractInputPlugin):
             response: Response = self.__session.get(full_url, params=params, auth=self.__auth, timeout=self.__TIMEOUT)
             self._validate_response(response, "get", endpoint)
             json_response: Any = response.json()
-            for result in json_response:
-                yield result
+            yield from json_response
             if not response.headers.get("cb-after"):
                 break
             params["after"] = response.headers["cb-after"]

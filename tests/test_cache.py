@@ -14,15 +14,14 @@
 
 
 import os
+import unittest
 from pathlib import Path
 from typing import Dict, List
-import unittest
 
 from dali.abstract_transaction import AbstractTransaction
 from dali.cache import CACHE_DIR, load_from_cache, save_to_cache
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
-
 
 ROOT_PATH: Path = Path(os.path.dirname(__file__)).parent.absolute()
 OUTPUT_PATH: Path = ROOT_PATH / Path("output")

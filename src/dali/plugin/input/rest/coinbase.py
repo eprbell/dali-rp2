@@ -23,7 +23,7 @@ import json
 import logging
 import time
 from multiprocessing.pool import ThreadPool
-from typing import Any, cast, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
 from requests import PreparedRequest
@@ -50,6 +50,7 @@ _CURRENCY: str = "currency"
 _DETAILS: str = "details"
 _EMAIL: str = "email"
 _EXCHANGE_DEPOSIT: str = "exchange_deposit"
+_EXCHANGE_WITHDRAWAL: str = "exchange_withdrawal"
 _FEE: str = "fee"
 _FIAT_DEPOSIT: str = "fiat_deposit"
 _FIAT_WITHDRAWAL: str = "fiat_withdrawal"
@@ -319,55 +320,65 @@ class InputPlugin(AbstractInputPlugin):
                 fiat_in_no_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_in_no_fee)
                 fiat_in_with_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_in_with_fee)
                 fiat_out_no_fee = RP2Decimal(out_transaction.fiat_out_no_fee)
-                if fiat_in_with_fee <= fiat_out_no_fee:
-                    # crypto_fee is always None (see swap logic in _process_fill()). Update notes and fiat_fee-related fields
-                    transaction_list[swap_pair.in_transaction.in_transaction_index] = InTransaction(
-                        plugin=self.__COINBASE,
-                        unique_id=in_transaction.unique_id,
-                        raw_data=in_transaction.raw_data,
-                        timestamp=in_transaction.timestamp,
-                        asset=in_transaction.asset,
-                        exchange=in_transaction.exchange,
-                        holder=in_transaction.holder,
-                        transaction_type=in_transaction.transaction_type,
-                        spot_price=in_transaction.spot_price,
-                        crypto_in=in_transaction.crypto_in,
-                        crypto_fee=in_transaction.crypto_fee,
-                        fiat_in_no_fee=in_transaction.fiat_in_no_fee,
-                        fiat_in_with_fee=str(fiat_out_no_fee),
-                        fiat_fee=str(fiat_out_no_fee - fiat_in_no_fee),
-                        notes=(
-                            f"{in_transaction.notes + '; ' if in_transaction.notes else ''} Buy side of conversion from "
-                            f"{out_transaction.crypto_out_with_fee} {out_transaction.asset} -> "
-                            f"{in_transaction.crypto_in} {in_transaction.asset} "
-                            f"({out_transaction.asset} out-transaction unique id: {out_transaction.unique_id})"
-                        ),
+                fiat_in_fee: RP2Decimal = fiat_out_no_fee - fiat_in_no_fee
+                if fiat_in_with_fee > fiat_out_no_fee:
+                    # Sometimes Coinbase produces conversions with fiat_in_with_fee > fiat_out_no_fee
+                    # (e.g. see https://github.com/eprbell/dali-rp2/issues/34). This is clearly incorrect
+                    # but the Coinbase API sometimes provides imprecise fiat data (see also
+                    # https://github.com/eprbell/dali-rp2/issues/20 for more on this problem).
+                    self.__logger.warning(
+                        "Coinbase returned imprecise data: fiat_in_with_fee > fiat_out_no_fee: artificially setting fiat fee to 0: %s // %s",
+                        str(in_transaction),
+                        str(out_transaction),
                     )
-                    # crypto_fee and fiat_fee are always 0 (see swap logic in _process_fill()). Update notes
-                    transaction_list[swap_pair.out_transaction.out_transaction_index] = OutTransaction(
-                        plugin=self.__COINBASE,
-                        unique_id=out_transaction.unique_id,
-                        raw_data=out_transaction.raw_data,
-                        timestamp=out_transaction.timestamp,
-                        asset=out_transaction.asset,
-                        exchange=out_transaction.exchange,
-                        holder=out_transaction.holder,
-                        transaction_type=out_transaction.transaction_type,
-                        spot_price=out_transaction.spot_price,
-                        crypto_out_no_fee=out_transaction.crypto_out_no_fee,
-                        crypto_fee=out_transaction.crypto_fee,
-                        crypto_out_with_fee=out_transaction.crypto_out_with_fee,
-                        fiat_out_no_fee=out_transaction.fiat_out_no_fee,
-                        fiat_fee=out_transaction.fiat_fee,
-                        notes=(
-                            f"{out_transaction.notes + '; ' if out_transaction.notes else ''} Sell side of conversion from "
-                            f"{out_transaction.crypto_out_with_fee} {out_transaction.asset} -> "
-                            f"{in_transaction.crypto_in} {in_transaction.asset} "
-                            f"({in_transaction.asset} in-transaction unique id: {in_transaction.unique_id})"
-                        ),
-                    )
-                else:
-                    raise Exception(f"Internal error: fiat_in_with_fee > fiat_out_no_fee: {in_transaction}//{out_transaction}")
+                    fiat_in_fee = ZERO  # Set fiat_fee to ZERO, otherwise it would be negative
+
+                # crypto_fee is always None (see swap logic in _process_fill()). Update notes and fiat_fee-related fields
+                transaction_list[swap_pair.in_transaction.in_transaction_index] = InTransaction(
+                    plugin=self.__COINBASE,
+                    unique_id=in_transaction.unique_id,
+                    raw_data=in_transaction.raw_data,
+                    timestamp=in_transaction.timestamp,
+                    asset=in_transaction.asset,
+                    exchange=in_transaction.exchange,
+                    holder=in_transaction.holder,
+                    transaction_type=in_transaction.transaction_type,
+                    spot_price=in_transaction.spot_price,
+                    crypto_in=in_transaction.crypto_in,
+                    crypto_fee=in_transaction.crypto_fee,
+                    fiat_in_no_fee=in_transaction.fiat_in_no_fee,
+                    fiat_in_with_fee=str(fiat_out_no_fee),
+                    fiat_fee=str(fiat_in_fee),
+                    notes=(
+                        f"{in_transaction.notes + '; ' if in_transaction.notes else ''} Buy side of conversion from "
+                        f"{out_transaction.crypto_out_with_fee} {out_transaction.asset} -> "
+                        f"{in_transaction.crypto_in} {in_transaction.asset} "
+                        f"({out_transaction.asset} out-transaction unique id: {out_transaction.unique_id})"
+                    ),
+                )
+                # crypto_fee and fiat_fee are always 0 (see swap logic in _process_fill()). Update notes
+                transaction_list[swap_pair.out_transaction.out_transaction_index] = OutTransaction(
+                    plugin=self.__COINBASE,
+                    unique_id=out_transaction.unique_id,
+                    raw_data=out_transaction.raw_data,
+                    timestamp=out_transaction.timestamp,
+                    asset=out_transaction.asset,
+                    exchange=out_transaction.exchange,
+                    holder=out_transaction.holder,
+                    transaction_type=out_transaction.transaction_type,
+                    spot_price=out_transaction.spot_price,
+                    crypto_out_no_fee=out_transaction.crypto_out_no_fee,
+                    crypto_fee=out_transaction.crypto_fee,
+                    crypto_out_with_fee=out_transaction.crypto_out_with_fee,
+                    fiat_out_no_fee=out_transaction.fiat_out_no_fee,
+                    fiat_fee=out_transaction.fiat_fee,
+                    notes=(
+                        f"{out_transaction.notes + '; ' if out_transaction.notes else ''} Sell side of conversion from "
+                        f"{out_transaction.crypto_out_with_fee} {out_transaction.asset} -> "
+                        f"{in_transaction.crypto_in} {in_transaction.asset} "
+                        f"({in_transaction.asset} in-transaction unique id: {in_transaction.unique_id})"
+                    ),
+                )
             else:
                 # InTransaction is fiat, so it is ignored in RP2: however any fiat_fee must be applied to the OutTransaction to avoid losing it
                 if not in_transaction.fiat_fee or not out_transaction.fiat_out_no_fee:
@@ -426,7 +437,7 @@ class InputPlugin(AbstractInputPlugin):
             raw_data: str = json.dumps(transaction)
             self.__logger.debug("Transaction: %s", raw_data)
             transaction_type: str = transaction[_TYPE]
-            if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _SEND}:
+            if transaction_type in {_PRIME_WITHDRAWAL, _PRO_DEPOSIT, _PRO_WITHDRAWAL, _EXCHANGE_DEPOSIT, _EXCHANGE_WITHDRAWAL, _SEND}:
                 self._process_transfer(transaction, currency, in_transaction_list, out_transaction_list, intra_transaction_list)
             elif transaction_type in {_BUY, _SELL, _TRADE}:
                 self._process_fill(
@@ -478,7 +489,7 @@ class InputPlugin(AbstractInputPlugin):
         transaction_type: str = transaction[_TYPE]
         raw_data: str = json.dumps(transaction)
 
-        if transaction_type in {_PRIME_WITHDRAWAL, _PRO_WITHDRAWAL}:
+        if transaction_type in {_PRIME_WITHDRAWAL, _PRO_WITHDRAWAL, _EXCHANGE_WITHDRAWAL}:
             intra_transaction_list.append(
                 IntraTransaction(
                     plugin=self.__COINBASE,
@@ -495,24 +506,7 @@ class InputPlugin(AbstractInputPlugin):
                     crypto_received=str(amount),
                 )
             )
-        elif transaction_type == _PRO_DEPOSIT:
-            intra_transaction_list.append(
-                IntraTransaction(
-                    plugin=self.__COINBASE,
-                    unique_id=transaction[_ID],
-                    raw_data=raw_data,
-                    timestamp=transaction[_CREATED_AT],
-                    asset=currency,
-                    from_exchange=self.__COINBASE,
-                    from_holder=self.account_holder,
-                    to_exchange=self.__COINBASE_PRO,
-                    to_holder=self.account_holder,
-                    spot_price=None,
-                    crypto_sent=str(-amount),
-                    crypto_received=str(-amount),
-                )
-            )
-        elif transaction_type == _EXCHANGE_DEPOSIT:
+        elif transaction_type in [_PRO_DEPOSIT, _EXCHANGE_DEPOSIT]:
             intra_transaction_list.append(
                 IntraTransaction(
                     plugin=self.__COINBASE,
@@ -739,9 +733,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-    def _process_fiat_deposit(
-        self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_fiat_deposit(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
         in_transaction_list.append(
@@ -764,9 +756,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-    def _process_fiat_withdrawal(
-        self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_fiat_withdrawal(self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
         out_transaction_list.append(
@@ -816,8 +806,7 @@ class InputPlugin(AbstractInputPlugin):
             response: Response = self.__session.get(current_url, params=params, auth=self.__auth, timeout=self.__TIMEOUT)
             self._validate_response(response, "get", endpoint)
             json_response: Any = response.json()
-            for result in json_response["data"]:
-                yield result
+            yield from json_response["data"]
             if "pagination" not in json_response or "next_uri" not in json_response["pagination"] or not json_response["pagination"]["next_uri"]:
                 break
             current_url = f"{self.__api_url}{json_response['pagination']['next_uri']}"
