@@ -116,7 +116,6 @@ class InputPlugin(AbstractInputPlugin):
 		account_holder: str,
 		api_key: str,
 		api_secret: str,
-		thread_count: Optional[int] = None,
 	) -> None:
 
 		super().__init__(account_holder)
