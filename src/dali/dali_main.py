@@ -57,6 +57,11 @@ def input_loader() -> None:
 
     _setup_paths(parser=parser, output_dir=args.output_dir)
 
+    if not Path(args.ini_file).exists():
+        print(f"Configuration file '{args.ini_file}' not found")
+        parser.print_help()
+        sys.exit(1)
+
     transactions: List[AbstractTransaction] = []
 
     try:
