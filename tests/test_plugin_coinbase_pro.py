@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
-from dali.plugin.input.rest.coinbase_pro import InputPlugin
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
+from dali.plugin.input.rest.coinbase_pro import InputPlugin
 
 
 class TestSwapFill:
@@ -28,6 +28,7 @@ class TestSwapFill:
             api_key="a",
             api_secret="b",
             api_passphrase="c",
+            thread_count=1,
         )
 
         btc_account_id = "bbbbbbbb-dddd-4444-8888-000000000000"

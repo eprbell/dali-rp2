@@ -13,14 +13,19 @@
 # limitations under the License.
 
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, cast
 
+import pandas as pd
 from Historic_Crypto import HistoricalData
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2TypeError, RP2ValueError
 
-from dali.abstract_transaction import AbstractTransaction, AssetAndTimestamp, AssetAndUniqueId
+from dali.abstract_transaction import (
+    AbstractTransaction,
+    AssetAndTimestamp,
+    AssetAndUniqueId,
+)
 from dali.cache import load_from_cache, save_to_cache
 from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none
 from dali.in_transaction import InTransaction
@@ -122,30 +127,39 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
             spot_price = historical_price_cache[key]
             LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
         else:
-            time_granularity: List[int] = [60, 300, 900, 3600, 21600, 84600]
-            from_timestamp: str = transaction.timestamp_value.strftime("%Y-%m-%d-%H-%M")
+            time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
+            # Coinbase API expects UTC timestamps only, see the forum discussion here:
+            # https://forums.coinbasecloud.dev/t/invalid-end-on-product-candles-endpoint/320
+            transaction_utc_timestamp = transaction.timestamp_value.astimezone(timezone.utc)
+            from_timestamp: str = transaction_utc_timestamp.strftime("%Y-%m-%d-%H-%M")
             retry_count: int = 0
             while retry_count < len(time_granularity):
                 try:
                     seconds = time_granularity[retry_count]
-                    to_timestamp: str = (transaction.timestamp_value + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
-                    spot_price = str(
-                        HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()["high"][0]
-                    )
+                    to_timestamp: str = (transaction_utc_timestamp + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
+                    df_quotes: pd.DataFrame = HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()
+                    df_quotes.index = df_quotes.index.tz_localize("UTC")  # The returned timestamps in the index are timezone naive
+                    first_quote_bar: pd.Series = df_quotes.reset_index().iloc[0]
+                    quote_field: str = "high"
+                    spot_price = str(first_quote_bar[quote_field])
                     break
                 except ValueError:
                     retry_count += 1
 
             if not spot_price:
                 raise Exception("Unable to read spot price from Coinbase Pro")
-
-            LOGGER.debug("Reading spot_price for %s/%s from Coinbase Pro: %s", key.timestamp, key.asset, spot_price)
+            LOGGER.debug(
+                "Fetched %s spot_price %s for %s/%s from Coinbase Pro %d second bar at %s",
+                quote_field,
+                spot_price,
+                key.timestamp,
+                key.asset,
+                seconds,
+                first_quote_bar.time,  # type: ignore
+            )
 
             historical_price_cache[key] = spot_price
-        notes: str = ""
-        if transaction.notes:
-            notes = f"{notes}; "
-        notes = f"spot_price read from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
+        notes: str = f"spot_price read from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
         init_parameters[Keyword.SPOT_PRICE.value] = spot_price
         init_parameters[Keyword.NOTES.value] = notes
         init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = True
@@ -278,10 +292,8 @@ def _apply_transaction_hint(
         elif isinstance(transaction, IntraTransaction):
             if not is_unknown(transaction.from_holder) or not is_unknown(transaction.from_exchange):
                 raise RP2ValueError(
-                    (
-                        f"Invalid conversion {Keyword.INTRA.value}->{Keyword.IN.value}: "
-                        f"{Keyword.FROM_HOLDER.value}/{Keyword.FROM_EXCHANGE.value} must be unknown: {transaction}"
-                    )
+                    f"Invalid conversion {Keyword.INTRA.value}->{Keyword.IN.value}: "
+                    f"{Keyword.FROM_HOLDER.value}/{Keyword.FROM_EXCHANGE.value} must be unknown: {transaction}"
                 )
             result = InTransaction(
                 plugin=transaction.plugin,
@@ -320,10 +332,8 @@ def _apply_transaction_hint(
         elif isinstance(transaction, IntraTransaction):
             if not is_unknown(transaction.to_holder) or not is_unknown(transaction.to_exchange):
                 raise RP2ValueError(
-                    (
-                        f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
-                        f"{Keyword.TO_HOLDER.value}/{Keyword.TO_EXCHANGE.value} must be unknown: {transaction}"
-                    )
+                    f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
+                    f"{Keyword.TO_HOLDER.value}/{Keyword.TO_EXCHANGE.value} must be unknown: {transaction}"
                 )
             crypto_out_no_fee: RP2Decimal = RP2Decimal(transaction.crypto_sent)
             crypto_fee: RP2Decimal = ZERO
@@ -365,10 +375,8 @@ def _apply_transaction_hint(
         elif isinstance(transaction, OutTransaction):
             if is_unknown(transaction.crypto_out_no_fee) or is_unknown(transaction.crypto_fee):
                 raise RP2ValueError(
-                    (
-                        f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
-                        f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} canot be unknown: {transaction}"
-                    )
+                    f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
+                    f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} canot be unknown: {transaction}"
                 )
             result = IntraTransaction(
                 plugin=transaction.plugin,

@@ -18,9 +18,10 @@ import unittest
 from pathlib import Path
 from subprocess import run
 from typing import List
-from dali.cache import CACHE_DIR
 
 from ods_diff import ods_diff
+
+from dali.cache import CACHE_DIR
 
 ROOT_PATH: Path = Path(os.path.dirname(__file__)).parent.absolute()
 

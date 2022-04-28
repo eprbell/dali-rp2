@@ -64,7 +64,7 @@ class InputPlugin(AbstractInputPlugin):
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
-        with open(self.__csv_file, mode="r", encoding="utf-8") as csv_file:
+        with open(self.__csv_file, encoding="utf-8") as csv_file:
             lines = reader(csv_file, delimiter=self.__DELIMITER)
             header_found: bool = False
             for line in lines:
