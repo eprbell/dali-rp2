@@ -28,6 +28,7 @@ from dali.abstract_transaction import (
 )
 from dali.cache import load_from_cache, save_to_cache
 from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none
+from dali.historical_bar import HistoricalBar
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
@@ -102,16 +103,18 @@ def _resolve_optional_fields(
     )
 
 
-def _load_from_historical_price_cache() -> Dict[AssetAndTimestamp, str]:
+def _load_from_historical_price_cache() -> Dict[AssetAndTimestamp, HistoricalBar]:
     result = load_from_cache(__HISTORICAL_PRICE_CACHE)
-    return cast(Dict[AssetAndTimestamp, str], result) if result is not None else {}
+    return cast(Dict[AssetAndTimestamp, HistoricalBar], result) if result is not None else {}
 
 
-def _save_to_historical_price_cache(historical_prices: Dict[AssetAndTimestamp, str]) -> None:
+def _save_to_historical_price_cache(historical_prices: Dict[AssetAndTimestamp, HistoricalBar]) -> None:
     save_to_cache(__HISTORICAL_PRICE_CACHE, historical_prices)
 
 
-def _update_spot_price_from_web(transaction: AbstractTransaction, historical_price_cache: Dict[AssetAndTimestamp, str]) -> AbstractTransaction:
+def _update_spot_price_from_web(
+    transaction: AbstractTransaction, historical_price_cache: Dict[AssetAndTimestamp, HistoricalBar], global_configuration: Dict[str, Any]
+) -> AbstractTransaction:
     init_parameters: Dict[str, Any] = transaction.constructor_parameter_dictionary
     if transaction.spot_price is None:  # type: ignore
         return transaction
@@ -122,9 +125,18 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
     # ignore the 0 and use a price read from the Internet.
     if is_unknown(transaction.spot_price) or RP2Decimal(transaction.spot_price) == ZERO:  # type: ignore
         spot_price: Optional[str] = None
+        historical_price_type: str = global_configuration[Keyword.HISTORICAL_MARKET_DATA.value][Keyword.HISTORICAL_PRICE.value]
+        cached_historical_bar: Optional[HistoricalBar] = None
         key: AssetAndTimestamp = AssetAndTimestamp(transaction.asset, transaction.timestamp_value)
         if key in historical_price_cache:
-            spot_price = historical_price_cache[key]
+            cached_value: Any = historical_price_cache[key]
+            if isinstance(cached_value, HistoricalBar):  # older caches did not store the full bar
+                cached_historical_bar = cached_value
+            else:
+                LOGGER.debug("Cached price for %s/%s is not a full bar", key.timestamp, key.asset)
+        if cached_historical_bar:
+            spot_price_value = cached_historical_bar.derive_transaction_price(transaction.timestamp_value, historical_price_type)
+            spot_price = str(spot_price_value)
             LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
         else:
             time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
@@ -138,10 +150,9 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
                     seconds = time_granularity[retry_count]
                     to_timestamp: str = (transaction_utc_timestamp + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
                     df_quotes: pd.DataFrame = HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()
-                    df_quotes.index = df_quotes.index.tz_localize("UTC")  # The returned timestamps in the index are timezone naive
-                    first_quote_bar: pd.Series = df_quotes.reset_index().iloc[0]
-                    quote_field: str = "high"
-                    spot_price = str(first_quote_bar[quote_field])
+                    historical_bar = HistoricalBar.from_historic_crypto_dataframe(timedelta(seconds=seconds), df_quotes)
+                    spot_price_value = historical_bar.derive_transaction_price(transaction.timestamp_value, historical_price_type)
+                    spot_price = str(spot_price_value)
                     break
                 except ValueError:
                     retry_count += 1
@@ -150,16 +161,17 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
                 raise Exception("Unable to read spot price from Coinbase Pro")
             LOGGER.debug(
                 "Fetched %s spot_price %s for %s/%s from Coinbase Pro %d second bar at %s",
-                quote_field,
+                historical_price_type,
                 spot_price,
                 key.timestamp,
                 key.asset,
                 seconds,
-                first_quote_bar.time,  # type: ignore
+                historical_bar.timestamp,
             )
 
-            historical_price_cache[key] = spot_price
-        notes: str = f"spot_price read from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
+            historical_price_cache[key] = historical_bar
+        verb: str = "derived" if historical_price_type == Keyword.HISTORICAL_PRICE_WEIGHTED.value else "read"
+        notes: str = f"{historical_price_type} spot_price {verb} from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
         init_parameters[Keyword.SPOT_PRICE.value] = spot_price
         init_parameters[Keyword.NOTES.value] = notes
         init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = True
@@ -191,7 +203,7 @@ def resolve_transactions(
     unique_id_2_transactions: Dict[AssetAndUniqueId, List[AbstractTransaction]] = {}
     transaction: AbstractTransaction
 
-    historical_price_cache: Dict[AssetAndTimestamp, str] = _load_from_historical_price_cache()
+    historical_price_cache: Dict[AssetAndTimestamp, HistoricalBar] = _load_from_historical_price_cache()
 
     for transaction in transactions:
         if not isinstance(transaction, AbstractTransaction):
@@ -200,7 +212,7 @@ def resolve_transactions(
         if is_unknown(transaction.unique_id):
             # Cannot resolve further if unique_id is not known
             if read_spot_price_from_web:
-                transaction = _update_spot_price_from_web(transaction, historical_price_cache)
+                transaction = _update_spot_price_from_web(transaction, historical_price_cache, global_configuration)
             LOGGER.debug("Unresolvable transaction (no %s): %s", Keyword.UNIQUE_ID.value, str(transaction))
             resolved_transactions.append(transaction)
         else:
@@ -214,7 +226,7 @@ def resolve_transactions(
         if len(transaction_list) == 1:
             transaction = _apply_transaction_hint(transaction_list[0], global_configuration)
             if read_spot_price_from_web:
-                transaction = _update_spot_price_from_web(transaction, historical_price_cache)
+                transaction = _update_spot_price_from_web(transaction, historical_price_cache, global_configuration)
             LOGGER.debug("Self-contained transaction: %s", str(transaction))
             resolved_transactions.append(transaction)
             continue
@@ -241,7 +253,7 @@ def resolve_transactions(
             )
 
         if read_spot_price_from_web:
-            transaction = _update_spot_price_from_web(transaction, historical_price_cache)
+            transaction = _update_spot_price_from_web(transaction, historical_price_cache, global_configuration)
 
         LOGGER.debug("Resolved transaction: %s", str(transaction))
         resolved_transactions.append(transaction)

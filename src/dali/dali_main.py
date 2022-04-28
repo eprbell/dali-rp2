@@ -29,6 +29,7 @@ from dali.dali_configuration import (
     DEFAULT_CONFIGURATION,
     DIRECTION_2_TRANSACTION_TYPE_SET,
     DIRECTION_SET,
+    HISTORICAL_PRICE_KEYWORDS,
     Keyword,
     is_builtin_section_name,
     is_internal_field,
@@ -76,6 +77,8 @@ def input_loader() -> None:
                     sys.exit(1)
                 if section_name == Keyword.TRANSACTION_HINTS.value:
                     dali_configuration[section_name] = _validate_transaction_hints_configuration(ini_config, section_name)
+                elif section_name == Keyword.HISTORICAL_MARKET_DATA.value:
+                    dali_configuration[section_name] = _validate_historical_market_data_configuration(ini_config, section_name)
                 else:
                     dali_configuration[section_name] = _validate_header_configuration(ini_config, section_name)
                 continue
@@ -252,6 +255,27 @@ def _validate_transaction_hints_configuration(ini_config: ConfigParser, section_
         notes = tokenized_transaction_hint[2].strip()
 
         result[unique_id] = DirectionTypeAndNotes(direction, transaction_type, notes)
+    return result
+
+
+# Sanity check of historical_market_data section.
+# Verify:
+#   - No unrecognized parameter names.
+#   - Historical_price is in the set of allowed HISTORICAL_PRICE_SET values.
+def _validate_historical_market_data_configuration(ini_config: ConfigParser, section_name: str) -> Dict[str, str]:
+    result: Dict[str, str] = {}
+
+    for key, value in ini_config[section_name].items():
+        if key == Keyword.HISTORICAL_PRICE.value:
+            if value not in HISTORICAL_PRICE_KEYWORDS:
+                LOGGER.error("The '%s' parameter must be one of (%s), instead it was '%s'", key, ", ".join(HISTORICAL_PRICE_KEYWORDS), value)
+                sys.exit(1)
+            else:
+                result[key] = value
+        else:
+            LOGGER.error("Unrecognized parameter '%s' in configuration file section '%s'", key, section_name)
+            sys.exit(1)
+
     return result
 
 
