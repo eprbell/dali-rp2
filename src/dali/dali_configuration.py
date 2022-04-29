@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from enum import Enum
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, Optional, Set, Tuple, Union
 
 from rp2.rp2_error import RP2ValueError
 
@@ -161,7 +161,7 @@ BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
     Keyword.INTRA_HEADER.value,
 }
 
-DEFAULT_CONFIGURATION: Dict[str, Dict[str, int | str]] = {
+DEFAULT_CONFIGURATION: Dict[str, Dict[str, Union[int, str]]] = {
     Keyword.IN_HEADER.value: {
         Keyword.TIMESTAMP.value: 0,
         Keyword.ASSET.value: 1,
