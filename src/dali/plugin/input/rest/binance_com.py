@@ -40,12 +40,14 @@ from dali.out_transaction import OutTransaction
 import ccxt
 
 # Native format keywords
+_ACCOUNTPROFITS: str = "accountProfits"
 _ALGO: str = "algo"
 _AMOUNT: str = "amount"
 _ASSET: str = "asset"
 _BEGINTIME: str = "beginTime"
 _BUY: str = "buy" # CCXT
 _COIN: str = "coin"
+_COINNAME: str = "coinName"
 _COST: str = "cost" # CCXT only variable
 _CREATETIME: str = "createTime"
 _CRYPTOCURRENCY: str = "cryptoCurrency"
@@ -69,6 +71,7 @@ _ORDER: str = "order" # CCXT
 _ORDERNO: str = "orderNo"
 _PAGEINDEX: str = "pageIndex"
 _PRICE: str = "price"
+_PROFITAMOUNT: str = "profitAmount"
 _ROWS: str = "rows"
 _SELL: str = "sell" # CCXT
 _SIDE: str = "side" # CCXT
@@ -76,7 +79,9 @@ _STARTTIME: str = "startTime"
 _STATUS: str = "status"
 _SOURCEAMOUNT: str = "sourceAmount"
 _SYMBOL: str = "symbol"
+_TIME: str = "time"
 _TIMESTAMP: str = "timestamp" # CCXT
+_TRANID: str = "tranId"
 _TRANSACTIONTYPE: str = "transactionType"
 _TOTAL: str = "total"
 _TOTALFEE: str = "totalFee"
@@ -364,36 +369,39 @@ class InputPlugin(AbstractInputPlugin):
 
 		### Mining Income	
 
-		# Currently supported pools as of 30.4.2022
-		# sha256 - BTC, BCH
-		# ethash - ETH
-		# scrypt - LTC
-		# etchash - ETC
-		validAlgos = ['sha256', 'ethash', 'scrypt', 'etchash']
-		for algo in validAlgos:
+		# username is only required when pulling mining data
+		if self.username is not None:
+			# Currently supported pools as of 30.4.2022
+			# sha256 - BTC, BCH
+			# ethash - ETH
+			# scrypt - LTC
+			# etchash - ETC
+			validAlgos = ['sha256', 'ethash', 'scrypt', 'etchash']
+			for algo in validAlgos:
 
-			# Binance uses pages for mining payments
-			currentPage = 1	
-			while True:
-				results = self.client.sapiGetMiningPaymentList(params=({
-					_ALGO:algo, _USERNAME:self.username, 
-					_PAGEINDEX:currentPage, _PAGESIZE:200}))
-				for result in results:
+				# Binance uses pages for mining payments
+				currentPage = 1	
+				while True:
+					results = self.client.sapiGetMiningPaymentList(params=({
+						_ALGO:algo, _USERNAME:self.username, 
+						_PAGEINDEX:currentPage, _PAGESIZE:200}))
+					for result in results:
 
-					# Currently the plugin only supports standard mining deposits
-					if result[_TYPE] == 0:
-						self._process_gain(result, Keyword.MINING, in_transaction_list)
+						# Currently the plugin only supports standard mining deposits
+						# Payment must also be made (status=2) in order to be counted
+						if result[_TYPE] == 0 && result[_STATUS] == 2:
+							self._process_gain(result, Keyword.MINING, in_transaction_list)
+						else:
+							self.__logger.error(
+								f"WARNING: Unsupported Mining Transaction Type: {result[_TYPE]}."
+								f"Full Details: {json.dumps(result)}"
+								f"Please open an issue at {self.ISSUES_URL}"
+							)
+
+					if len(results[_ACCOUNTPROFITS]) == 200:
+						currentPage += 1
 					else:
-						self.__logger.error(
-							f"WARNING: Unsupported Mining Transaction Type: {result[_TYPE]}."
-							f"Full Details: {json.dumps(result)}"
-							f"Please open an issue at {self.ISSUES_URL}"
-						)
-
-				if len(results[_ACCOUNTPROFITS]) == 200:
-					currentPage += 1
-				else:
-					break
+						break
 
 
 
@@ -631,28 +639,53 @@ class InputPlugin(AbstractInputPlugin):
 	def _process_gain(
 		self, transaction: Any, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None
 	) -> None:
-		amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT])
-		notes = f"{notes + '; ' if notes else ''}{transaction[_ENINFO]}"
 
-		in_transaction_list.append(
-			InTransaction(
-				plugin=self.__BINANCE_COM,
-				unique_id=transaction[_tranId],
-				raw_data=json.dumps(transaction),
-				timestamp=_rp2timestamp_from_ms_epoch(transaction[_DIVTIME]),
-				asset=transaction[_ASSET],
-				exchange=self.__BINANCE_COM,
-				holder=self.account_holder,
-				transaction_type=transaction_type.value,
-				spot_price=Keyword.UNKNOWN.value,
-				crypto_in=str(amount),
-				crypto_fee=None,
-				fiat_in_no_fee=None,
-				fiat_in_with_fee=None,
-				fiat_fee="0",
-				notes=notes,
+		if transaction_type == Keyword.MINING:
+			amount: RP2Decimal = RP2Decimal(transaction[_PROFITAMOUNT])
+			notes = f"{notes + '; ' if notes else ''}'Mining profit'"
+			in_transaction_list.append(
+				InTransaction(
+					plugin=self.__BINANCE_COM,
+					unique_id=(transaction[_TIME] + transaction[_COINNAME]),
+					raw_data=json.dumps(transaction),
+					timestamp=_rp2timestamp_from_ms_epoch(transaction[_TIME]),
+					asset=transaction[_COINNAME],
+					exchange=self.__BINANCE_COM,
+					holder=self.account_holder,
+					transaction_type=transaction_type.value,
+					spot_price=Keyword.UNKNOWN.value,
+					crypto_in=str(amount),
+					crypto_fee=None,
+					fiat_in_no_fee=None,
+					fiat_in_with_fee=None,
+					fiat_fee="0",
+					notes=notes,
+				)
 			)
-		)
+		else:
+
+			amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT])
+			notes = f"{notes + '; ' if notes else ''}{transaction[_ENINFO]}"
+
+			in_transaction_list.append(
+				InTransaction(
+					plugin=self.__BINANCE_COM,
+					unique_id=transaction[_TRANID],
+					raw_data=json.dumps(transaction),
+					timestamp=_rp2timestamp_from_ms_epoch(transaction[_DIVTIME]),
+					asset=transaction[_ASSET],
+					exchange=self.__BINANCE_COM,
+					holder=self.account_holder,
+					transaction_type=transaction_type.value,
+					spot_price=Keyword.UNKNOWN.value,
+					crypto_in=str(amount),
+					crypto_fee=None,
+					fiat_in_no_fee=None,
+					fiat_in_with_fee=None,
+					fiat_fee="0",
+					notes=notes,
+				)
+			)
 
 	def _process_sell(
 		self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None
