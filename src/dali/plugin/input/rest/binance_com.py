@@ -110,12 +110,7 @@ class _Trade(NamedTuple):
 	base_info: str
 	quote_info: str
 
-# class _BinanceAuth(AuthBase): - possibly not needed
-
 class InputPlugin(AbstractInputPlugin):
-
-	__DEFAULT_THREAD_COUNT: int = 3 # Maybe unnecessary
-	__MAX_THREAD_COUNT: int = 4
 
 	__BINANCE_COM: str = "Binance.com"
 
@@ -124,7 +119,7 @@ class InputPlugin(AbstractInputPlugin):
 		account_holder: str,
 		api_key: str,
 		api_secret: str,
-		userName: str,
+		username: str,
 	) -> None:
 
 		super().__init__(account_holder)
@@ -134,7 +129,7 @@ class InputPlugin(AbstractInputPlugin):
 			'apiKey': api_key,
 			'secret': api_secret,
 			})
-		self.username = userName
+		self.username = username
 		
 		# We have to know what markets are on Binance so that we can pull orders using the market
 		self.markets: set = set()
@@ -148,7 +143,11 @@ class InputPlugin(AbstractInputPlugin):
 
 	@staticmethod
 	def _rp2timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
-		return str(datetime.datetime.fromtimestamp((int(epoch_timestamp) / 1000), datetime.timezone.utc))
+		time = datetime.datetime.fromtimestamp((int(epoch_timestamp) / 1000), datetime.timezone.utc)
+
+		# RP2 Timestamp has a space between the UTC offset and seconds
+		# Standard Python format does not
+		return time.strftime("%Y-%m-%d %H:%M:%S %z")
 
 	@staticmethod
 	def _to_trade(marketPair: str, base_amount: str, quote_amount: str) -> Optional[_Trade]:
@@ -169,11 +168,12 @@ class InputPlugin(AbstractInputPlugin):
 		out_transactions: List[AbstractTransaction] = []
 		intra_transactions: List[AbstractTransaction] = []
 
-		self._process_deposits(in_transactions, intra_transactions)
+		self._process_deposits(in_transactions, out_transactions, intra_transactions)
 		self._process_trades(in_transactions, out_transactions)
-		self._process_incomes(in_transactions)
+		self._process_gains(in_transactions)
 
 		result.extend(in_transactions)
+		result.extend(out_transactions)
 		result.extend(intra_transactions)
 
 		return result
@@ -181,7 +181,8 @@ class InputPlugin(AbstractInputPlugin):
 	### Multiple Transaction Processing
 
 	def _process_deposits(
-		self, in_transactions: List[InTransaction], intra_transactions: List[IntraTransaction],
+		self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction],
+		intra_transactions: List[IntraTransaction],
 	) -> None:
 		
 		# We need milliseconds for Binance
@@ -218,10 +219,11 @@ class InputPlugin(AbstractInputPlugin):
 		#	"total": 1,
 		#	"success": true
 		# }
-		for payment in fiat_payments[_DATA]:
-			if payment[_STATUS] == "Completed":
-				payment[_ISFIATPAYMENT] = True
-				self._process_fiat_payment(payment, in_transactions)
+		if _DATA in fiat_payments:
+			for payment in fiat_payments[_DATA]:
+				if payment[_STATUS] == "Completed":
+					payment[_ISFIATPAYMENT] = True
+					self._process_buy(payment, in_transactions, out_transactions)
 
 		
 		# Process crypto deposits (limited to 90 day windows), fetches 1000 transactions
@@ -304,10 +306,11 @@ class InputPlugin(AbstractInputPlugin):
 		#	   ],
 		#	   "total": 1,
 		#	   "success": True
-		#	 }	
-		for deposit in fiat_deposits[_DATA]:
-			if deposit[_STATUS] == "Completed":
-				self._process_deposit(deposit, in_transactions)
+		#	 }
+		if _DATA in fiat_deposits:	
+			for deposit in fiat_deposits[_DATA]:
+				if deposit[_STATUS] == "Completed":
+					self._process_deposit(deposit, in_transactions)
 
 	def _process_gains(
 		self, in_transactions: List[InTransaction]
@@ -389,7 +392,7 @@ class InputPlugin(AbstractInputPlugin):
 
 						# Currently the plugin only supports standard mining deposits
 						# Payment must also be made (status=2) in order to be counted
-						if result[_TYPE] == 0 && result[_STATUS] == 2:
+						if result[_TYPE] == 0 and result[_STATUS] == 2:
 							self._process_gain(result, Keyword.MINING, in_transaction_list)
 						else:
 							self.__logger.error(
@@ -516,9 +519,12 @@ class InputPlugin(AbstractInputPlugin):
 			unique_id = transaction[_ORDERNO]
 			timestamp = self._rp2timestamp_from_ms_epoch(transaction[_CREATETIME])
 			in_asset = transaction[_CRYPTOCURRENCY]
-			spot_price = transaction[_PRICE]
+			spot_price = RP2Decimal(transaction[_SOURCEAMOUNT]) / RP2Decimal(transaction[_OBTAINAMOUNT])
 			crypto_in = transaction[_OBTAINAMOUNT]
-			crypto_fee = transaction[_TOTALFEE]
+			crypto_fee = None 
+			fiat_in_no_fee = transaction[_SOURCEAMOUNT]
+			fiat_in_with_fee = RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE])
+			fiat_fee = RP2Decimal(transaction[_TOTALFEE])
 			transaction_notes = (
 				f"Buy transaction for fiat payment orderNo - "
 				f"{transaction[_ORDERNO]}"
@@ -544,7 +550,7 @@ class InputPlugin(AbstractInputPlugin):
 			if transaction[_FEE][_CURRENCY] == in_asset:
 				crypto_fee: RP2Decimal = RP2Decimal(str(transaction[_FEE][_COST]))
 			else:
-				crypto_fee = "0"
+				crypto_fee = None
 
 				# Users can use BNB to pay fees on Binance
 				if transaction[_FEE][_CURRENCY] != out_asset:
@@ -587,10 +593,10 @@ class InputPlugin(AbstractInputPlugin):
 				transaction_type=Keyword.BUY.value,
 				spot_price=str(spot_price),
 				crypto_in=str(crypto_in),
-				crypto_fee=str(crypto_fee),
-				fiat_in_no_fee=None,
-				fiat_in_with_fee=None,
-				fiat_fee=None,
+				crypto_fee=crypto_fee,
+				fiat_in_no_fee=str(fiat_in_no_fee),
+				fiat_in_with_fee=str(fiat_in_with_fee),
+				fiat_fee=str(fiat_fee),
 				notes=(
 					f"{notes + '; ' if notes else ''} {transaction_notes}"
 				),
@@ -629,13 +635,6 @@ class InputPlugin(AbstractInputPlugin):
 			)
 		)
 
-
-	def _process_fiat_payment(
-		self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None 
-	) -> None:
-		self._process_deposit(transaction, in_transaction_list, notes)
-		self._process_buy(transaction, in_transaction_list, notes)
-
 	def _process_gain(
 		self, transaction: Any, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None
 	) -> None:
@@ -663,7 +662,6 @@ class InputPlugin(AbstractInputPlugin):
 				)
 			)
 		else:
-
 			amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT])
 			notes = f"{notes + '; ' if notes else ''}{transaction[_ENINFO]}"
 
