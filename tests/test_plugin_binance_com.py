@@ -66,15 +66,75 @@ class TestBinance:
                "success": True
         }
 
-        mocker.patch.object(plugin.client, "fetch_deposits").return_value = {}
+        mocker.patch.object(plugin.client, "fetch_deposits").return_value = [
+            {
+                'info': {
+                  'amount': '0.00999800', 
+                  'coin': 'PAXG', 
+                  'network': 'ETH', 
+                  'status': '1', 
+                  'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
+                  'addressTag': '', 
+                  'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3', 
+                  'insertTime': '1599621997000', 
+                  'transferType': '0', 
+                  'confirmTimes': '12/12', 
+                  'unlockConfirm': '12/12', 
+                  'walletType': '0'
+                },
+                'id': None, 
+                'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3', 
+                'timestamp': 1599621997000, 
+                'datetime': '2020-09-09T03:26:37.000Z', 
+                'network': 'ETH', 
+                'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
+                'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
+                'addressFrom': None, 
+                'tag': None, 
+                'tagTo': None, 
+                'tagFrom': None, 
+                'type': 'deposit', 
+                'amount': 0.00999800, 
+                'currency': 'PAXG', 
+                'status': 'ok', 
+                'updated': None, 
+                'internal': False, 
+                'fee': None
+            }
+        ]
+
         mocker.patch.object(plugin.client, "sapiGetFiatOrders").return_value = {}
+        # mocker.patch.object(plugin.client, "sapiGetFiatOrders").return_value = {
+        #     "code": "000000",
+        #     "message": "success",
+        #     "data": [
+        #         {
+        #          "orderNo": "25ced37075c1470ba8939d0df2316e23",
+        #          "fiatCurrency": "EUR",
+        #          "indicatedAmount": "15.00",
+        #          "amount": "15.00",
+        #          "totalFee": "0.00",
+        #          "method": "card",
+        #          "status": "Failed",
+        #          "createTime": 1627501026000,
+        #          "updateTime": 1627501027000
+        #         }
+        #     ],
+        #     "total": 1,
+        #     "success": True
+        # }
+
         mocker.patch.object(plugin, "_process_trades").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
 
         result = plugin.load()
-        assert len(result) == 1
+
+        # One completed Fiat Payment +
+        # 
+        assert len(result) == 2
 
         fiat_in_transaction: InTransaction = result[0]
+        crypto_deposit_transaction: InTransaction = result[1]
 
         assert fiat_in_transaction.asset == "LUNA"
         assert fiat_in_transaction.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1624529919000)
@@ -86,4 +146,11 @@ class TestBinance:
         assert RP2Decimal(fiat_in_transaction.fiat_in_with_fee) == RP2Decimal("19.8")
         assert RP2Decimal(fiat_in_transaction.fiat_fee) == RP2Decimal("0.2")
         # assert fiat_in_transaction.fiat_iso_code == "EUR"
+
+        assert crypto_deposit_transaction.asset == "PAXG"
+        assert crypto_deposit_transaction.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1599621997000)
+        assert crypto_deposit_transaction.from_exchange == Keyword.UNKNOWN.value
+        assert crypto_deposit_transaction.to_exchange == "Binance.com"
+        assert crypto_deposit_transaction.crypto_sent == Keyword.UNKNOWN.value
+        assert RP2Decimal(crypto_deposit_transaction.crypto_received) == RP2Decimal("0.00999800")
 
