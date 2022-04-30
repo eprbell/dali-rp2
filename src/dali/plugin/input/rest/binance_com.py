@@ -38,9 +38,9 @@ from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
 import ccxt
-from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 
 # Native format keywords
+_ALGO: str = "algo"
 _AMOUNT: str = "amount"
 _ASSET: str = "asset"
 _BEGINTIME: str = "beginTime"
@@ -67,6 +67,7 @@ _LIMIT: str = "limit"
 _OBTAINAMOUNT: str = "obtainAmount"
 _ORDER: str = "order" # CCXT
 _ORDERNO: str = "orderNo"
+_PAGEINDEX: str = "pageIndex"
 _PRICE: str = "price"
 _ROWS: str = "rows"
 _SELL: str = "sell" # CCXT
@@ -79,8 +80,10 @@ _TIMESTAMP: str = "timestamp" # CCXT
 _TRANSACTIONTYPE: str = "transactionType"
 _TOTAL: str = "total"
 _TOTALFEE: str = "totalFee"
+_TYPE: str = "type"
 _TXID: str = "txid" # CCXT doesn't capitalize I
 _UPDATETIME: str = "updateTime"
+_USERNAME: str = "userName"
 
 # Types of Binance Dividends
 _BNBVAULT = "BNB Vault"
@@ -116,6 +119,7 @@ class InputPlugin(AbstractInputPlugin):
 		account_holder: str,
 		api_key: str,
 		api_secret: str,
+		userName: str,
 	) -> None:
 
 		super().__init__(account_holder)
@@ -125,6 +129,7 @@ class InputPlugin(AbstractInputPlugin):
 			'apiKey': api_key,
 			'secret': api_secret,
 			})
+		self.username = userName
 		
 		# We have to know what markets are on Binance so that we can pull orders using the market
 		self.markets: set = set()
@@ -303,6 +308,8 @@ class InputPlugin(AbstractInputPlugin):
 		self, in_transactions: List[InTransaction]
 	) -> None:
 
+		### Regular Dividends from Staking (including Eth staking) and Savings (Lending)
+
 		# We need milliseconds for Binance
 		currentStart = self.startTimeMS
 		nowTime = int(datetime.datetime.now().timestamp()) * 1000
@@ -351,10 +358,42 @@ class InputPlugin(AbstractInputPlugin):
 				currentEnd = currentStart + 2592000000
 			else:
 				# Binance sends latest record first ([0])
-				# CCXT sorts by timestamp, so latest record is last ([999])
+				# CCXT sorts by timestamp, so latest record is last ([499])
 				currentStart = int(dividends[_ROWS][499][_DIVTIME]) + 1 # times are inclusive
-				currentEnd = currentStart + 2592000000			
+				currentEnd = currentStart + 2592000000	
 
+		### Mining Income	
+
+		# Currently supported pools as of 30.4.2022
+		# sha256 - BTC, BCH
+		# ethash - ETH
+		# scrypt - LTC
+		# etchash - ETC
+		validAlgos = ['sha256', 'ethash', 'scrypt', 'etchash']
+		for algo in validAlgos:
+
+			# Binance uses pages for mining payments
+			currentPage = 1	
+			while True:
+				results = self.client.sapiGetMiningPaymentList(params=({
+					_ALGO:algo, _USERNAME:self.username, 
+					_PAGEINDEX:currentPage, _PAGESIZE:200}))
+				for result in results:
+
+					# Currently the plugin only supports standard mining deposits
+					if result[_TYPE] == 0:
+						self._process_gain(result, Keyword.MINING, in_transaction_list)
+					else:
+						self.__logger.error(
+							f"WARNING: Unsupported Mining Transaction Type: {result[_TYPE]}."
+							f"Full Details: {json.dumps(result)}"
+							f"Please open an issue at {self.ISSUES_URL}"
+						)
+
+				if len(results[_ACCOUNTPROFITS]) == 200:
+					currentPage += 1
+				else:
+					break
 
 
 
