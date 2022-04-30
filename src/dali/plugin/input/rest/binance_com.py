@@ -253,7 +253,7 @@ class InputPlugin(AbstractInputPlugin):
 			# 	'id': None, 
 			# 	'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3', 
 			# 	'timestamp': 1599621997000, 
-			# 	'datetime': '2020-02-11T04:21:19.000Z', 
+			# 	'datetime': '2020-09-09T03:26:37.000Z', 
 			# 	'network': 'ETH', 
 			# 	'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
 			# 	'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
@@ -608,12 +608,8 @@ class InputPlugin(AbstractInputPlugin):
 	) -> None:
 		self.__logger.debug("Deposit: %s", transaction)
 
-		if _ISFIATPAYMENT in transaction:
-			amount: RP2Decimal = RP2Decimal(transaction[_SOURCEAMOUNT])
-			fee = "0"	
-		else:
-			amount: RP2Decimal = RP2Decimal(transaction[_INDICATEDAMOUNT])
-			fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
+		amount: RP2Decimal = RP2Decimal(transaction[_INDICATEDAMOUNT])
+		fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
 		notes = f"{notes + '; ' if notes else ''}{'Fiat Deposit of '}; {transaction[_FIATCURRENCY]}"
 		in_transaction_list.append(
 			InTransaction(
