@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import datetime
 from typing import Any, Dict, List
 
 from rp2.rp2_decimal import RP2Decimal
@@ -66,6 +67,7 @@ class TestBinance:
                "success": True
         }
 
+        mocker.patch.object(plugin, "startTimeMS", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "fetch_deposits").return_value = [
             {
                 'info': {
@@ -358,3 +360,103 @@ class TestBinance:
             api_secret="b",
             username="user",
         ) 
+
+        mocker.patch.object(plugin, "startTimeMS", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin.client, "sapiGetAssetAssetDividend").return_value = {
+                "rows":[
+                    {
+                        "id":1637366104,
+                        "amount":"0.00001600",
+                        "asset":"BETH",
+                        "divTime":1563189166000,
+                        "enInfo":"ETH 2.0 Staking",
+                        "tranId":2968885920
+                    },
+                    {
+                        "id":1631750237,
+                        "amount":"0.51206985",
+                        "asset":"BUSD",
+                        "divTime":1563189165000,
+                        "enInfo":"Flexible Savings",
+                        "tranId":2968885920
+                    }
+                ],
+                "total":2
+            }
+
+        # Only mining type 0 transactions are supported
+        mocker.patch.object(plugin.client, "sapiGetMiningPaymentList").return_value = {
+              "code": 0,
+              "msg": "",
+              "data": {
+                "accountProfits": [
+                  {
+                    "time": 1586188800000,           # Mining date
+                    "type": 31,                      # 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
+                    "hashTransfer": None,            # Transferred Hashrate
+                    "transferAmount": None,          # Transferred Income   
+                    "dayHashRate": 129129903378244,  # Daily Hashrate
+                    "profitAmount": 8.6083060304,    # Earnings Amount
+                    "coinName":"BTC",                # Coin Type
+                    "status": 2                      # Status：0:Unpaid， 1:Paying  2：Paid
+                  },
+                  {
+                    "time": 1607529600000,
+                    "coinName": "BTC",
+                    "type": 0,
+                    "dayHashRate": 9942053925926,
+                    "profitAmount": 0.85426469,
+                    "hashTransfer": 200000000000,
+                    "transferAmount": 0.02180958,
+                    "status": 2
+                  }
+                ],
+                "totalNum": 2,          # Total Rows
+                "pageSize": 20          # Rows per page
+              }
+            }
+
+        mocker.patch.object(plugin, "_process_deposits").return_value = None
+        mocker.patch.object(plugin, "_process_trades").return_value = None
+
+        result = plugin.load()
+
+        # One Eth staking transaction +
+        # One BUSD savings transaction +
+        # 4 Mining transactions (one for each algo) = 6
+        assert len(result) == 6
+
+        eth_staking: InTransaction = result[0]
+        busd_savings: InTransaction = result[1]
+        mining_deposit: InTransaction = result[2]
+
+        # Make sure it identifies this as staking income
+        assert eth_staking.asset == "BETH"
+        assert eth_staking.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1563189166000)
+        assert eth_staking.transaction_type == Keyword.STAKING.value
+        assert eth_staking.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(eth_staking.crypto_in) == RP2Decimal("0.00001600")
+        assert eth_staking.crypto_fee == None
+        assert eth_staking.fiat_in_no_fee == None
+        assert eth_staking.fiat_in_with_fee == None
+        assert eth_staking.fiat_fee == None
+
+        assert busd_savings.asset == "BUSD"
+        assert busd_savings.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1563189165000)
+        assert busd_savings.transaction_type == Keyword.INTEREST.value
+        assert busd_savings.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(busd_savings.crypto_in) == RP2Decimal("0.51206985")
+        assert busd_savings.crypto_fee == None
+        assert busd_savings.fiat_in_no_fee == None
+        assert busd_savings.fiat_in_with_fee == None
+        assert busd_savings.fiat_fee == None 
+
+        assert mining_deposit.asset == "BTC"
+        assert mining_deposit.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1607529600000)
+        assert mining_deposit.transaction_type == Keyword.MINING.value
+        assert mining_deposit.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(mining_deposit.crypto_in) == RP2Decimal("0.85426469")
+        assert mining_deposit.crypto_fee == None
+        assert mining_deposit.fiat_in_no_fee == None
+        assert mining_deposit.fiat_in_with_fee == None
+        assert mining_deposit.fiat_fee == None       
