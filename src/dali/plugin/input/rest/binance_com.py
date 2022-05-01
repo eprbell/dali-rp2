@@ -418,7 +418,9 @@ class InputPlugin(AbstractInputPlugin):
 		# max limit is 1000
 		for market in self.markets:
 			since = self.startTimeMS
-			while True:
+			test = True
+	#		while True:
+			while test:
 				marketTrades = self.client.fetch_my_trades(symbol=market, since=since,
 					limit=1000)
 				#   {
@@ -449,6 +451,7 @@ class InputPlugin(AbstractInputPlugin):
 				for trade in marketTrades:
 					self._process_sell(trade, out_transactions)
 					self._process_buy(trade, in_transactions, out_transactions)
+					test = False
 				if len(marketTrades) < 1000:
 					break
 				# Times are inclusive
@@ -473,7 +476,6 @@ class InputPlugin(AbstractInputPlugin):
 			# over each 'dribblet'. Each dribblet can have multiple assets converted into BNB at the same time.
 			# If the user converts more than 100 assets at one time, we can not retrieve accurate records.
 			if len(dustTrades) == 100:
-				retry: bool = True
 				currentDribblet: list[dict] = []
 				currentDribbletTime: int = dustTrades[0][_DIVTIME]
 				for dust in dustTrades:
@@ -519,30 +521,34 @@ class InputPlugin(AbstractInputPlugin):
 			unique_id = transaction[_ORDERNO]
 			timestamp = self._rp2timestamp_from_ms_epoch(transaction[_CREATETIME])
 			in_asset = transaction[_CRYPTOCURRENCY]
-			spot_price = RP2Decimal(transaction[_SOURCEAMOUNT]) / RP2Decimal(transaction[_OBTAINAMOUNT])
+			spot_price:RP2Decimal = RP2Decimal(transaction[_SOURCEAMOUNT]) / RP2Decimal(transaction[_OBTAINAMOUNT])
 			crypto_in = transaction[_OBTAINAMOUNT]
 			crypto_fee = None 
-			fiat_in_no_fee = transaction[_SOURCEAMOUNT]
-			fiat_in_with_fee = RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE])
-			fiat_fee = RP2Decimal(transaction[_TOTALFEE])
+			fiat_in_no_fee = str(transaction[_SOURCEAMOUNT])
+			fiat_in_with_fee = str(RP2Decimal(transaction[_SOURCEAMOUNT]) - 
+				RP2Decimal(transaction[_TOTALFEE]))
+			fiat_fee = str(RP2Decimal(transaction[_TOTALFEE]))
 			transaction_notes = (
 				f"Buy transaction for fiat payment orderNo - "
 				f"{transaction[_ORDERNO]}"
 			)
 		else:
 			trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
-			timestamp = transaction[_DATETIME]
+			timestamp = self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP])
 			spot_price = Keyword.UNKNOWN.value
 			unique_id = transaction[_ID]
+			fiat_in_no_fee = None
+			fiat_in_with_fee = None
+			fiat_fee = None
 			if transaction[_SIDE] == _BUY:
 				out_asset = trade.quote_asset
 				in_asset = trade.base_asset
-				crypto_in: RP2Decimal = RP2Decimal(str(transaction[_COST]))
+				crypto_in: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
 				conversion_info = f"{trade.quote_info} -> {trade.base_info}"
 			elif transaction[_SIDE] == _SELL:
 				out_asset = trade.base_asset
 				in_asset = trade.quote_asset
-				crypto_in: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
+				crypto_in: RP2Decimal = RP2Decimal(str(transaction[_COST]))
 				conversion_info = f"{trade.base_info} -> {trade.quote_info}"
 			else:
 				raise Exception(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}" )
@@ -550,7 +556,7 @@ class InputPlugin(AbstractInputPlugin):
 			if transaction[_FEE][_CURRENCY] == in_asset:
 				crypto_fee: RP2Decimal = RP2Decimal(str(transaction[_FEE][_COST]))
 			else:
-				crypto_fee = None
+				crypto_fee: RP2Decimal = RP2Decimal("0.00")
 
 				# Users can use BNB to pay fees on Binance
 				if transaction[_FEE][_CURRENCY] != out_asset:
@@ -559,7 +565,7 @@ class InputPlugin(AbstractInputPlugin):
 							plugin=self.__BINANCE_COM,
 							unique_id=transaction[_ID],
 							raw_data=json.dumps(transaction),
-							timestamp=transaction[_DATETIME],
+							timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
 							asset=transaction[_FEE][_CURRENCY],
 							exchange=self.__BINANCE_COM,
 							holder=self.account_holder,
@@ -567,6 +573,7 @@ class InputPlugin(AbstractInputPlugin):
 							spot_price=Keyword.UNKNOWN.value,
 							crypto_out_no_fee=str(transaction[_FEE][_COST]),
 							crypto_fee="0",
+							crypto_out_with_fee=str(transaction[_FEE][_COST]),
 							fiat_out_no_fee=None,
 							fiat_fee=None,
 							notes=(
@@ -593,10 +600,10 @@ class InputPlugin(AbstractInputPlugin):
 				transaction_type=Keyword.BUY.value,
 				spot_price=str(spot_price),
 				crypto_in=str(crypto_in),
-				crypto_fee=crypto_fee,
-				fiat_in_no_fee=str(fiat_in_no_fee),
-				fiat_in_with_fee=str(fiat_in_with_fee),
-				fiat_fee=str(fiat_fee),
+				crypto_fee=(str(crypto_fee) if (crypto_fee is not None) else None),
+				fiat_in_no_fee=fiat_in_no_fee,
+				fiat_in_with_fee=fiat_in_with_fee,
+				fiat_fee=fiat_fee,
 				notes=(
 					f"{notes + '; ' if notes else ''} {transaction_notes}"
 				),
@@ -714,7 +721,7 @@ class InputPlugin(AbstractInputPlugin):
 				plugin=self.__BINANCE_COM,
 				unique_id=transaction[_ID],
 				raw_data=json.dumps(transaction),
-				timestamp=transaction[_DATETIME],
+				timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
 				asset=out_asset,
 				exchange=self.__BINANCE_COM,
 				holder=self.account_holder,
