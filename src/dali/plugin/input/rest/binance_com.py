@@ -609,6 +609,7 @@ class InputPlugin(AbstractInputPlugin):
 		self.__logger.debug("Deposit: %s", transaction)
 
 		amount: RP2Decimal = RP2Decimal(transaction[_INDICATEDAMOUNT])
+		fiat_in_with_fee: RP2Decimal = RP2Decimal(transaction[_AMOUNT])
 		fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
 		notes = f"{notes + '; ' if notes else ''}{'Fiat Deposit of '}; {transaction[_FIATCURRENCY]}"
 		in_transaction_list.append(
@@ -623,10 +624,10 @@ class InputPlugin(AbstractInputPlugin):
 				transaction_type=Keyword.BUY.value,
 				spot_price="1",
 				crypto_in=str(amount),
-				crypto_fee=str(fee),
-				fiat_in_no_fee=None,
-				fiat_in_with_fee=None,
-				fiat_fee=None,
+				crypto_fee=None,
+				fiat_in_no_fee=str(fiat_in_with_fee),
+				fiat_in_with_fee=str(amount),
+				fiat_fee=str(fee),
 				notes=notes,
 			)
 		)
