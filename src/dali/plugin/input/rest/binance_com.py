@@ -70,6 +70,7 @@ _OBTAINAMOUNT: str = "obtainAmount"
 _ORDER: str = "order" # CCXT
 _ORDERNO: str = "orderNo"
 _PAGEINDEX: str = "pageIndex"
+_PAGESIZE: str = "pageSize"
 _PRICE: str = "price"
 _PROFITAMOUNT: str = "profitAmount"
 _ROWS: str = "rows"
@@ -96,8 +97,19 @@ _ETHSTAKING = "ETH 2.0 Staking"
 _FLEXIBLESAVINGS = "Flexible Savings"
 _LOCKEDSAVINGS = "Locked Savings"
 _LOCKEDSTAKING = "Locked Staking"
-_INTEREST = {_FLEXIBLESAVINGS, _LOCKEDSAVINGS}
-_STAKING = {_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT}
+_INTEREST = [_FLEXIBLESAVINGS, _LOCKEDSAVINGS]
+_STAKING = [_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT]
+
+# Currently supported pools as of 30.4.2022
+# sha256 - BTC, BCH
+# ethash - ETH
+# scrypt - LTC
+# etchash - ETC
+_SHA256: str = "sha256"
+_ETHASH: str = "ethash"
+_SCRYPT: str = "scrypt"
+_ETCHASH: str = "etchash"
+_VALIDALGOS: list = [_SHA256, _ETHASH, _SCRYPT, _ETCHASH]
 
 class _ProcessAccountResult(NamedTuple):
 	in_transactions: List[InTransaction]
@@ -275,7 +287,7 @@ class InputPlugin(AbstractInputPlugin):
 
 			# If user made more than 1000 transactions in a 90 day period we need to shrink the window.			
 			if len(crypto_deposits) < 1000:
-				currentStart += currentEnd + 1
+				currentStart = currentEnd + 1
 				currentEnd = currentStart + 7776000000
 			else:
 				# Binance sends latest record first ([0])
@@ -353,9 +365,9 @@ class InputPlugin(AbstractInputPlugin):
 			# }
 			for dividend in dividends[_ROWS]:
 				if dividend[_ENINFO] in _STAKING:
-					self._process_gain(dividend, Keyword.STAKING, in_transaction_list)
+					self._process_gain(dividend, Keyword.STAKING, in_transactions)
 				elif dividend[_ENINFO] in _INTEREST:
-					self._process_gain(dividend, Keyword.INTEREST, in_transaction_list)
+					self._process_gain(dividend, Keyword.INTEREST, in_transactions)
 				else:
 					self.__logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_ENINFO], self.ISSUES_URL)					
 					self._process_gain(dividend, Keyword.INCOME, in_transaction_list)
@@ -374,35 +386,74 @@ class InputPlugin(AbstractInputPlugin):
 
 		# username is only required when pulling mining data
 		if self.username is not None:
-			# Currently supported pools as of 30.4.2022
-			# sha256 - BTC, BCH
-			# ethash - ETH
-			# scrypt - LTC
-			# etchash - ETC
-			validAlgos = ['sha256', 'ethash', 'scrypt', 'etchash']
-			for algo in validAlgos:
+
+			for algo in _VALIDALGOS:
 
 				# Binance uses pages for mining payments
 				currentPage = 1	
 				while True:
-					results = self.client.sapiGetMiningPaymentList(params=({
+					results: dict = self.client.sapiGetMiningPaymentList(params=({
 						_ALGO:algo, _USERNAME:self.username, 
 						_PAGEINDEX:currentPage, _PAGESIZE:200}))
-					for result in results:
+					# {
+					#   "code": 0,
+					#   "msg": "",
+					#   "data": {
+					#     "accountProfits": [
+					#       {
+					#         "time": 1586188800000,            // Mining date
+					#         "type": 31, // 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
+					#         "hashTransfer": null,            // Transferred Hashrate
+					#         "transferAmount": null,          // Transferred Income   
+					#         "dayHashRate": 129129903378244,  // Daily Hashrate
+					#         "profitAmount": 8.6083060304,   //Earnings Amount
+					#         "coinName":"BTC",              // Coin Type
+					#         "status": 2    //Status：0:Unpaid， 1:Paying  2：Paid
+					#       },
+					#       {
+					#         "time": 1607529600000,
+					#         "coinName": "BTC",
+					#         "type": 0,
+					#         "dayHashRate": 9942053925926,
+					#         "profitAmount": 0.85426469,
+					#         "hashTransfer": 200000000000,
+					#         "transferAmount": 0.02180958,
+					#         "status": 2
+					#       },
+					#       {
+					#         "time": 1607443200000,
+					#         "coinName": "BTC",
+					#         "type": 31,
+					#         "dayHashRate": 200000000000,
+					#         "profitAmount": 0.02905916,
+					#         "hashTransfer": null,
+					#         "transferAmount": null,
+					#         "status": 2
+					#       }
+					#     ],
+					#     "totalNum": 3,          // Total Rows
+					#     "pageSize": 20          // Rows per page
+					#   }
+					# }
 
-						# Currently the plugin only supports standard mining deposits
-						# Payment must also be made (status=2) in order to be counted
-						if result[_TYPE] == 0 and result[_STATUS] == 2:
-							self._process_gain(result, Keyword.MINING, in_transaction_list)
+					if _DATA in results:
+						for result in results[_DATA][_ACCOUNTPROFITS]:
+
+							# Currently the plugin only supports standard mining deposits
+							# Payment must also be made (status=2) in order to be counted
+							if result[_TYPE] == 0 and result[_STATUS] == 2:
+								self._process_gain(result, Keyword.MINING, in_transactions)
+							else:
+								self.__logger.error(
+									f"WARNING: Unsupported Mining Transaction Type: {result[_TYPE]}."
+									f"Full Details: {json.dumps(result)}"
+									f"Please open an issue at {self.ISSUES_URL}"
+								)
+
+						if len(results[_DATA][_ACCOUNTPROFITS]) == 200:
+							currentPage += 1
 						else:
-							self.__logger.error(
-								f"WARNING: Unsupported Mining Transaction Type: {result[_TYPE]}."
-								f"Full Details: {json.dumps(result)}"
-								f"Please open an issue at {self.ISSUES_URL}"
-							)
-
-					if len(results[_ACCOUNTPROFITS]) == 200:
-						currentPage += 1
+							break
 					else:
 						break
 
@@ -488,11 +539,11 @@ class InputPlugin(AbstractInputPlugin):
 								self._process_sell(dribbletPiece, out_transactions)
 								self._process_buy(dribbletPiece, in_transactions, out_transactions)
 
-								# Shift the call window forward past this dribblet
-								currentEnd += currentDribbletTime - currentStart + 2592000000
-								currentStart = currentDribbletTime + 2592000001  
+							# Shift the call window forward past this dribblet
+							currentStart = currentDribbletTime + 1
+							currentEnd = currentStart + 2592000000 
 
-								break
+							break
 						else:
 							raise Exception(
 								f"Too many assets dusted at the same time: "
@@ -506,8 +557,8 @@ class InputPlugin(AbstractInputPlugin):
 					self._process_sell(dust, out_transactions)
 					self._process_buy(dust, in_transactions, out_transactions)
 					
-				currentStart += 2592000000
-				currentEnd += 2592000000
+				currentStart = currentEnd + 1
+				currentEnd = currentStart + 2592000000
 
 	### Single Transaction Processing
 
@@ -644,14 +695,14 @@ class InputPlugin(AbstractInputPlugin):
 	) -> None:
 
 		if transaction_type == Keyword.MINING:
-			amount: RP2Decimal = RP2Decimal(transaction[_PROFITAMOUNT])
+			amount: RP2Decimal = RP2Decimal(str(transaction[_PROFITAMOUNT]))
 			notes = f"{notes + '; ' if notes else ''}'Mining profit'"
 			in_transaction_list.append(
 				InTransaction(
 					plugin=self.__BINANCE_COM,
-					unique_id=(transaction[_TIME] + transaction[_COINNAME]),
+					unique_id=(str(transaction[_TIME]) + transaction[_COINNAME]),
 					raw_data=json.dumps(transaction),
-					timestamp=_rp2timestamp_from_ms_epoch(transaction[_TIME]),
+					timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIME]),
 					asset=transaction[_COINNAME],
 					exchange=self.__BINANCE_COM,
 					holder=self.account_holder,
@@ -661,7 +712,7 @@ class InputPlugin(AbstractInputPlugin):
 					crypto_fee=None,
 					fiat_in_no_fee=None,
 					fiat_in_with_fee=None,
-					fiat_fee="0",
+					fiat_fee=None,
 					notes=notes,
 				)
 			)
@@ -672,9 +723,9 @@ class InputPlugin(AbstractInputPlugin):
 			in_transaction_list.append(
 				InTransaction(
 					plugin=self.__BINANCE_COM,
-					unique_id=transaction[_TRANID],
+					unique_id=str(transaction[_TRANID]),
 					raw_data=json.dumps(transaction),
-					timestamp=_rp2timestamp_from_ms_epoch(transaction[_DIVTIME]),
+					timestamp=self._rp2timestamp_from_ms_epoch(transaction[_DIVTIME]),
 					asset=transaction[_ASSET],
 					exchange=self.__BINANCE_COM,
 					holder=self.account_holder,
@@ -684,7 +735,7 @@ class InputPlugin(AbstractInputPlugin):
 					crypto_fee=None,
 					fiat_in_no_fee=None,
 					fiat_in_with_fee=None,
-					fiat_fee="0",
+					fiat_fee=None,
 					notes=notes,
 				)
 			)
@@ -765,20 +816,3 @@ class InputPlugin(AbstractInputPlugin):
 				crypto_received=str(amount),
 			)
 		)
-
-
-
-
-
-
-
-
-
-
-		
-
-
-
-
-
-
