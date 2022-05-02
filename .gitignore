@@ -25,5 +25,3 @@ __pycache__/
 src/*.egg-info/
 .venv/
 .vscode/
-console_init.py
-*.log
