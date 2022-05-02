@@ -17,11 +17,12 @@
 # Authentication: https://binance-docs.github.io/apidocs/spot/en/#introduction
 # Endpoint: https://api.binance.com
 
+import datetime
 import json
 import logging
-import datetime
 from typing import Any, Dict, List, NamedTuple, Optional
 
+import ccxt
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -32,8 +33,6 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
-import ccxt
-
 # Native format keywords
 _ACCOUNTPROFITS: str = "accountProfits"
 _ALGO: str = "algo"
@@ -41,21 +40,21 @@ _ALGONAME: str = "algoName"
 _AMOUNT: str = "amount"
 _ASSET: str = "asset"
 _BEGINTIME: str = "beginTime"
-_BUY: str = "buy" # CCXT
+_BUY: str = "buy"  # CCXT
 _COIN: str = "coin"
 _COINNAME: str = "coinName"
-_COST: str = "cost" # CCXT only variable
+_COST: str = "cost"  # CCXT only variable
 _CREATETIME: str = "createTime"
 _CRYPTOCURRENCY: str = "cryptoCurrency"
-_CURRENCY: str = "currency" # CCXT only variable
+_CURRENCY: str = "currency"  # CCXT only variable
 _DATA: str = "data"
-_DATETIME: str = "datetime" # CCXT only variable
+_DATETIME: str = "datetime"  # CCXT only variable
 _DIVTIME: str = "divTime"
 _ENDTIME: str = "endTime"
 _ENINFO: str = "enInfo"
 _FEE: str = "fee"
 _FIATCURRENCY: str = "fiatCurrency"
-_ID: str = "id" # CCXT
+_ID: str = "id"  # CCXT
 _INDICATEDAMOUNT: str = "indicatedAmount"
 _INFO: str = "info"
 _INSERTTIME: str = "insertTime"
@@ -63,27 +62,27 @@ _ISDUST: str = "isDust"
 _ISFIATPAYMENT: str = "isFiatPayment"
 _LIMIT: str = "limit"
 _OBTAINAMOUNT: str = "obtainAmount"
-_ORDER: str = "order" # CCXT
+_ORDER: str = "order"  # CCXT
 _ORDERNO: str = "orderNo"
 _PAGEINDEX: str = "pageIndex"
 _PAGESIZE: str = "pageSize"
 _PRICE: str = "price"
 _PROFITAMOUNT: str = "profitAmount"
 _ROWS: str = "rows"
-_SELL: str = "sell" # CCXT
-_SIDE: str = "side" # CCXT
+_SELL: str = "sell"  # CCXT
+_SIDE: str = "side"  # CCXT
 _STARTTIME: str = "startTime"
 _STATUS: str = "status"
 _SOURCEAMOUNT: str = "sourceAmount"
 _SYMBOL: str = "symbol"
 _TIME: str = "time"
-_TIMESTAMP: str = "timestamp" # CCXT
+_TIMESTAMP: str = "timestamp"  # CCXT
 _TRANID: str = "tranId"
 _TRANSACTIONTYPE: str = "transactionType"
 _TOTAL: str = "total"
 _TOTALFEE: str = "totalFee"
 _TYPE: str = "type"
-_TXID: str = "txid" # CCXT doesn't capitalize I
+_TXID: str = "txid"  # CCXT doesn't capitalize I
 _UPDATETIME: str = "updateTime"
 _USERNAME: str = "userName"
 
@@ -96,16 +95,19 @@ _LOCKEDSTAKING = "Locked Staking"
 _INTEREST = [_FLEXIBLESAVINGS, _LOCKEDSAVINGS]
 _STAKING = [_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT]
 
+
 class _ProcessAccountResult(NamedTuple):
     in_transactions: List[InTransaction]
     out_transactions: List[OutTransaction]
     intra_transactions: List[IntraTransaction]
+
 
 class _Trade(NamedTuple):
     base_asset: str
     quote_asset: str
     base_info: str
     quote_info: str
+
 
 class InputPlugin(AbstractInputPlugin):
 
@@ -122,15 +124,17 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder)
         self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM}/{self.account_holder}")
         self.__cache_key: str = f"{self.__BINANCE_COM.lower()}-{account_holder}"
-        self.client: ccxt = ccxt.binance({
-            'apiKey': api_key,
-            'secret': api_secret,
-            })
+        self.client: ccxt = ccxt.binance(
+            {
+                "apiKey": api_key,
+                "secret": api_secret,
+            }
+        )
         self.username = username
 
         # We have to know what markets are on Binance so that we can pull orders using the market
         self.markets: List[str] = []
-        ccxt_markets: Dict[str,str] = self.client.fetch_markets()
+        ccxt_markets: Dict[str, str] = self.client.fetch_markets()
         for market in ccxt_markets:
             self.markets.append(market[_ID])
 
@@ -141,7 +145,7 @@ class InputPlugin(AbstractInputPlugin):
                 self.algos.append(algo[_ALGONAME])
 
         # We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
-        self.start_time: datetime = datetime.datetime(2017,7,13,0,0,0,0)
+        self.start_time: datetime = datetime.datetime(2017, 7, 13, 0, 0, 0, 0)
         self.start_time_ms: int = int(self.start_time.timestamp()) * 1000
 
     @staticmethod
@@ -184,7 +188,9 @@ class InputPlugin(AbstractInputPlugin):
     ### Multiple Transaction Processing
 
     def _process_deposits(
-        self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction],
+        self,
+        in_transactions: List[InTransaction],
+        out_transactions: List[OutTransaction],
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
@@ -199,9 +205,7 @@ class InputPlugin(AbstractInputPlugin):
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
         # No limit on the date range
         # fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
-        fiat_payments = self.client.sapiGetFiatPayments(params=({_TRANSACTIONTYPE:0,
-            _BEGINTIME :self.start_time_ms,
-            _ENDTIME :now_time}))
+        fiat_payments = self.client.sapiGetFiatPayments(params=({_TRANSACTIONTYPE: 0, _BEGINTIME: self.start_time_ms, _ENDTIME: now_time}))
         # {
         #   "code": "000000",
         #   "message": "success",
@@ -231,7 +235,7 @@ class InputPlugin(AbstractInputPlugin):
         # Process crypto deposits (limited to 90 day windows), fetches 1000 transactions
         while current_start < now_time:
             # The CCXT function only retrieves fiat deposits if you provide a valid 'legalMoney' code as variable.
-            crypto_deposits = self.client.fetch_deposits(params=({_STARTTIME:current_start, _ENDTIME:current_end}))
+            crypto_deposits = self.client.fetch_deposits(params=({_STARTTIME: current_start, _ENDTIME: current_end}))
 
             # CCXT returns a standardized response from fetch_deposits. 'info' is the exchange-specific information
             # in this case from Binance.com
@@ -281,14 +285,13 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([999])
-                current_start = int(crypto_deposits[999][_TIMESTAMP]) + 1 # times are inclusive
+                current_start = int(crypto_deposits[999][_TIMESTAMP]) + 1  # times are inclusive
                 current_end = current_start + 7776000000
 
         # Process actual fiat deposits (no limit on the date range)
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
         # Using the underlying api call is faster for Binance.
-        fiat_deposits = self.client.sapiGetFiatOrders(params=({_TRANSACTIONTYPE:0,
-            _STARTTIME:self.start_time_ms, _ENDTIME:now_time}))
+        fiat_deposits = self.client.sapiGetFiatOrders(params=({_TRANSACTIONTYPE: 0, _STARTTIME: self.start_time_ms, _ENDTIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -313,9 +316,7 @@ class InputPlugin(AbstractInputPlugin):
                 if deposit[_STATUS] == "Completed":
                     self._process_deposit(deposit, in_transactions)
 
-    def _process_gains(
-        self, in_transactions: List[InTransaction]
-    ) -> None:
+    def _process_gains(self, in_transactions: List[InTransaction]) -> None:
 
         ### Regular Dividends from Staking (including Eth staking) and Savings (Lending)
 
@@ -329,8 +330,7 @@ class InputPlugin(AbstractInputPlugin):
         while current_start < now_time:
 
             # CCXT doesn't have a standard way to pull income, we must use the underlying API call
-            dividends = self.client.sapiGetAssetAssetDividend(params=({_STARTTIME:current_start,
-                _ENDTIME:current_end, _LIMIT:500}))
+            dividends = self.client.sapiGetAssetAssetDividend(params=({_STARTTIME: current_start, _ENDTIME: current_end, _LIMIT: 500}))
             # {
             #     "rows":[
             #         {
@@ -368,7 +368,7 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([499])
-                current_start = int(dividends[_ROWS][499][_DIVTIME]) + 1 # times are inclusive
+                current_start = int(dividends[_ROWS][499][_DIVTIME]) + 1  # times are inclusive
                 current_end = current_start + 2592000000
 
         ### Mining Income
@@ -378,9 +378,7 @@ class InputPlugin(AbstractInputPlugin):
             # Binance uses pages for mining payments
             current_page = 1
             while True:
-                results: Any = self.client.sapiGetMiningPaymentList(params=({
-                    _ALGO:algo, _USERNAME:self.username,
-                    _PAGEINDEX:current_page, _PAGESIZE:200}))
+                results: Any = self.client.sapiGetMiningPaymentList(params=({_ALGO: algo, _USERNAME: self.username, _PAGEINDEX: current_page, _PAGESIZE: 200}))
                 # {
                 #   "code": 0,
                 #   "msg": "",
@@ -431,8 +429,12 @@ class InputPlugin(AbstractInputPlugin):
                         if result[_TYPE] == 0 and result[_STATUS] == 2:
                             self._process_gain(result, Keyword.MINING, in_transactions)
                         else:
-                            self.__logger.error("WARNING: Unsupported Mining Transaction Type: %s.\nFull Details: %s\nPlease open an issue at %s.",
-                                result[_TYPE], json.dumps(result), self.ISSUES_URL)
+                            self.__logger.error(
+                                "WARNING: Unsupported Mining Transaction Type: %s.\nFull Details: %s\nPlease open an issue at %s.",
+                                result[_TYPE],
+                                json.dumps(result),
+                                self.ISSUES_URL,
+                            )
                     if len(results[_DATA][_ACCOUNTPROFITS]) == 200:
                         current_page += 1
                     else:
@@ -440,11 +442,7 @@ class InputPlugin(AbstractInputPlugin):
                 else:
                     break
 
-
-
-    def _process_trades(
-        self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction]
-    ) -> None:
+    def _process_trades(self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction]) -> None:
 
         ### Regular Trades
 
@@ -453,10 +451,9 @@ class InputPlugin(AbstractInputPlugin):
         for market in self.markets:
             since = self.start_time_ms
             test = True
-    #       while True:
+            #       while True:
             while test:
-                market_trades = self.client.fetch_my_trades(symbol=market, since=since,
-                    limit=1000)
+                market_trades = self.client.fetch_my_trades(symbol=market, since=since, limit=1000)
                 #   {
                 #       'info':         { ... },                    // the original decoded JSON as is
                 #       'id':           '12345-67890:09876/54321',  // string trade id
@@ -476,7 +473,6 @@ class InputPlugin(AbstractInputPlugin):
                 #           'rate': 0.002,                          // the fee rate (if available)
                 #       },
                 #   }
-
 
                 # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
                 # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
@@ -503,7 +499,7 @@ class InputPlugin(AbstractInputPlugin):
         # Maybe we can set a smaller window in the .ini file?
         current_end = current_start + 2592000000
         while current_start < now_time:
-            dust_trades = self.client.fetch_my_dust_trades(params=({_STARTTIME:current_start, _ENDTIME:current_end}))
+            dust_trades = self.client.fetch_my_dust_trades(params=({_STARTTIME: current_start, _ENDTIME: current_end}))
             # CCXT returns the same json as .fetch_trades()
 
             # Binance only returns 100 dust trades per call. If we hit the limit we will have to crawl
@@ -526,10 +522,7 @@ class InputPlugin(AbstractInputPlugin):
                         current_end = current_start + 2592000000
                         break
                     else:
-                        raise Exception(
-                            f"Too many assets dusted at the same time: "
-                            f"{self._rp2timestamp_from_ms_epoch(current_dribblet_time)}"
-                        )
+                        raise Exception(f"Too many assets dusted at the same time: " f"{self._rp2timestamp_from_ms_epoch(current_dribblet_time)}")
             else:
 
                 for dust in dust_trades:
@@ -544,13 +537,12 @@ class InputPlugin(AbstractInputPlugin):
     ### Single Transaction Processing
 
     def _process_buy(
-        self, transaction: Any, in_transaction_list: List[InTransaction],
-        out_transaction_list: List[OutTransaction], notes: Optional[str] = None
+        self, transaction: Any, in_transaction_list: List[InTransaction], out_transaction_list: List[OutTransaction], notes: Optional[str] = None
     ) -> None:
         self.__logger.debug("Buy Transaction: %s", transaction)
         unique_id: str
         timestamp: str
-        spot_price:RP2Decimal
+        spot_price: RP2Decimal
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
 
@@ -562,13 +554,9 @@ class InputPlugin(AbstractInputPlugin):
             crypto_in = transaction[_OBTAINAMOUNT]
             crypto_fee = None
             fiat_in_no_fee = str(transaction[_SOURCEAMOUNT])
-            fiat_in_with_fee = str(RP2Decimal(transaction[_SOURCEAMOUNT]) -
-                RP2Decimal(transaction[_TOTALFEE]))
+            fiat_in_with_fee = str(RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE]))
             fiat_fee = str(RP2Decimal(transaction[_TOTALFEE]))
-            transaction_notes = (
-                f"Buy transaction for fiat payment orderNo - "
-                f"{transaction[_ORDERNO]}"
-            )
+            transaction_notes = f"Buy transaction for fiat payment orderNo - " f"{transaction[_ORDERNO]}"
         else:
             trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
             timestamp = self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP])
@@ -588,7 +576,7 @@ class InputPlugin(AbstractInputPlugin):
                 crypto_in = RP2Decimal(str(transaction[_COST]))
                 conversion_info = f"{trade.base_info} -> {trade.quote_info}"
             else:
-                raise Exception(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}" )
+                raise Exception(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
 
             if transaction[_FEE][_CURRENCY] == in_asset:
                 crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
@@ -609,21 +597,14 @@ class InputPlugin(AbstractInputPlugin):
                             transaction_type=Keyword.FEE.value,
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_out_no_fee=str(transaction[_FEE][_COST]),
-                            crypto_fee=ZERO,
+                            crypto_fee="0",
                             crypto_out_with_fee=str(transaction[_FEE][_COST]),
                             fiat_out_no_fee=None,
                             fiat_fee=None,
-                            notes=(
-                                f"{notes + '; ' if notes else ''} Fee for conversion from "
-                                f"{conversion_info}"
-                            )
+                            notes=(f"{notes + '; ' if notes else ''} Fee for conversion from " f"{conversion_info}"),
                         )
                     )
-            transaction_notes = (
-                f"Buy side of conversion from "
-                f"{conversion_info}"
-                f"({out_asset} out-transaction unique id: {transaction[_ID]}"
-            )
+            transaction_notes = f"Buy side of conversion from " f"{conversion_info}" f"({out_asset} out-transaction unique id: {transaction[_ID]}"
 
         in_transaction_list.append(
             InTransaction(
@@ -641,15 +622,11 @@ class InputPlugin(AbstractInputPlugin):
                 fiat_in_no_fee=fiat_in_no_fee,
                 fiat_in_with_fee=fiat_in_with_fee,
                 fiat_fee=fiat_fee,
-                notes=(
-                    f"{notes + '; ' if notes else ''} {transaction_notes}"
-                ),
+                notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
             )
         )
 
-    def _process_deposit(
-        self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_deposit(self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
         self.__logger.debug("Deposit: %s", transaction)
 
         amount: RP2Decimal = RP2Decimal(transaction[_INDICATEDAMOUNT])
@@ -676,9 +653,7 @@ class InputPlugin(AbstractInputPlugin):
             )
         )
 
-    def _process_gain(
-        self, transaction: Any, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_gain(self, transaction: Any, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
 
         if transaction_type == Keyword.MINING:
             amount: RP2Decimal = RP2Decimal(str(transaction[_PROFITAMOUNT]))
@@ -726,9 +701,7 @@ class InputPlugin(AbstractInputPlugin):
                 )
             )
 
-    def _process_sell(
-        self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None
-    ) -> None:
+    def _process_sell(self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
         self.__logger.debug("Sell Transaction: %s", transaction)
         trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
@@ -774,13 +747,10 @@ class InputPlugin(AbstractInputPlugin):
                     f"{conversion_info}"
                     f"({in_asset} in-transaction unique id: {transaction[_ID]}"
                 ),
-
             )
         )
 
-    def _process_transfer(
-        self, transaction: Any, intra_transaction_list: List[IntraTransaction]
-    ) -> None:
+    def _process_transfer(self, transaction: Any, intra_transaction_list: List[IntraTransaction]) -> None:
         self.__logger.debug("Transfer: %s", transaction)
 
         # This is a CCXT list must convert to string from float
