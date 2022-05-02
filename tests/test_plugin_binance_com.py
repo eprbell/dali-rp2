@@ -19,6 +19,7 @@ from rp2.rp2_decimal import RP2Decimal
 
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
+from dali.intra_transaction import IntraTransaction
 from dali.plugin.input.rest.binance_com import InputPlugin
 from dali.dali_configuration import Keyword
 
@@ -31,7 +32,6 @@ class TestBinance:
             account_holder="tester",
             api_key="a",
             api_secret="b",
-            username="user",
         )
 
         mocker.patch.object(plugin.client, "sapiGetFiatPayments").return_value = {
@@ -45,22 +45,22 @@ class TestBinance:
                   "obtainAmount": "4.462", # Crypto trade amount
                   "cryptoCurrency": "LUNA",  # Crypto token
                   "totalFee": "0.2",     # Trade fee
-                  "price": "4.437472", 
+                  "price": "4.437472",
                   "status": "Completed",  # Processing, Completed, Failed, Refunded
                   "createTime": 1624529919000,
-                  "updateTime": 1624529919000  
+                  "updateTime": 1624529919000
                },
-               {               
+               {
                   "orderNo": "353fca443f06466db0c4dc89f94f027b",
                   "sourceAmount": "40.0",  # Fiat trade amount
                   "fiatCurrency": "EUR",   # Fiat token
                   "obtainAmount": "8.924", # Crypto trade amount
                   "cryptoCurrency": "LUNA",  # Crypto token
                   "totalFee": "0.4",     # Trade fee
-                  "price": "4.437472", 
+                  "price": "4.437472",
                   "status": "Failed",  # Processing, Completed, Failed, Refunded
                   "createTime": 1624529920000,
-                  "updateTime": 1624529920000  
+                  "updateTime": 1624529920000
                }
                ],
                "total": 2,
@@ -71,36 +71,36 @@ class TestBinance:
         mocker.patch.object(plugin.client, "fetch_deposits").return_value = [
             {
                 'info': {
-                  'amount': '0.00999800', 
-                  'coin': 'PAXG', 
-                  'network': 'ETH', 
-                  'status': '1', 
-                  'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
-                  'addressTag': '', 
-                  'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3', 
-                  'insertTime': '1599621997000', 
-                  'transferType': '0', 
-                  'confirmTimes': '12/12', 
-                  'unlockConfirm': '12/12', 
+                  'amount': '0.00999800',
+                  'coin': 'PAXG',
+                  'network': 'ETH',
+                  'status': '1',
+                  'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                  'addressTag': '',
+                  'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                  'insertTime': '1599621997000',
+                  'transferType': '0',
+                  'confirmTimes': '12/12',
+                  'unlockConfirm': '12/12',
                   'walletType': '0'
                 },
-                'id': None, 
-                'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3', 
-                'timestamp': 1599621997000, 
-                'datetime': '2020-09-09T03:26:37.000Z', 
-                'network': 'ETH', 
-                'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
-                'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c', 
-                'addressFrom': None, 
-                'tag': None, 
-                'tagTo': None, 
-                'tagFrom': None, 
-                'type': 'deposit', 
-                'amount': 0.00999800, 
-                'currency': 'PAXG', 
-                'status': 'ok', 
-                'updated': None, 
-                'internal': False, 
+                'id': None,
+                'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                'timestamp': 1599621997000,
+                'datetime': '2020-09-09T03:26:37.000Z',
+                'network': 'ETH',
+                'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                'addressFrom': None,
+                'tag': None,
+                'tagTo': None,
+                'tagFrom': None,
+                'type': 'deposit',
+                'amount': 0.00999800,
+                'currency': 'PAXG',
+                'status': 'ok',
+                'updated': None,
+                'internal': False,
                 'fee': None
             }
         ]
@@ -185,9 +185,8 @@ class TestBinance:
             account_holder="tester",
             api_key="a",
             api_secret="b",
-            username="user",
-        )       
-       
+        )
+
         plugin.markets = [{'id':'ETHBTC'}]
         mocker.patch.object(plugin.client, "fetch_my_trades").return_value = [
 
@@ -319,7 +318,7 @@ class TestBinance:
         assert RP2Decimal(regular_sell.crypto_fee) == RP2Decimal("0")
         assert RP2Decimal(regular_sell.crypto_out_with_fee) == RP2Decimal("0.20753052")
         assert regular_sell.fiat_out_no_fee == None
-        assert regular_sell.fiat_fee == None  
+        assert regular_sell.fiat_fee == None
 
         assert regular_buy.asset == "ETH"
         assert regular_buy.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1502962946217)
@@ -329,7 +328,7 @@ class TestBinance:
         assert RP2Decimal(regular_buy.crypto_fee) == RP2Decimal("0.0015")
         assert regular_buy.fiat_in_no_fee == None
         assert regular_buy.fiat_in_with_fee == None
-        assert regular_buy.fiat_fee == None     
+        assert regular_buy.fiat_fee == None
 
         # Sell with quote asset as fee payment
         assert sell_order_sell.asset == "ETH"
@@ -340,7 +339,7 @@ class TestBinance:
         assert RP2Decimal(sell_order_sell.crypto_fee) == RP2Decimal("0")
         assert RP2Decimal(sell_order_sell.crypto_out_with_fee) == RP2Decimal("6")
         assert sell_order_sell.fiat_out_no_fee == None
-        assert sell_order_sell.fiat_fee == None  
+        assert sell_order_sell.fiat_fee == None
 
         assert sell_order_buy.asset == "BTC"
         assert sell_order_buy.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1502962946218)
@@ -350,7 +349,7 @@ class TestBinance:
         assert RP2Decimal(sell_order_buy.crypto_fee) == RP2Decimal("0.0015")
         assert sell_order_buy.fiat_in_no_fee == None
         assert sell_order_buy.fiat_in_with_fee == None
-        assert sell_order_buy.fiat_fee == None 
+        assert sell_order_buy.fiat_fee == None
 
     # pylint: disable=no-self-use
     def test_gains(self, mocker: Any) -> None:
@@ -358,8 +357,12 @@ class TestBinance:
             account_holder="tester",
             api_key="a",
             api_secret="b",
-            username="user",
-        ) 
+        )
+
+        # Bypassing algo call
+        plugin.algos = ['sha256']
+        plugin.username = "user"
+
 
         mocker.patch.object(plugin, "startTimeMS", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "sapiGetAssetAssetDividend").return_value = {
@@ -392,9 +395,10 @@ class TestBinance:
                 "accountProfits": [
                   {
                     "time": 1586188800000,           # Mining date
-                    "type": 31,                      # 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
+                    "type": 31,                      # 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,
+                                                     # 32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
                     "hashTransfer": None,            # Transferred Hashrate
-                    "transferAmount": None,          # Transferred Income   
+                    "transferAmount": None,          # Transferred Income
                     "dayHashRate": 129129903378244,  # Daily Hashrate
                     "profitAmount": 8.6083060304,    # Earnings Amount
                     "coinName":"BTC",                # Coin Type
@@ -416,6 +420,7 @@ class TestBinance:
               }
             }
 
+
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         mocker.patch.object(plugin, "_process_trades").return_value = None
 
@@ -423,8 +428,8 @@ class TestBinance:
 
         # One Eth staking transaction +
         # One BUSD savings transaction +
-        # 4 Mining transactions (one for each algo) = 6
-        assert len(result) == 6
+        # One Mining transaction = 3
+        assert len(result) == 3
 
         eth_staking: InTransaction = result[0]
         busd_savings: InTransaction = result[1]
@@ -449,7 +454,7 @@ class TestBinance:
         assert busd_savings.crypto_fee == None
         assert busd_savings.fiat_in_no_fee == None
         assert busd_savings.fiat_in_with_fee == None
-        assert busd_savings.fiat_fee == None 
+        assert busd_savings.fiat_fee == None
 
         assert mining_deposit.asset == "BTC"
         assert mining_deposit.timestamp == InputPlugin._rp2timestamp_from_ms_epoch(1607529600000)
@@ -459,4 +464,4 @@ class TestBinance:
         assert mining_deposit.crypto_fee == None
         assert mining_deposit.fiat_in_no_fee == None
         assert mining_deposit.fiat_in_with_fee == None
-        assert mining_deposit.fiat_fee == None       
+        assert mining_deposit.fiat_fee == None
