@@ -47,7 +47,6 @@ class Keyword(Enum):
     HISTORICAL_PRICE_LOW: str = "low"
     HISTORICAL_PRICE_CLOSE: str = "close"
     HISTORICAL_PRICE_NEAREST: str = "nearest"
-    HISTORICAL_PRICE_WEIGHTED: str = "weighted"
     HOLDER: str = "holder"
     IN: str = "in"
     INCOME: str = "income"
@@ -144,13 +143,12 @@ DIRECTION_2_TRANSACTION_TYPE_SET: Dict[str, Set[str]] = {
 }
 
 # This is a tuple, not a set, because we want this order when printed
-HISTORICAL_PRICE_KEYWORDS: Tuple[str, str, str, str, str, str] = (
+HISTORICAL_PRICE_KEYWORDS: Tuple[str, str, str, str, str] = (
     Keyword.HISTORICAL_PRICE_OPEN.value,
     Keyword.HISTORICAL_PRICE_HIGH.value,
     Keyword.HISTORICAL_PRICE_LOW.value,
     Keyword.HISTORICAL_PRICE_CLOSE.value,
     Keyword.HISTORICAL_PRICE_NEAREST.value,
-    Keyword.HISTORICAL_PRICE_WEIGHTED.value,
 )
 
 BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {

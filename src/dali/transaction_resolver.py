@@ -170,8 +170,7 @@ def _update_spot_price_from_web(
             )
 
             historical_price_cache[key] = historical_bar
-        verb: str = "derived" if historical_price_type == Keyword.HISTORICAL_PRICE_WEIGHTED.value else "read"
-        notes: str = f"{historical_price_type} spot_price {verb} from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
+        notes: str = f"{historical_price_type} spot_price read from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
         init_parameters[Keyword.SPOT_PRICE.value] = spot_price
         init_parameters[Keyword.NOTES.value] = notes
         init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = True

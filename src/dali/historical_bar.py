@@ -73,17 +73,6 @@ class HistoricalBar(NamedTuple):
             start_timedelta = abs(transaction_timestamp - bar_start_timestamp)
             end_timedelta = abs(transaction_timestamp - bar_end_timestamp)
             price = self.open if start_timedelta < end_timedelta else self.close
-        elif historical_price_type == Keyword.HISTORICAL_PRICE_WEIGHTED.value:
-            bar_start_timestamp = self.timestamp
-            bar_end_timestamp = self.timestamp + self.duration
-            if transaction_timestamp <= bar_start_timestamp:
-                price = self.open
-            elif transaction_timestamp >= bar_end_timestamp:
-                price = self.close
-            else:
-                start_timedelta = abs(transaction_timestamp - bar_start_timestamp)
-                time_fraction: float = start_timedelta / self.duration
-                price = (1 - time_fraction) * self.open + time_fraction * self.close
         else:
             raise ValueError(f"Unrecognized historical_price_type '{historical_price_type}'")
         return price

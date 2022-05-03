@@ -97,35 +97,3 @@ def test_derive_transaction_price_nearest_open(bar: HistoricalBar, seconds: int)
 def test_derive_transaction_price_nearest_close(bar: HistoricalBar, seconds: int) -> None:  # pylint: disable=C0104, W0621
     transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=seconds)).replace(tzinfo=timezone.utc)
     assert BAR_CLOSE == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_NEAREST.value)
-
-
-def test_derive_transaction_price_weighted_at_open(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=-1)).replace(tzinfo=timezone.utc)
-    assert BAR_OPEN == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_WEIGHTED.value)
-    transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=0)).replace(tzinfo=timezone.utc)
-    assert BAR_OPEN == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_WEIGHTED.value)
-
-
-def test_derive_transaction_price_weighted_at_25percent(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=BAR_SECONDS * 0.25)).replace(tzinfo=timezone.utc)
-    expected_price: float = 0.75 * BAR_OPEN + 0.25 * BAR_CLOSE
-    assert expected_price == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_WEIGHTED.value)
-
-
-def test_derive_transaction_price_weighted_at_50percent(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=BAR_SECONDS * 0.5)).replace(tzinfo=timezone.utc)
-    expected_price: float = 0.5 * BAR_OPEN + 0.5 * BAR_CLOSE
-    assert expected_price == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_WEIGHTED.value)
-
-
-def test_derive_transaction_price_weighted_at_75percent(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=BAR_SECONDS * 0.75)).replace(tzinfo=timezone.utc)
-    expected_price: float = 0.25 * BAR_OPEN + 0.75 * BAR_CLOSE
-    assert expected_price == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_WEIGHTED.value)
-
-
-def test_derive_transaction_price_weighted_at_close(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=BAR_SECONDS)).replace(tzinfo=timezone.utc)
-    assert BAR_CLOSE == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_WEIGHTED.value)
-    transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=BAR_SECONDS + 1)).replace(tzinfo=timezone.utc)
-    assert BAR_CLOSE == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_WEIGHTED.value)
