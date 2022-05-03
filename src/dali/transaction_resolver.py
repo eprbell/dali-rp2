@@ -133,11 +133,13 @@ def _update_spot_price_from_web(
             if isinstance(cached_value, HistoricalBar):  # older caches did not store the full bar
                 cached_historical_bar = cached_value
             else:
-                LOGGER.debug("Cached price for %s/%s is not a full bar", key.timestamp, key.asset)
+                LOGGER.error("Cached price for %s/%s is not a full bar", key.timestamp, key.asset)
         if cached_historical_bar:
             spot_price_value = cached_historical_bar.derive_transaction_price(transaction.timestamp_value, historical_price_type)
             spot_price = str(spot_price_value)
-            LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
+            LOGGER.debug(
+                "Fetched %s spot_price %s for %s/%s from cache: %s", historical_price_type, spot_price, key.timestamp, key.asset, cached_historical_bar
+            )
         else:
             time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
             # Coinbase API expects UTC timestamps only, see the forum discussion here:
@@ -160,13 +162,12 @@ def _update_spot_price_from_web(
             if not spot_price:
                 raise Exception("Unable to read spot price from Coinbase Pro")
             LOGGER.debug(
-                "Fetched %s spot_price %s for %s/%s from Coinbase Pro %d second bar at %s",
+                "Fetched %s spot_price %s for %s/%s from Coinbase Pro: %s",
                 historical_price_type,
                 spot_price,
                 key.timestamp,
                 key.asset,
-                seconds,
-                historical_bar.timestamp,
+                historical_bar,
             )
 
             historical_price_cache[key] = historical_bar

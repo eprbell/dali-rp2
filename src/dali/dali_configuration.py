@@ -144,11 +144,11 @@ DIRECTION_2_TRANSACTION_TYPE_SET: Dict[str, Set[str]] = {
 
 # This is a tuple, not a set, because we want this order when printed
 HISTORICAL_PRICE_KEYWORDS: Tuple[str, str, str, str, str] = (
-    Keyword.HISTORICAL_PRICE_OPEN.value,
+    Keyword.HISTORICAL_PRICE_CLOSE.value,
     Keyword.HISTORICAL_PRICE_HIGH.value,
     Keyword.HISTORICAL_PRICE_LOW.value,
-    Keyword.HISTORICAL_PRICE_CLOSE.value,
     Keyword.HISTORICAL_PRICE_NEAREST.value,
+    Keyword.HISTORICAL_PRICE_OPEN.value,
 )
 
 BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
@@ -159,7 +159,7 @@ BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
     Keyword.INTRA_HEADER.value,
 }
 
-DEFAULT_CONFIGURATION: Dict[str, Dict[str, Union[int, str]]] = {
+DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
     Keyword.IN_HEADER.value: {
         Keyword.TIMESTAMP.value: 0,
         Keyword.ASSET.value: 1,
