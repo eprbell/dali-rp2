@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 from typing import NamedTuple, Type, TypeVar, cast
 
 import pandas as pd
+from rp2.rp2_decimal import RP2Decimal
 
 from dali.dali_configuration import Keyword
 
@@ -28,11 +29,11 @@ class HistoricalBar(NamedTuple):
 
     duration: timedelta
     timestamp: datetime
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: float
+    open: RP2Decimal
+    high: RP2Decimal
+    low: RP2Decimal
+    close: RP2Decimal
+    volume: RP2Decimal
 
     @classmethod
     def from_historic_crypto_series(cls: Type[T], duration: timedelta, historic_crypto_series: pd.Series) -> T:
@@ -42,11 +43,11 @@ class HistoricalBar(NamedTuple):
         return cls(
             duration=duration,
             timestamp=historic_crypto_series.time,  # type: ignore
-            open=historic_crypto_series.open,  # type: ignore
-            high=historic_crypto_series.high,  # type: ignore
-            low=historic_crypto_series.low,  # type: ignore
-            close=historic_crypto_series.close,  # type: ignore
-            volume=historic_crypto_series.volume,  # type: ignore
+            open=RP2Decimal(str(historic_crypto_series.open)),  # type: ignore
+            high=RP2Decimal(str(historic_crypto_series.high)),  # type: ignore
+            low=RP2Decimal(str(historic_crypto_series.low)),  # type: ignore
+            close=RP2Decimal(str(historic_crypto_series.close)),  # type: ignore
+            volume=RP2Decimal(str(historic_crypto_series.volume)),  # type: ignore
         )
 
     @classmethod
@@ -56,9 +57,9 @@ class HistoricalBar(NamedTuple):
         historic_crypto_series: pd.Series = df_historic_crypto.reset_index().iloc[0]
         return cls.from_historic_crypto_series(duration, historic_crypto_series)
 
-    def derive_transaction_price(self, transaction_timestamp: datetime, historical_price_type: str) -> float:
+    def derive_transaction_price(self, transaction_timestamp: datetime, historical_price_type: str) -> RP2Decimal:
         """Derive a transaction price from a historical bar."""
-        price: float = cast(float, None)
+        price: RP2Decimal = cast(RP2Decimal, None)
         if historical_price_type == Keyword.HISTORICAL_PRICE_OPEN.value:
             price = self.open
         elif historical_price_type == Keyword.HISTORICAL_PRICE_HIGH.value:

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
+from rp2.rp2_decimal import RP2Decimal
 
 from dali.dali_configuration import Keyword
 from dali.historical_bar import HistoricalBar
@@ -70,25 +71,25 @@ def test_derive_transaction_price_invalid(bar: HistoricalBar) -> None:  # pylint
 
 
 def test_derive_transaction_price_open(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    assert BAR_OPEN == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_OPEN.value)
+    assert RP2Decimal(str(BAR_OPEN)) == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_OPEN.value)
 
 
 def test_derive_transaction_price_high(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    assert BAR_HIGH == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_HIGH.value)
+    assert RP2Decimal(str(BAR_HIGH)) == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_HIGH.value)
 
 
 def test_derive_transaction_price_low(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    assert BAR_LOW == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_LOW.value)
+    assert RP2Decimal(str(BAR_LOW)) == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_LOW.value)
 
 
 def test_derive_transaction_price_close(bar: HistoricalBar) -> None:  # pylint: disable=C0104, W0621
-    assert BAR_CLOSE == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_CLOSE.value)
+    assert RP2Decimal(str(BAR_CLOSE)) == bar.derive_transaction_price(DONT_CARE_TIMESTAMP, Keyword.HISTORICAL_PRICE_CLOSE.value)
 
 
 @pytest.mark.parametrize("seconds", [-1, 0, 1, int(BAR_SECONDS / 2) - 1])  # test various time offsets after bar start timestamp
 def test_derive_transaction_price_nearest_open(bar: HistoricalBar, seconds: int) -> None:  # pylint: disable=C0104, W0621
     transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=seconds)).replace(tzinfo=timezone.utc)
-    assert BAR_OPEN == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_NEAREST.value)
+    assert RP2Decimal(str(BAR_OPEN)) == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_NEAREST.value)
 
 
 @pytest.mark.parametrize(  # test various time offsets after bar start timestamp
@@ -96,4 +97,4 @@ def test_derive_transaction_price_nearest_open(bar: HistoricalBar, seconds: int)
 )
 def test_derive_transaction_price_nearest_close(bar: HistoricalBar, seconds: int) -> None:  # pylint: disable=C0104, W0621
     transaction_timestamp = (BAR_START_TIMESTAMP + timedelta(seconds=seconds)).replace(tzinfo=timezone.utc)
-    assert BAR_CLOSE == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_NEAREST.value)
+    assert RP2Decimal(str(BAR_CLOSE)) == bar.derive_transaction_price(transaction_timestamp, Keyword.HISTORICAL_PRICE_NEAREST.value)
