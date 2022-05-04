@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from enum import Enum
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Union
 
 from rp2.rp2_error import RP2ValueError
 
@@ -40,6 +40,13 @@ class Keyword(Enum):
     FROM_HOLDER: str = "from_holder"
     GIFT: str = "gift"
     HARDFORK: str = "hardfork"
+    HISTORICAL_MARKET_DATA: str = "historical_market_data"
+    HISTORICAL_PRICE: str = "historical_price"
+    HISTORICAL_PRICE_OPEN: str = "open"
+    HISTORICAL_PRICE_HIGH: str = "high"
+    HISTORICAL_PRICE_LOW: str = "low"
+    HISTORICAL_PRICE_CLOSE: str = "close"
+    HISTORICAL_PRICE_NEAREST: str = "nearest"
     HOLDER: str = "holder"
     IN: str = "in"
     INCOME: str = "income"
@@ -135,9 +142,23 @@ DIRECTION_2_TRANSACTION_TYPE_SET: Dict[str, Set[str]] = {
     },
 }
 
-BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {Keyword.TRANSACTION_HINTS.value, Keyword.IN_HEADER.value, Keyword.OUT_HEADER.value, Keyword.INTRA_HEADER.value}
+HISTORICAL_PRICE_KEYWORD_SET: Set[str] = {
+    Keyword.HISTORICAL_PRICE_CLOSE.value,
+    Keyword.HISTORICAL_PRICE_HIGH.value,
+    Keyword.HISTORICAL_PRICE_LOW.value,
+    Keyword.HISTORICAL_PRICE_NEAREST.value,
+    Keyword.HISTORICAL_PRICE_OPEN.value,
+}
 
-DEFAULT_CONFIGURATION: Dict[str, Dict[str, int]] = {
+BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
+    Keyword.HISTORICAL_MARKET_DATA.value,
+    Keyword.TRANSACTION_HINTS.value,
+    Keyword.IN_HEADER.value,
+    Keyword.OUT_HEADER.value,
+    Keyword.INTRA_HEADER.value,
+}
+
+DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
     Keyword.IN_HEADER.value: {
         Keyword.TIMESTAMP.value: 0,
         Keyword.ASSET.value: 1,
@@ -180,6 +201,9 @@ DEFAULT_CONFIGURATION: Dict[str, Dict[str, int]] = {
         Keyword.CRYPTO_RECEIVED.value: 8,
         Keyword.UNIQUE_ID.value: 12,
         Keyword.NOTES.value: 13,
+    },
+    Keyword.HISTORICAL_MARKET_DATA.value: {
+        Keyword.HISTORICAL_PRICE.value: Keyword.HISTORICAL_PRICE_HIGH.value,
     },
 }
 

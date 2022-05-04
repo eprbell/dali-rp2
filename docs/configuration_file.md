@@ -25,6 +25,7 @@
 * **[Builtin Sections](#builtin-sections)**
   * [Transaction Hints Section](#transaction-hints-section)
   * [Header Sections](#header-sections)
+  * [Historical Market Data Section](#historical-market-data-section)
 
 ## Introduction
 
@@ -36,6 +37,7 @@ Look at [test_config.ini](../config/test_config.ini) for an example of a configu
 
 The example shows several concepts described in this document (see sections below for more details):
 * [transaction hints](#transaction-hints-section): a transaction is recast from intra to out in the `transaction_hints` section of test_config.ini;
+* configurable historical market data behaviors;
 * multiple instances of the same plugin: test_config.ini has two Trezor sections with different qualifiers and parameters (this captures two different Trezor wallets);
 * multiple people filing together: test_config.ini has a section for Alice's Trezor and another for Bob's Trezor;
 * unsupported exchanges/wallets: the [manual](#manual-section-csv) section of test_config.ini points to [test_manual_in.csv](../input/test_manual_in.csv) containing buy transactions on FTX (which is not yet supported directly by DaLI);
@@ -311,3 +313,17 @@ crypto_received = 8
 unique_id = 12
 notes = 13
 </pre>
+
+
+### Historical Market Data Section
+The historical_market_data section is optional and is used to configure the behavior of market data price lookups when transaction spot prices are unknown.
+
+The format of this section is as follows:
+
+<pre>
+[historical_market_data]
+historical_price = <em>&lt;price&gt;</em>
+</pre>
+
+Where:
+* *`price`* is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
