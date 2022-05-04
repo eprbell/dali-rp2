@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from enum import Enum
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Dict, Optional, Set, Union
 
 from rp2.rp2_error import RP2ValueError
 
@@ -142,14 +142,13 @@ DIRECTION_2_TRANSACTION_TYPE_SET: Dict[str, Set[str]] = {
     },
 }
 
-# This is a tuple, not a set, because we want this order when printed
-HISTORICAL_PRICE_KEYWORDS: Tuple[str, str, str, str, str] = (
+HISTORICAL_PRICE_KEYWORD_SET: Set[str] = {
     Keyword.HISTORICAL_PRICE_CLOSE.value,
     Keyword.HISTORICAL_PRICE_HIGH.value,
     Keyword.HISTORICAL_PRICE_LOW.value,
     Keyword.HISTORICAL_PRICE_NEAREST.value,
     Keyword.HISTORICAL_PRICE_OPEN.value,
-)
+}
 
 BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
     Keyword.HISTORICAL_MARKET_DATA.value,

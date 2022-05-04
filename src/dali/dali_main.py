@@ -29,7 +29,7 @@ from dali.dali_configuration import (
     DEFAULT_CONFIGURATION,
     DIRECTION_2_TRANSACTION_TYPE_SET,
     DIRECTION_SET,
-    HISTORICAL_PRICE_KEYWORDS,
+    HISTORICAL_PRICE_KEYWORD_SET,
     Keyword,
     is_builtin_section_name,
     is_internal_field,
@@ -272,8 +272,8 @@ def _validate_historical_market_data_configuration(ini_config: ConfigParser, sec
 
     for key, value in ini_config[section_name].items():
         if key == Keyword.HISTORICAL_PRICE.value:
-            if value not in HISTORICAL_PRICE_KEYWORDS:
-                LOGGER.error("The '%s' parameter must be one of (%s), instead it was '%s'", key, ", ".join(HISTORICAL_PRICE_KEYWORDS), value)
+            if value not in HISTORICAL_PRICE_KEYWORD_SET:
+                LOGGER.error("The '%s' parameter must be one of (%s), instead it was '%s'", key, ", ".join(sorted(HISTORICAL_PRICE_KEYWORD_SET)), value)
                 sys.exit(1)
             else:
                 result[key] = value
