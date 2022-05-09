@@ -17,6 +17,9 @@
 # Authentication: https://binance-docs.github.io/apidocs/spot/en/#introduction
 # Endpoint: https://api.binance.com
 
+# CCXT documentation:
+# https://docs.ccxt.com/en/latest/index.html
+
 import datetime as dt
 from datetime import datetime
 import json
@@ -87,6 +90,10 @@ _TXID: str = "txid"  # CCXT doesn't capitalize I
 _UPDATETIME: str = "updateTime"
 _USERNAME: str = "userName"
 
+# Time period constants
+_NINETY_DAYS_IN_MS: int = 7776000000
+_THIRTY_DAYS_IN_MS: int = 2592000000	
+
 # Types of Binance Dividends
 _BNBVAULT = "BNB Vault"
 _ETHSTAKING = "ETH 2.0 Staking"
@@ -137,12 +144,14 @@ class InputPlugin(AbstractInputPlugin):
         self.markets: List[str] = []
         ccxt_markets: Any = self.client.fetch_markets()
         for market in ccxt_markets:
+            self.__logger.debug("Market: %s", json.dumps(market))
             self.markets.append(market[_ID])
 
         if self.username:
             self.algos: List[str] = []
             binance_algos = self.client.sapiGetMiningPubAlgoList()
             for algo in binance_algos[_DATA]:
+                self.__logger.debug("Algo: %s", json.dumps(algo))
                 self.algos.append(algo[_ALGONAME])
 
         # We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
@@ -200,7 +209,7 @@ class InputPlugin(AbstractInputPlugin):
         now_time = int(datetime.now().timestamp()) * 1000
 
         # Crypto Deposits can only be pulled in 90 day windows
-        current_end = current_start + 7776000000
+        current_end = current_start + _NINETY_DAYS_IN_MS	
         crypto_deposits = []
 
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
@@ -229,6 +238,7 @@ class InputPlugin(AbstractInputPlugin):
         # }
         if _DATA in fiat_payments:
             for payment in fiat_payments[_DATA]:
+                self.__logger.debug("Payments: %s", json.dumps(payment))
                 if payment[_STATUS] == "Completed":
                     payment[_ISFIATPAYMENT] = True
                     self._process_buy(payment, in_transactions, out_transactions)
@@ -282,12 +292,12 @@ class InputPlugin(AbstractInputPlugin):
             # If user made more than 1000 transactions in a 90 day period we need to shrink the window.
             if len(crypto_deposits) < 1000:
                 current_start = current_end + 1
-                current_end = current_start + 7776000000
+                current_end = current_start + _NINETY_DAYS_IN_MS	
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([999])
                 current_start = int(crypto_deposits[999][_TIMESTAMP]) + 1  # times are inclusive
-                current_end = current_start + 7776000000
+                current_end = current_start + _NINETY_DAYS_IN_MS	
 
         # Process actual fiat deposits (no limit on the date range)
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
@@ -326,7 +336,7 @@ class InputPlugin(AbstractInputPlugin):
         now_time = int(datetime.now().timestamp()) * 1000
 
         # We will pull in 30 day periods. This allows for 16 assets with daily dividends.
-        current_end = current_start + 2592000000
+        current_end = current_start + _THIRTY_DAYS_IN_MS
 
         while current_start < now_time:
 
@@ -365,12 +375,12 @@ class InputPlugin(AbstractInputPlugin):
             # If user received more than 500 dividends in a 30 day period we need to shrink the window.
             if dividends[_TOTAL] < 500:
                 current_start = current_end + 1
-                current_end = current_start + 2592000000
+                current_end = current_start + _THIRTY_DAYS_IN_MS
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([499])
                 current_start = int(dividends[_ROWS][499][_DIVTIME]) + 1  # times are inclusive
-                current_end = current_start + 2592000000
+                current_end = current_start + _THIRTY_DAYS_IN_MS
 
         ### Mining Income
 
@@ -500,7 +510,7 @@ class InputPlugin(AbstractInputPlugin):
         # We will pull in 30 day periods
         # If the user has more than 100 dust trades in a 30 day period this will break.
         # Maybe we can set a smaller window in the .ini file?
-        current_end = current_start + 2592000000
+        current_end = current_start + _THIRTY_DAYS_IN_MS
         while current_start < now_time:
             dust_trades = self.client.fetch_my_dust_trades(params=({_STARTTIME: current_start, _ENDTIME: current_end}))
             # CCXT returns the same json as .fetch_trades()
@@ -512,6 +522,7 @@ class InputPlugin(AbstractInputPlugin):
                 current_dribblet: Any = []
                 current_dribblet_time: int = int(dust_trades[0][_DIVTIME])
                 for dust in dust_trades:
+                    self.__logger.debug("Dust: %s", json.dumps(dust))
                     dust[_ID] = dust[_ORDER]
                     if dust[_DIVTIME] == current_dribblet_time:
                         current_dribblet.append(dust)
@@ -522,20 +533,21 @@ class InputPlugin(AbstractInputPlugin):
 
                         # Shift the call window forward past this dribblet
                         current_start = current_dribblet_time + 1
-                        current_end = current_start + 2592000000
+                        current_end = current_start + _THIRTY_DAYS_IN_MS
                         break
                     else:
                         raise Exception(f"Too many assets dusted at the same time: " f"{self._rp2timestamp_from_ms_epoch(str(current_dribblet_time))}")
             else:
 
                 for dust in dust_trades:
+                    self.__logger.debug("Dust: %s", json.dumps(dust))
                     # dust trades have a null id
                     dust[_ID] = dust[_ORDER]
                     self._process_sell(dust, out_transactions)
                     self._process_buy(dust, in_transactions, out_transactions)
 
                 current_start = current_end + 1
-                current_end = current_start + 2592000000
+                current_end = current_start + _THIRTY_DAYS_IN_MS
 
     ### Single Transaction Processing
 
