@@ -147,9 +147,9 @@ class TestBinance:
         # 1 fiat deposit = 3
         assert len(result) == 3
 
-        fiat_in_transaction: InTransaction = result[0]
-        crypto_deposit_transaction: IntraTransaction = result[2]
-        fiat_deposit: InTransaction = result[1]
+        fiat_in_transaction: InTransaction = result[0]              # type: ignore
+        crypto_deposit_transaction: IntraTransaction = result[2]    # type: ignore
+        fiat_deposit: InTransaction = result[1]                     # type: ignore
 
         assert fiat_in_transaction.asset == "LUNA"
         assert int(parser.parse(fiat_in_transaction.timestamp).timestamp()) * 1000 == 1624529919000
@@ -157,9 +157,9 @@ class TestBinance:
         assert RP2Decimal(fiat_in_transaction.spot_price) == RP2Decimal("20.0") / RP2Decimal("4.462")
         assert RP2Decimal(fiat_in_transaction.crypto_in) == RP2Decimal("4.462")
         assert fiat_in_transaction.crypto_fee is None
-        assert RP2Decimal(fiat_in_transaction.fiat_in_no_fee) == RP2Decimal("20.0")
-        assert RP2Decimal(fiat_in_transaction.fiat_in_with_fee) == RP2Decimal("19.8")
-        assert RP2Decimal(fiat_in_transaction.fiat_fee) == RP2Decimal("0.2")
+        assert RP2Decimal(str(fiat_in_transaction.fiat_in_no_fee)) == RP2Decimal("20.0")
+        assert RP2Decimal(str(fiat_in_transaction.fiat_in_with_fee)) == RP2Decimal("19.8")
+        assert RP2Decimal(str(fiat_in_transaction.fiat_fee)) == RP2Decimal("0.2")
         # assert fiat_in_transaction.fiat_iso_code == "EUR"
 
         assert crypto_deposit_transaction.asset == "PAXG"
@@ -175,9 +175,9 @@ class TestBinance:
         assert RP2Decimal(fiat_deposit.spot_price) == RP2Decimal("1")
         assert RP2Decimal(fiat_deposit.crypto_in) == RP2Decimal("15.00")
         assert fiat_deposit.crypto_fee is None
-        assert RP2Decimal(fiat_deposit.fiat_in_no_fee) == RP2Decimal("14.80")
-        assert RP2Decimal(fiat_deposit.fiat_in_with_fee) == RP2Decimal("15.00")
-        assert RP2Decimal(fiat_deposit.fiat_fee) == RP2Decimal("0.20")
+        assert RP2Decimal(str(fiat_deposit.fiat_in_no_fee)) == RP2Decimal("14.80")
+        assert RP2Decimal(str(fiat_deposit.fiat_in_with_fee)) == RP2Decimal("15.00")
+        assert RP2Decimal(str(fiat_deposit.fiat_fee)) == RP2Decimal("0.20")
 
     # pylint: disable=no-self-use
     def test_trades(self, mocker: Any) -> None:
@@ -187,7 +187,7 @@ class TestBinance:
             api_secret="b",
         )
 
-        plugin.markets = [{"id": "ETHBTC"}]
+        plugin.markets = ["ETHBTC"]
         mocker.patch.object(plugin.client, "fetch_my_trades").return_value = [
             # Trade using BNB for fee payment
             {
@@ -267,13 +267,13 @@ class TestBinance:
         # One Buy of base asset (for Sell order) = 7
         assert len(result) == 7
 
-        bnb_sell_transaction: OutTransaction = result[3]
-        bnb_buy_transaction: InTransaction = result[0]
-        bnb_fee_transaction: OutTransaction = result[4]
-        regular_sell: OutTransaction = result[5]
-        regular_buy: InTransaction = result[1]
-        sell_order_sell: OutTransaction = result[6]
-        sell_order_buy: InTransaction = result[2]
+        bnb_sell_transaction: OutTransaction = result[3]    # type: ignore
+        bnb_buy_transaction: InTransaction = result[0]      # type: ignore
+        bnb_fee_transaction: OutTransaction = result[4]     # type: ignore
+        regular_sell: OutTransaction = result[5]            # type: ignore
+        regular_buy: InTransaction = result[1]              # type: ignore
+        sell_order_sell: OutTransaction = result[6]         # type: ignore
+        sell_order_buy: InTransaction = result[2]           # type: ignore
 
         # Buy with BNB as fee payment
         assert bnb_sell_transaction.asset == "BTC"
@@ -282,7 +282,7 @@ class TestBinance:
         assert bnb_sell_transaction.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(bnb_sell_transaction.crypto_out_no_fee) == RP2Decimal("0.10376526")
         assert RP2Decimal(bnb_sell_transaction.crypto_fee) == RP2Decimal("0")
-        assert RP2Decimal(bnb_sell_transaction.crypto_out_with_fee) == RP2Decimal("0.10376526")
+        assert RP2Decimal(str(bnb_sell_transaction.crypto_out_with_fee)) == RP2Decimal("0.10376526")
         assert bnb_sell_transaction.fiat_out_no_fee is None
         assert bnb_sell_transaction.fiat_fee is None
 
@@ -291,7 +291,7 @@ class TestBinance:
         assert bnb_buy_transaction.transaction_type == Keyword.BUY.value
         assert bnb_buy_transaction.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(bnb_buy_transaction.crypto_in) == RP2Decimal("1.5")
-        assert RP2Decimal(bnb_buy_transaction.crypto_fee) == RP2Decimal("0")
+        assert RP2Decimal(str(bnb_buy_transaction.crypto_fee)) == RP2Decimal("0")
         assert bnb_buy_transaction.fiat_in_no_fee is None
         assert bnb_buy_transaction.fiat_in_with_fee is None
         assert bnb_buy_transaction.fiat_fee is None
@@ -302,7 +302,7 @@ class TestBinance:
         assert bnb_fee_transaction.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(bnb_fee_transaction.crypto_out_no_fee) == RP2Decimal("0.0015")
         assert RP2Decimal(bnb_fee_transaction.crypto_fee) == RP2Decimal("0")
-        assert RP2Decimal(bnb_fee_transaction.crypto_out_with_fee) == RP2Decimal("0.0015")
+        assert RP2Decimal(str(bnb_fee_transaction.crypto_out_with_fee)) == RP2Decimal("0.0015")
         assert bnb_fee_transaction.fiat_out_no_fee is None
         assert bnb_fee_transaction.fiat_fee is None
 
@@ -313,7 +313,7 @@ class TestBinance:
         assert regular_sell.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(regular_sell.crypto_out_no_fee) == RP2Decimal("0.20753052")
         assert RP2Decimal(regular_sell.crypto_fee) == RP2Decimal("0")
-        assert RP2Decimal(regular_sell.crypto_out_with_fee) == RP2Decimal("0.20753052")
+        assert RP2Decimal(str(regular_sell.crypto_out_with_fee)) == RP2Decimal("0.20753052")
         assert regular_sell.fiat_out_no_fee is None
         assert regular_sell.fiat_fee is None
 
@@ -322,7 +322,7 @@ class TestBinance:
         assert regular_buy.transaction_type == Keyword.BUY.value
         assert regular_buy.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(regular_buy.crypto_in) == RP2Decimal("3")
-        assert RP2Decimal(regular_buy.crypto_fee) == RP2Decimal("0.0015")
+        assert RP2Decimal(str(regular_buy.crypto_fee)) == RP2Decimal("0.0015")
         assert regular_buy.fiat_in_no_fee is None
         assert regular_buy.fiat_in_with_fee is None
         assert regular_buy.fiat_fee is None
@@ -334,7 +334,7 @@ class TestBinance:
         assert sell_order_sell.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(sell_order_sell.crypto_out_no_fee) == RP2Decimal("6")
         assert RP2Decimal(sell_order_sell.crypto_fee) == RP2Decimal("0")
-        assert RP2Decimal(sell_order_sell.crypto_out_with_fee) == RP2Decimal("6")
+        assert RP2Decimal(str(sell_order_sell.crypto_out_with_fee)) == RP2Decimal("6")
         assert sell_order_sell.fiat_out_no_fee is None
         assert sell_order_sell.fiat_fee is None
 
@@ -343,7 +343,7 @@ class TestBinance:
         assert sell_order_buy.transaction_type == Keyword.BUY.value
         assert sell_order_buy.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(sell_order_buy.crypto_in) == RP2Decimal("0.41506104")
-        assert RP2Decimal(sell_order_buy.crypto_fee) == RP2Decimal("0.0015")
+        assert RP2Decimal(str(sell_order_buy.crypto_fee)) == RP2Decimal("0.0015")
         assert sell_order_buy.fiat_in_no_fee is None
         assert sell_order_buy.fiat_in_with_fee is None
         assert sell_order_buy.fiat_fee is None
@@ -412,9 +412,9 @@ class TestBinance:
         # One Mining transaction = 3
         assert len(result) == 3
 
-        eth_staking: InTransaction = result[0]
-        busd_savings: InTransaction = result[1]
-        mining_deposit: InTransaction = result[2]
+        eth_staking: InTransaction = result[0]      # type: ignore
+        busd_savings: InTransaction = result[1]     # type: ignore
+        mining_deposit: InTransaction = result[2]   # type: ignore
 
         # Make sure it identifies this as staking income
         assert eth_staking.asset == "BETH"
