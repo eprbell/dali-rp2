@@ -22,6 +22,8 @@
   * [Trezor Section (CSV)](#trezor-section-csv)
   * [Trezor Old Section (CSV)](#trezor-old-section-csv)
   * [Manual Section (CSV)](#manual-section-csv)
+* **[Pair Converter Plugin Sections](#pair-converter-plugin-sections)**
+  * [Historic Crypto](#historic-crypto)
 * **[Builtin Sections](#builtin-sections)**
   * [Transaction Hints Section](#transaction-hints-section)
   * [Header Sections](#header-sections)
@@ -30,8 +32,9 @@
 ## Introduction
 
 The configuration file is in [INI format](https://en.wikipedia.org/wiki/INI_file) and it is used to initialize data loader plugins and configure DaLI's behavior. It contains a sequence of configuration sections, which are of two types:
-* plugin sections: they select data loader plugins to run (e.g. Coinbase REST, Trezor CSV, etc.) and contain their initialization parameters;
-* builtin sections: they configure general DaLI behavior (format of the output ODS file, hints on how to generate certain transactions, etc.).
+* builtin sections: they configure general DaLI behavior (format of the output ODS file, hints on how to generate certain transactions, etc.);
+* data loader plugin sections: they select data loader plugins to run (e.g. Coinbase REST, Trezor CSV, etc.) and contain their initialization parameters;
+* pair converter plugin sections: they are optional and select pair converter plugins to use for filling missing spot price and converting foreign fiat to USD.
 
 Look at [test_config.ini](../config/test_config.ini) for an example of a configuration file. For instructions on how to run the example read the [Running](../README.md#running) section of the README.md file.
 
@@ -241,6 +244,31 @@ unique_id   |timestamp                 |asset|from_exchange|from_holder|to_excha
 ------------|--------------------------|-----|-------------|-----------|-----------|---------|----------|-----------|---------------
 389ded74b35f|2020-03-01 11:25:18 +00:00|BTC  |Coinbase     |Alice      |FTX        |Alice    |15100     |0.5        |0.49
 
+## Pair Converter Plugin Sections
+A pair converter plugin has the purpose of converting a currency to another (both crypto and fiat) and it is used to fill missing spot price and convert foreign fiat to USD. It is initialized with parameters from a plugin-specific section of the INI file. This section has the following format:
+<pre>
+[dali.plugin.price_converter.<em>&lt;plugin&gt;</em>]
+<em>&lt;parameter_1&gt;</em> = <em>&lt;value_1&gt;</em>
+...
+<em>&lt;parameter_n&gt;</em> = <em>&lt;value_n&gt;</em>
+</pre>
+Where:
+* *`<parameter>`* and *`<value>`* are plugin-specific name-value pairs used to initialize a specific instance of the plugin. They are described in the plugin-specific sections below.
+
+Pair converters are optional: if they are missing from the configuration file DaLI selects a default one.
+
+### Historic Crypto
+This plugin is based on the Historic_Crypto Python library.
+
+Initialize this plugin section as follows:
+<pre>
+[dali.plugin.price_converter.historic_crypto</em>]
+historical_price_type = <em>&lt;historical_price_type&gt;</em>
+</pre>
+
+Where:
+* `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
+
 ## Builtin Sections
 Builtin sections are used as global configuration of DaLI's behavior.
 
@@ -313,17 +341,3 @@ crypto_received = 8
 unique_id = 12
 notes = 13
 </pre>
-
-
-### Historical Market Data Section
-The historical_market_data section is optional and is used to configure the behavior of market data price lookups when transaction spot prices are unknown.
-
-The format of this section is as follows:
-
-<pre>
-[historical_market_data]
-historical_price = <em>&lt;price&gt;</em>
-</pre>
-
-Where:
-* *`price`* is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
