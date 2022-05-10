@@ -14,6 +14,12 @@
 
 # RP2 Change Log
 
+## 0.4.9
+* added new pair conversion plugin infrastructure
+* added support for currency conversion to transaction resolver (useful to support non-USD fiats from foreign exchanges)
+* fixed PR #44: added configurable historical data behavior and improved caching
+* small improvements to code and documentation
+
 ## 0.4.8
 * fixed PR #35: added exchange_withdrawal transaction type to Coinbase plugin
 * various documentation improvements
