@@ -143,10 +143,11 @@ DaLI code adheres to these principles:
     * class fields are private (prepended with double-underscore). Fields that need public access have a read-only property. Write-properties are not used;
     * @dataclass classes have `frozen=True`;
 * runtime checks: parameters of public functions are type-checked at runtime;
-* type hints: all variables and functions have Python type hints;
+* type hints: all variables and functions have Python type hints (with the exception of local variables, for which type hints are optional);
 * no id-based hashing: classes that are added to dictionaries and sets redefine `__eq__()`, `__neq__()` and `__hash__()`;
 * encapsulated math: all high-precision math is done via `RP2Decimal` (a subclass of Decimal), to ensure the correct precision is used throughout the code. `RP2Decimal` instances are never mixed with other types in expressions;
 * f-strings only: every time string interpolation is needed, f-strings are used;
+* no raw strings (unless they occur only once): use global constants instead;
 * logging: logging is done via the `logger` module;
 * no unnamed tuples: dataclasses or named tuples are used instead;
 * one class per file (with exceptions for trivial classes);
@@ -176,7 +177,8 @@ Unit tests are in the [tests](tests) directory. Please add unit tests for any ne
 
 ## Internal Design
 DaLI's control flow is as follows (see [dali_main.py](src/dali/dali_main.py)):
-* parse the INI configuration file which includes data loader plugin initialization parameters and global configuration sections;
+* parse the INI configuration file which includes plugin initialization parameters and global configuration sections;
+* discover and instantiate pair converter plugins using the initialization parameters from the config file and store them in a list to be passed to the transaction resolver (see below);
 * discover and instantiate data loader plugins using the initialization parameters from the config file and call their load() method, which reads data from native sources (CSV files or REST endpoints) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
 * join the lists returned by plugin load() calls and pass them to the [transaction resolver](src/dali/transaction_resolver.py), which merges incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
 * pass the resolved data to the RP2 [ODS input file generator](src/dali/ods_generator.py) and the RP2 [config file generator](src/dali/config_generator.py), which create the input files for RP2.
@@ -186,14 +188,35 @@ The [transaction resolver](src/dali/transaction_resolver.py) is a critical compo
 
 For this reason it's essential that all data loader plugins populate the `unique_id` field as best they can: without it the transaction resolver cannot merge incomplete data. Sometimes hash information is missing (especially in CSV files) and so it's impossible to populate the `unique_id` field: in such cases it's still possible to write a plugin, but the user will have to manually modify the generated result and perform transaction resolution manually, which is not ideal.
 
+Another feature of the transaction resolver is filling in or converting certain fiat values, using the pair converter plugin list passed to it:
+* `spot_price`: sometimes the native sources read by data loader plugins don't provide this information. If instructed by the user with the `-c` option, the transaction resolver tries to retrieve this information from pair converter plugins;
+* foreign fiat values: transactions that occurred on foreign exchanges can have their fiat values denominated in non-USD fiat. When the transaction resolver detects this condition, it converts these foreign fiat values to USD, using pair converter plugins.
+
 ### Plugin Development
+DaLI has a plugin architecture for data loaders and pair converters, which makes it extensible for new use cases:
+* data loader plugins read crypto data from a native source (REST endpoint or CSV file) and convert it into DaLI's internal format
+* pair converter plugins convert from a currency to another (both fiat and crypto)
+
+#### Data Loader Plugin Development
 All data loader plugins are subclasses of [AbstractInputPlugin](src/dali/abstract_input_plugin.py) and they must:
 * invoke the superclass constructor in their own constructor;
-* implement the load() method, which reads data from the native source and returns a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances, which can be of any of the following classes: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together). The fields of transaction classes are described [here](docs/configuration_file.md#manual-section-csv).
+* implement the `load()` method, which reads data from the native source and returns a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances, which can be of any of the following classes: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together). The fields of transaction classes are described [here](docs/configuration_file.md#manual-section-csv).
 
 Data loader plugins live in one of the following directories, depending on their type (CSV or REST):
 * `src/dali/plugin/input/csv/`;
 * `src/dali/plugin/input/rest/`.
+
+If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`.
+
+For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
+
+#### Pair Converter Plugin Development
+All pair converter plugins are subclasses of [AbstractPairConverterPlugin](src/dali/abstract_pair_converter_plugin.py) and they must:
+* invoke the superclass constructor in their own constructor;
+* implement the `get_historic_bar_from_native_source()`, `name()` and `cache_key()` methods.
+
+Pair converter plugins live in the following directory:
+* `src/dali/plugin/pair_converter`.
 
 If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`.
 
