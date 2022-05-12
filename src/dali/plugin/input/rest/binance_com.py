@@ -21,9 +21,9 @@
 # https://docs.ccxt.com/en/latest/index.html
 
 import datetime as dt
-from datetime import datetime
 import json
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
 import ccxt
@@ -92,7 +92,7 @@ _USERNAME: str = "userName"
 
 # Time period constants
 _NINETY_DAYS_IN_MS: int = 7776000000
-_THIRTY_DAYS_IN_MS: int = 2592000000	
+_THIRTY_DAYS_IN_MS: int = 2592000000
 
 # Types of Binance Dividends
 _BNBVAULT = "BNB Vault"
@@ -100,8 +100,8 @@ _ETHSTAKING = "ETH 2.0 Staking"
 _FLEXIBLESAVINGS = "Flexible Savings"
 _LOCKEDSAVINGS = "Locked Savings"
 _LOCKEDSTAKING = "Locked Staking"
-_INTEREST = [_FLEXIBLESAVINGS, _LOCKEDSAVINGS]
-_STAKING = [_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT]
+_INTEREST_LIST = [_FLEXIBLESAVINGS, _LOCKEDSAVINGS]
+_STAKING_LIST = [_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT]
 
 
 class _ProcessAccountResult(NamedTuple):
@@ -209,7 +209,7 @@ class InputPlugin(AbstractInputPlugin):
         now_time = int(datetime.now().timestamp()) * 1000
 
         # Crypto Deposits can only be pulled in 90 day windows
-        current_end = current_start + _NINETY_DAYS_IN_MS	
+        current_end = current_start + _NINETY_DAYS_IN_MS
         crypto_deposits = []
 
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
@@ -287,21 +287,22 @@ class InputPlugin(AbstractInputPlugin):
             # }
 
             for deposit in crypto_deposits:
+                self.__logger.debug("Transfer: %s", json.dumps(deposit))
                 self._process_transfer(deposit, intra_transactions)
 
             # If user made more than 1000 transactions in a 90 day period we need to shrink the window.
             if len(crypto_deposits) < 1000:
                 current_start = current_end + 1
-                current_end = current_start + _NINETY_DAYS_IN_MS	
+                current_end = current_start + _NINETY_DAYS_IN_MS
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([999])
                 current_start = int(crypto_deposits[999][_TIMESTAMP]) + 1  # times are inclusive
-                current_end = current_start + _NINETY_DAYS_IN_MS	
+                current_end = current_start + _NINETY_DAYS_IN_MS
 
         # Process actual fiat deposits (no limit on the date range)
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
-        # Using the underlying api call is faster for Binance.
+        # Using the underlying api endpoint is faster for Binance.
         fiat_deposits = self.client.sapiGetFiatOrders(params=({_TRANSACTIONTYPE: 0, _STARTTIME: self.start_time_ms, _ENDTIME: now_time}))
         #    {
         #      "code": "000000",
@@ -324,6 +325,7 @@ class InputPlugin(AbstractInputPlugin):
         #    }
         if _DATA in fiat_deposits:
             for deposit in fiat_deposits[_DATA]:
+                self.__logger.debug("Deposit: %s", json.dumps(deposit))
                 if deposit[_STATUS] == "Completed":
                     self._process_deposit(deposit, in_transactions)
 
@@ -340,7 +342,7 @@ class InputPlugin(AbstractInputPlugin):
 
         while current_start < now_time:
 
-            # CCXT doesn't have a standard way to pull income, we must use the underlying API call
+            # CCXT doesn't have a standard way to pull income, we must use the underlying API endpoint
             dividends = self.client.sapiGetAssetAssetDividend(params=({_STARTTIME: current_start, _ENDTIME: current_end, _LIMIT: 500}))
             # {
             #     "rows":[
@@ -364,9 +366,10 @@ class InputPlugin(AbstractInputPlugin):
             #     "total":2
             # }
             for dividend in dividends[_ROWS]:
-                if dividend[_ENINFO] in _STAKING:
+                self.__logger.debug("Dividend: %s", json.dumps(dividend))
+                if dividend[_ENINFO] in _STAKING_LIST:
                     self._process_gain(dividend, Keyword.STAKING, in_transactions)
-                elif dividend[_ENINFO] in _INTEREST:
+                elif dividend[_ENINFO] in _INTEREST_LIST:
                     self._process_gain(dividend, Keyword.INTEREST, in_transactions)
                 else:
                     self.__logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_ENINFO], self.ISSUES_URL)
@@ -435,6 +438,7 @@ class InputPlugin(AbstractInputPlugin):
                 if _DATA in results:
                     profits: List[Dict[str, Union[int, str]]] = results[_DATA][_ACCOUNTPROFITS]
                     for result in profits:
+                        self.__logger.debug("Mining profit: %s", json.dumps(result))
 
                         # Currently the plugin only supports standard mining deposits
                         # Payment must also be made (status=2) in order to be counted
@@ -447,7 +451,7 @@ class InputPlugin(AbstractInputPlugin):
                                 json.dumps(result),
                                 self.ISSUES_URL,
                             )
-                    
+
                     if len(profits) == 200:
                         current_page += 1
                     else:
@@ -493,6 +497,7 @@ class InputPlugin(AbstractInputPlugin):
                 # * The cost field itself is there mostly for convenience and can be deduced from other fields.
                 # * The ``cost`` of the trade is a *"gross"* value. That is the value pre-fee, and the fee has to be applied afterwards.
                 for trade in market_trades:
+                    self.__logger.debug("Trade: %s", json.dumps(trade))
                     self._process_sell(trade, out_transactions)
                     self._process_buy(trade, in_transactions, out_transactions)
                     test = False
@@ -554,33 +559,29 @@ class InputPlugin(AbstractInputPlugin):
     def _process_buy(
         self, transaction: Any, in_transaction_list: List[InTransaction], out_transaction_list: List[OutTransaction], notes: Optional[str] = None
     ) -> None:
-        self.__logger.debug("Buy Transaction: %s", transaction)
-        unique_id: str
-        timestamp: str
-        spot_price: str
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
 
         if _ISFIATPAYMENT in transaction:
-	        in_transaction_list.append(
-	            InTransaction(
-	                plugin=self.__BINANCE_COM,
-	                unique_id=transaction[_ORDERNO],
-	                raw_data=json.dumps(transaction),
-	                timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATETIME]),
-	                asset=transaction[_CRYPTOCURRENCY],
-	                exchange=self.__BINANCE_COM,
-	                holder=self.account_holder,
-	                transaction_type=Keyword.BUY.value,
-	                spot_price=str(RP2Decimal(transaction[_SOURCEAMOUNT]) / RP2Decimal(transaction[_OBTAINAMOUNT])),
-	                crypto_in=transaction[_OBTAINAMOUNT],
-	                crypto_fee=None,
-	                fiat_in_no_fee=str(transaction[_SOURCEAMOUNT]),
-	                fiat_in_with_fee=str(RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE])),
-	                fiat_fee=str(RP2Decimal(transaction[_TOTALFEE])),
-	                notes=(f"Buy transaction for fiat payment orderNo - " f"{transaction[_ORDERNO]}"),
-	            )
-	        )           
+            in_transaction_list.append(
+                InTransaction(
+                    plugin=self.__BINANCE_COM,
+                    unique_id=transaction[_ORDERNO],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATETIME]),
+                    asset=transaction[_CRYPTOCURRENCY],
+                    exchange=self.__BINANCE_COM,
+                    holder=self.account_holder,
+                    transaction_type=Keyword.BUY.value,
+                    spot_price=str(RP2Decimal(transaction[_SOURCEAMOUNT]) / RP2Decimal(transaction[_OBTAINAMOUNT])),
+                    crypto_in=transaction[_OBTAINAMOUNT],
+                    crypto_fee=None,
+                    fiat_in_no_fee=str(transaction[_SOURCEAMOUNT]),
+                    fiat_in_with_fee=str(RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE])),
+                    fiat_fee=str(RP2Decimal(transaction[_TOTALFEE])),
+                    notes=(f"Buy transaction for fiat payment orderNo - " f"{transaction[_ORDERNO]}"),
+                )
+            )
 
         else:
             trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
@@ -681,7 +682,7 @@ class InputPlugin(AbstractInputPlugin):
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.__BINANCE_COM,
-                    unique_id=(str(transaction[_TIME]) + transaction[_COINNAME]),
+                    unique_id=Keyword.UNKNOWN.value,
                     raw_data=json.dumps(transaction),
                     timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIME]),
                     asset=transaction[_COINNAME],
@@ -722,7 +723,6 @@ class InputPlugin(AbstractInputPlugin):
             )
 
     def _process_sell(self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
-        self.__logger.debug("Sell Transaction: %s", transaction)
         trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
         # For some reason CCXT outputs amounts in float
@@ -771,7 +771,6 @@ class InputPlugin(AbstractInputPlugin):
         )
 
     def _process_transfer(self, transaction: Any, intra_transaction_list: List[IntraTransaction]) -> None:
-        self.__logger.debug("Transfer: %s", transaction)
 
         # This is a CCXT list must convert to string from float
         amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))

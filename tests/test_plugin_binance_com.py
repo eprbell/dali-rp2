@@ -147,9 +147,9 @@ class TestBinance:
         # 1 fiat deposit = 3
         assert len(result) == 3
 
-        fiat_in_transaction: InTransaction = result[0]              # type: ignore
-        crypto_deposit_transaction: IntraTransaction = result[2]    # type: ignore
-        fiat_deposit: InTransaction = result[1]                     # type: ignore
+        fiat_in_transaction: InTransaction = result[0]  # type: ignore
+        crypto_deposit_transaction: IntraTransaction = result[2]  # type: ignore
+        fiat_deposit: InTransaction = result[1]  # type: ignore
 
         assert fiat_in_transaction.asset == "LUNA"
         assert int(parser.parse(fiat_in_transaction.timestamp).timestamp()) * 1000 == 1624529919000
@@ -267,13 +267,13 @@ class TestBinance:
         # One Buy of base asset (for Sell order) = 7
         assert len(result) == 7
 
-        bnb_sell_transaction: OutTransaction = result[3]    # type: ignore
-        bnb_buy_transaction: InTransaction = result[0]      # type: ignore
-        bnb_fee_transaction: OutTransaction = result[4]     # type: ignore
-        regular_sell: OutTransaction = result[5]            # type: ignore
-        regular_buy: InTransaction = result[1]              # type: ignore
-        sell_order_sell: OutTransaction = result[6]         # type: ignore
-        sell_order_buy: InTransaction = result[2]           # type: ignore
+        bnb_sell_transaction: OutTransaction = result[3]  # type: ignore
+        bnb_buy_transaction: InTransaction = result[0]  # type: ignore
+        bnb_fee_transaction: OutTransaction = result[4]  # type: ignore
+        regular_sell: OutTransaction = result[5]  # type: ignore
+        regular_buy: InTransaction = result[1]  # type: ignore
+        sell_order_sell: OutTransaction = result[6]  # type: ignore
+        sell_order_buy: InTransaction = result[2]  # type: ignore
 
         # Buy with BNB as fee payment
         assert bnb_sell_transaction.asset == "BTC"
@@ -412,9 +412,9 @@ class TestBinance:
         # One Mining transaction = 3
         assert len(result) == 3
 
-        eth_staking: InTransaction = result[0]      # type: ignore
-        busd_savings: InTransaction = result[1]     # type: ignore
-        mining_deposit: InTransaction = result[2]   # type: ignore
+        eth_staking: InTransaction = result[0]  # type: ignore
+        busd_savings: InTransaction = result[1]  # type: ignore
+        mining_deposit: InTransaction = result[2]  # type: ignore
 
         # Make sure it identifies this as staking income
         assert eth_staking.asset == "BETH"
