@@ -13,28 +13,30 @@
 # limitations under the License.
 
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, cast
+from datetime import datetime
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
-import pandas as pd
-from Historic_Crypto import HistoricalData
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2TypeError, RP2ValueError
 
+from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import (
     AbstractTransaction,
-    AssetAndTimestamp,
     AssetAndUniqueId,
 )
-from dali.cache import load_from_cache, save_to_cache
-from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none
+from dali.dali_configuration import Keyword, get_native_fiat, is_unknown, is_unknown_or_none
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
 from dali.out_transaction import OutTransaction
 
+
+class RateAndPairConverter(NamedTuple):
+    rate: Optional[RP2Decimal]
+    pair_converter: AbstractPairConverterPlugin
+
+
 __RESOLVER: str = "DaLI Resolver"
-__HISTORICAL_PRICE_CACHE: str = "coinbase_pro_historical_prices"
 
 
 def _is_number(value: str) -> bool:
@@ -102,16 +104,21 @@ def _resolve_optional_fields(
     )
 
 
-def _load_from_historical_price_cache() -> Dict[AssetAndTimestamp, str]:
-    result = load_from_cache(__HISTORICAL_PRICE_CACHE)
-    return cast(Dict[AssetAndTimestamp, str], result) if result is not None else {}
+def _get_pair_conversion_rate(timestamp: datetime, from_asset: str, to_asset: str, global_configuration: Dict[str, Any]) -> RateAndPairConverter:
+    rate: Optional[RP2Decimal] = None
+    pair_converter: Optional[AbstractPairConverterPlugin] = None
+    for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
+        rate = cast(AbstractPairConverterPlugin, pair_converter).get_conversion_rate(timestamp, from_asset, to_asset)
+        if rate:
+            break
+
+    if pair_converter is None:
+        raise Exception("No pair converter plugin found")
+
+    return RateAndPairConverter(rate, pair_converter)
 
 
-def _save_to_historical_price_cache(historical_prices: Dict[AssetAndTimestamp, str]) -> None:
-    save_to_cache(__HISTORICAL_PRICE_CACHE, historical_prices)
-
-
-def _update_spot_price_from_web(transaction: AbstractTransaction, historical_price_cache: Dict[AssetAndTimestamp, str]) -> AbstractTransaction:
+def _update_spot_price_from_web(transaction: AbstractTransaction, global_configuration: Dict[str, Any]) -> AbstractTransaction:
     init_parameters: Dict[str, Any] = transaction.constructor_parameter_dictionary
     if transaction.spot_price is None:  # type: ignore
         return transaction
@@ -121,48 +128,20 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
     # the contract with RP2, which requires spot_price to be > 0. If this situation is detected and the user passed the read_spot_price_from_web, then
     # ignore the 0 and use a price read from the Internet.
     if is_unknown(transaction.spot_price) or RP2Decimal(transaction.spot_price) == ZERO:  # type: ignore
-        spot_price: Optional[str] = None
-        key: AssetAndTimestamp = AssetAndTimestamp(transaction.asset, transaction.timestamp_value)
-        if key in historical_price_cache:
-            spot_price = historical_price_cache[key]
-            LOGGER.debug("Reading spot_price for %s/%s from cache: %s", key.timestamp, key.asset, spot_price)
-        else:
-            time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
-            # Coinbase API expects UTC timestamps only, see the forum discussion here:
-            # https://forums.coinbasecloud.dev/t/invalid-end-on-product-candles-endpoint/320
-            transaction_utc_timestamp = transaction.timestamp_value.astimezone(timezone.utc)
-            from_timestamp: str = transaction_utc_timestamp.strftime("%Y-%m-%d-%H-%M")
-            retry_count: int = 0
-            while retry_count < len(time_granularity):
-                try:
-                    seconds = time_granularity[retry_count]
-                    to_timestamp: str = (transaction_utc_timestamp + timedelta(seconds=seconds)).strftime("%Y-%m-%d-%H-%M")
-                    df_quotes: pd.DataFrame = HistoricalData(f"{transaction.asset}-USD", seconds, from_timestamp, to_timestamp, verbose=False).retrieve_data()
-                    df_quotes.index = df_quotes.index.tz_localize("UTC")  # The returned timestamps in the index are timezone naive
-                    first_quote_bar: pd.Series = df_quotes.reset_index().iloc[0]
-                    quote_field: str = "high"
-                    spot_price = str(first_quote_bar[quote_field])
-                    break
-                except ValueError:
-                    retry_count += 1
-
-            if not spot_price:
-                raise Exception("Unable to read spot price from Coinbase Pro")
-            LOGGER.debug(
-                "Fetched %s spot_price %s for %s/%s from Coinbase Pro %d second bar at %s",
-                quote_field,
-                spot_price,
-                key.timestamp,
-                key.asset,
-                seconds,
-                first_quote_bar.time,  # type: ignore
+        conversion: RateAndPairConverter = _get_pair_conversion_rate(transaction.timestamp_value, transaction.asset, get_native_fiat(), global_configuration)
+        if conversion.rate is None:
+            raise Exception(
+                f"Spot price for {transaction.timestamp_value}:{transaction.asset}->{get_native_fiat()} not found on any pair converter plugin"
             )
 
-            historical_price_cache[key] = spot_price
-        notes: str = f"spot_price read from Coinbase Pro; {transaction.notes if transaction.notes else ''}"
-        init_parameters[Keyword.SPOT_PRICE.value] = spot_price
+        notes: str = (
+            f"{conversion.pair_converter.historical_price_type} spot_price read from {conversion.pair_converter.name()} "
+            f"plugin; {transaction.notes if transaction.notes else ''}"
+        )
+        init_parameters[Keyword.SPOT_PRICE.value] = str(conversion.rate)
         init_parameters[Keyword.NOTES.value] = notes
         init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = True
+        init_parameters[Keyword.FIAT_TICKER.value] = transaction.fiat_ticker
         if isinstance(transaction, InTransaction):
             return InTransaction(**init_parameters)
         if isinstance(transaction, OutTransaction):
@@ -172,6 +151,44 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, historical_pri
         raise Exception(f"Invalid transaction: {transaction}")
 
     return transaction
+
+
+# Sometimes transactions on foreign exchanges are expressed in a fiat that is not native (USD): convert the fiat fields to native fiat
+def _convert_fiat_fields_to_native_fiat(transaction: AbstractTransaction, global_configuration: Dict[str, Any]) -> AbstractTransaction:
+    from_fiat = transaction.fiat_ticker
+    to_fiat = get_native_fiat()
+    conversion: RateAndPairConverter = _get_pair_conversion_rate(transaction.timestamp_value, from_fiat, to_fiat, global_configuration)
+    if conversion.rate is None:
+        raise Exception(f"Conversion rate for {transaction.timestamp_value}:{from_fiat}->{to_fiat} not found on any pair converter plugin")
+
+    init_parameters: Dict[str, Any] = transaction.constructor_parameter_dictionary
+    notes: str = f"Fiat conversion {from_fiat}->{to_fiat} using {conversion.pair_converter.name()} plugin; {transaction.notes if transaction.notes else ''}"
+    init_parameters[Keyword.NOTES.value] = notes
+    init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = transaction.is_spot_price_from_web
+    init_parameters[Keyword.FIAT_TICKER.value] = None
+
+    fiat_fields = []
+    if isinstance(transaction, InTransaction):
+        fiat_fields = [Keyword.SPOT_PRICE, Keyword.FIAT_IN_NO_FEE, Keyword.FIAT_IN_WITH_FEE, Keyword.FIAT_FEE]
+    if isinstance(transaction, OutTransaction):
+        fiat_fields = [Keyword.SPOT_PRICE, Keyword.FIAT_OUT_NO_FEE, Keyword.FIAT_FEE]
+    if isinstance(transaction, IntraTransaction):
+        fiat_fields = [Keyword.SPOT_PRICE]
+
+    for fiat_field in fiat_fields:
+        value = init_parameters[fiat_field.value]
+        if not is_unknown_or_none(value):
+            value = str(RP2Decimal(value) * conversion.rate)
+            init_parameters[fiat_field.value] = value
+
+    if isinstance(transaction, InTransaction):
+        return InTransaction(**init_parameters)
+    if isinstance(transaction, OutTransaction):
+        return OutTransaction(**init_parameters)
+    if isinstance(transaction, IntraTransaction):
+        return IntraTransaction(**init_parameters)
+
+    raise Exception(f"Invalid transaction: {transaction}")
 
 
 # This resolves incomplete transactions. An INTRA transaction from an exchange (e.g. Coinbase) to another
@@ -191,16 +208,18 @@ def resolve_transactions(
     unique_id_2_transactions: Dict[AssetAndUniqueId, List[AbstractTransaction]] = {}
     transaction: AbstractTransaction
 
-    historical_price_cache: Dict[AssetAndTimestamp, str] = _load_from_historical_price_cache()
-
     for transaction in transactions:
         if not isinstance(transaction, AbstractTransaction):
             raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
 
+        if transaction.fiat_ticker != get_native_fiat():
+            # Foreign exchanges may have transactions denominated in non-native fiat
+            transaction = _convert_fiat_fields_to_native_fiat(transaction, global_configuration)
+
         if is_unknown(transaction.unique_id):
             # Cannot resolve further if unique_id is not known
             if read_spot_price_from_web:
-                transaction = _update_spot_price_from_web(transaction, historical_price_cache)
+                transaction = _update_spot_price_from_web(transaction, global_configuration)
             LOGGER.debug("Unresolvable transaction (no %s): %s", Keyword.UNIQUE_ID.value, str(transaction))
             resolved_transactions.append(transaction)
         else:
@@ -214,7 +233,7 @@ def resolve_transactions(
         if len(transaction_list) == 1:
             transaction = _apply_transaction_hint(transaction_list[0], global_configuration)
             if read_spot_price_from_web:
-                transaction = _update_spot_price_from_web(transaction, historical_price_cache)
+                transaction = _update_spot_price_from_web(transaction, global_configuration)
             LOGGER.debug("Self-contained transaction: %s", str(transaction))
             resolved_transactions.append(transaction)
             continue
@@ -241,12 +260,14 @@ def resolve_transactions(
             )
 
         if read_spot_price_from_web:
-            transaction = _update_spot_price_from_web(transaction, historical_price_cache)
+            transaction = _update_spot_price_from_web(transaction, global_configuration)
 
         LOGGER.debug("Resolved transaction: %s", str(transaction))
         resolved_transactions.append(transaction)
 
-    _save_to_historical_price_cache(historical_price_cache)
+    # Save pair converter caches
+    for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
+        cast(AbstractPairConverterPlugin, pair_converter).save_historical_price_cache()
 
     return resolved_transactions
 
@@ -332,7 +353,7 @@ def _apply_transaction_hint(
         elif isinstance(transaction, IntraTransaction):
             if not is_unknown(transaction.to_holder) or not is_unknown(transaction.to_exchange):
                 raise RP2ValueError(
-                    f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
+                    f"Invalid conversion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
                     f"{Keyword.TO_HOLDER.value}/{Keyword.TO_EXCHANGE.value} must be unknown: {transaction}"
                 )
             crypto_out_no_fee: RP2Decimal = RP2Decimal(transaction.crypto_sent)
@@ -375,8 +396,8 @@ def _apply_transaction_hint(
         elif isinstance(transaction, OutTransaction):
             if is_unknown(transaction.crypto_out_no_fee) or is_unknown(transaction.crypto_fee):
                 raise RP2ValueError(
-                    f"Invalid converstion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
-                    f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} canot be unknown: {transaction}"
+                    f"Invalid conversion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
+                    f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} cannot be unknown: {transaction}"
                 )
             result = IntraTransaction(
                 plugin=transaction.plugin,

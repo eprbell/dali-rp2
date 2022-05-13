@@ -45,8 +45,18 @@ class InTransaction(AbstractTransaction):
         fiat_fee: Optional[str] = None,
         notes: Optional[str] = None,
         is_spot_price_from_web: Optional[bool] = None,
+        fiat_ticker: Optional[str] = None,
     ) -> None:
-        super().__init__(plugin, unique_id, raw_data, timestamp, asset, notes, is_spot_price_from_web)
+        super().__init__(
+            plugin=plugin,
+            unique_id=unique_id,
+            raw_data=raw_data,
+            timestamp=timestamp,
+            asset=asset,
+            notes=notes,
+            is_spot_price_from_web=is_spot_price_from_web,
+            fiat_ticker=fiat_ticker,
+        )
 
         self.__exchange: str = self._validate_string_field(Keyword.EXCHANGE.value, exchange, raw_data, disallow_empty=True, disallow_unknown=True)
         self.__holder: str = self._validate_string_field(Keyword.HOLDER.value, holder, raw_data, disallow_empty=True, disallow_unknown=True)
