@@ -139,6 +139,7 @@ class TestBinance:
 
         mocker.patch.object(plugin, "_process_trades").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
+        mocker.patch.object(plugin, "_process_withdrawals").return_value = None
 
         result = plugin.load()
 
@@ -255,7 +256,7 @@ class TestBinance:
         mocker.patch.object(plugin.client, "fetch_my_dust_trades").return_value = []
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
-        mocker.patch.object(plugin, "_process_withdrawls").return_value = None
+        mocker.patch.object(plugin, "_process_withdrawals").return_value = None
 
         result = plugin.load()
 
@@ -405,7 +406,7 @@ class TestBinance:
 
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         mocker.patch.object(plugin, "_process_trades").return_value = None
-        mocker.patch.object(plugin, "_process_withdrawls").return_value = None
+        mocker.patch.object(plugin, "_process_withdrawals").return_value = None
 
         result = plugin.load()
 
@@ -458,7 +459,7 @@ class TestBinance:
         )
 
         mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
-        mocker.patch.object(plugin.client, "fetch_withdrawls").return_value = [
+        mocker.patch.object(plugin.client, "fetch_withdrawals").return_value = [
             {
                 "info": {
                     "amount": "0.00999800",
@@ -485,7 +486,7 @@ class TestBinance:
                 "tag": None,
                 "tagTo": None,
                 "tagFrom": None,
-                "type": "withdrawl",
+                "type": "withdrawal",
                 "amount": 0.00999800,
                 "currency": "PAXG",
                 "status": "ok",
@@ -536,22 +537,21 @@ class TestBinance:
         # 1 fiat withdrawl = 2
         assert len(result) == 2
 
-        crypto_withdrawl_transaction: IntraTransaction = result[1]  # type: ignore
-        fiat_withdrawl: InTransaction = result[0]  # type: ignore
+        crypto_withdrawal_transaction: IntraTransaction = result[1]  # type: ignore
+        fiat_withdrawal: InTransaction = result[0]  # type: ignore
 
-        assert fiat_withdrawl.asset == "EUR"
-        assert int(parser.parse(fiat_withdrawl.timestamp).timestamp()) * 1000 == 1627501026000
-        assert fiat_withdrawl.transaction_type == Keyword.BUY.value
-        assert RP2Decimal(fiat_withdrawl.spot_price) == RP2Decimal("1")
-        assert RP2Decimal(fiat_withdrawl.crypto_in) == RP2Decimal("15.00")
-        assert RP2Decimal(fiat_withdrawl.crypto_fee) == RP2Decimal("0.20")
-        assert fiat_withdrawl.fiat_in_no_fee is None
-        assert fiat_withdrawl.fiat_in_with_fee is None 
-        assert fiat_withdrawl.fiat_fee is None
+        assert fiat_withdrawal.asset == "EUR"
+        assert int(parser.parse(fiat_withdrawal.timestamp).timestamp()) * 1000 == 1627501026000
+        assert fiat_withdrawal.transaction_type == Keyword.SELL.value
+        assert RP2Decimal(fiat_withdrawal.spot_price) == RP2Decimal("1")
+        assert RP2Decimal(fiat_withdrawal.crypto_out_no_fee) == RP2Decimal("15.00")
+        assert RP2Decimal(fiat_withdrawal.crypto_fee) == RP2Decimal("0.20")
+        assert fiat_withdrawal.fiat_out_no_fee is None
+        assert fiat_withdrawal.fiat_fee is None
 
-        assert crypto_withdrawl_transaction.asset == "PAXG"
-        assert int(parser.parse(crypto_withdrawl_transaction.timestamp).timestamp()) * 1000 == 1599621997000
-        assert crypto_withdrawl_transaction.to_exchange == Keyword.UNKNOWN.value
-        assert crypto_withdrawl_transaction.from_exchange == "Binance.com"
-        assert crypto_withdrawl_transaction.crypto_received == Keyword.UNKNOWN.value
-        assert RP2Decimal(crypto_withdrawl_transaction.crypto_sent) == RP2Decimal("0.00999800")
+        assert crypto_withdrawal_transaction.asset == "PAXG"
+        assert int(parser.parse(crypto_withdrawal_transaction.timestamp).timestamp()) * 1000 == 1599621997000
+        assert crypto_withdrawal_transaction.to_exchange == Keyword.UNKNOWN.value
+        assert crypto_withdrawal_transaction.from_exchange == "Binance.com"
+        assert crypto_withdrawal_transaction.crypto_received == Keyword.UNKNOWN.value
+        assert RP2Decimal(crypto_withdrawal_transaction.crypto_sent) == RP2Decimal("0.00999800")

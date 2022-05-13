@@ -190,7 +190,7 @@ class InputPlugin(AbstractInputPlugin):
         self._process_deposits(in_transactions, out_transactions, intra_transactions)
         self._process_gains(in_transactions)
         self._process_trades(in_transactions, out_transactions)
-        self._process_withdrawls(out_transactions)
+        self._process_withdrawals(out_transactions, intra_transactions)
 
 
         result.extend(in_transactions)
@@ -559,7 +559,9 @@ class InputPlugin(AbstractInputPlugin):
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
-    def _process_withdrawls(self, out_transactions: List[OutTransaction]) -> None:
+    def _process_withdrawals(
+            self, out_transactions: List[OutTransaction], intra_transactions: List[IntraTransaction]
+        ) -> None:
 
         # We need milliseconds for Binance
         current_start = self.start_time_ms
@@ -572,7 +574,7 @@ class InputPlugin(AbstractInputPlugin):
         # Process crypto withdrawls (limited to 90 day windows), fetches 1000 transactions
         while current_start < now_time:
             # The CCXT function only retrieves fiat deposits if you provide a valid 'legalMoney' code as variable.
-            crypto_deposits = self.client.fetch_withdrawls(params=({_STARTTIME: current_start, _ENDTIME: current_end}))
+            crypto_withdrawals = self.client.fetch_withdrawals(params=({_STARTTIME: current_start, _ENDTIME: current_end}))
 
             # CCXT returns a standardized response from fetch_withdrawls. 'info' is the exchange-specific information
             # in this case from Binance.com
@@ -603,7 +605,7 @@ class InputPlugin(AbstractInputPlugin):
             #   'tag': None,
             #   'tagTo': None,
             #   'tagFrom': None,
-            #   'type': 'withdrawl',
+            #   'type': 'withdrawal',
             #   'amount': 0.00999800,
             #   'currency': 'PAXG',
             #   'status': 'ok',
@@ -612,25 +614,25 @@ class InputPlugin(AbstractInputPlugin):
             #   'fee': None
             # }
 
-            for withdrawl in crypto_withdrawls:
-                self.__logger.debug("Transfer: %s", json.dumps(deposit))
-                self._process_transfer(withdrawl, intra_transactions)
+            for withdrawal in crypto_withdrawals:
+                self.__logger.debug("Transfer: %s", json.dumps(withdrawal))
+                self._process_transfer(withdrawal, intra_transactions)
 
             # If user made more than 1000 transactions in a 90 day period we need to shrink the window.
-            if len(crypto_withdrawls) < 1000:
+            if len(crypto_withdrawals) < 1000:
                 current_start = current_end + 1
                 current_end = current_start + _NINETY_DAYS_IN_MS
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([999])
-                current_start = int(crypto_withdrawls[999][_TIMESTAMP]) + 1  # times are inclusive
+                current_start = int(crypto_withdrawals[999][_TIMESTAMP]) + 1  # times are inclusive
                 current_end = current_start + _NINETY_DAYS_IN_MS
 
         # Process actual fiat withdrawls (no limit on the date range)
         # Fiat deposits can also be pulled via CCXT fetch_withdrawls by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as deposits, but with _TRANSACTIONTYPE set to 1 (for withdrawls)
-        fiat_withdrawls = self.client.sapiGetFiatOrders(params=({_TRANSACTIONTYPE: 1, _STARTTIME: self.start_time_ms, _ENDTIME: now_time}))
+        fiat_withdrawals = self.client.sapiGetFiatOrders(params=({_TRANSACTIONTYPE: 1, _STARTTIME: self.start_time_ms, _ENDTIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -650,11 +652,11 @@ class InputPlugin(AbstractInputPlugin):
         #      "total": 1,
         #      "success": True
         #    }
-        if _DATA in fiat_withdrawls:
-            for withdrawl in fiat_withdrawls[_DATA]:
-                self.__logger.debug("Withdrawl: %s", json.dumps(deposit))
-                if withdrawl[_STATUS] == "Completed":
-                    self._process_withdrawl(withdrawl, in_transactions)           
+        if _DATA in fiat_withdrawals:
+            for withdrawal in fiat_withdrawals[_DATA]:
+                self.__logger.debug("Withdrawal: %s", json.dumps(withdrawal))
+                if withdrawal[_STATUS] == "Completed":
+                    self._process_withdrawal(withdrawal, out_transactions)           
 
     ### Single Transaction Processing
 
@@ -751,7 +753,6 @@ class InputPlugin(AbstractInputPlugin):
             )
 
     def _process_deposit(self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
-        self.__logger.debug("Deposit: %s", transaction)
 
         amount: RP2Decimal = RP2Decimal(transaction[_INDICATEDAMOUNT])
         fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
@@ -914,13 +915,12 @@ class InputPlugin(AbstractInputPlugin):
         else:
             self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))          
 
-    def _process_withdrawl(self, transaction: Any, out_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
-        self.__logger.debug("Withdrawl: %s", transaction)
+    def _process_withdrawal(self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
 
         amount: RP2Decimal = RP2Decimal(transaction[_INDICATEDAMOUNT])
         fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
-        notes = f"{notes + '; ' if notes else ''}{'Fiat Withdrawl of '}; {transaction[_FIATCURRENCY]}"
-        in_transaction_list.append(
+        notes = f"{notes + '; ' if notes else ''}{'Fiat Withdrawal of '}; {transaction[_FIATCURRENCY]}"
+        out_transaction_list.append(
             OutTransaction(
                 plugin=self.__BINANCE_COM,
                 unique_id=transaction[_ORDERNO],
@@ -933,8 +933,7 @@ class InputPlugin(AbstractInputPlugin):
                 spot_price="1",
                 crypto_out_no_fee=str(amount),
                 crypto_fee=str(fee),
-                fiat_in_no_fee=None,
-                fiat_in_with_fee=None,
+                fiat_out_no_fee=None,
                 fiat_fee=None,
                 notes=notes,
             )
