@@ -42,7 +42,7 @@ from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.4.8"
+_VERSION: str = "0.4.4"
 
 
 def input_loader() -> None:
@@ -147,7 +147,7 @@ def _setup_argument_parser() -> ArgumentParser:
         "-c",
         "--use-cache",
         action="store_true",
-        help="Cache input plugin data load (developers only)",
+        help="Cache input plugin data load",
     )
     parser.add_argument(
         "-o",
