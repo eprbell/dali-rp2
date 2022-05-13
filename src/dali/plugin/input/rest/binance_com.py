@@ -146,7 +146,7 @@ class InputPlugin(AbstractInputPlugin):
         self.markets: List[str] = []
         ccxt_markets: Any = self.client.fetch_markets()
         for market in ccxt_markets:
-            self.__logger.debug("Market: %s", json.dumps(market))
+#            self.__logger.debug("Market: %s", json.dumps(market))
             self.markets.append(market[_ID])
 
         if self.username:

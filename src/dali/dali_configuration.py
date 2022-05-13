@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from enum import Enum
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Union
 
 from rp2.rp2_error import RP2ValueError
 
@@ -36,10 +36,18 @@ class Keyword(Enum):
     FIAT_IN_NO_FEE: str = "fiat_in_no_fee"
     FIAT_IN_WITH_FEE: str = "fiat_in_with_fee"
     FIAT_OUT_NO_FEE: str = "fiat_out_no_fee"
+    FIAT_TICKER: str = "fiat_ticker"
     FROM_EXCHANGE: str = "from_exchange"
     FROM_HOLDER: str = "from_holder"
     GIFT: str = "gift"
     HARDFORK: str = "hardfork"
+    HISTORICAL_MARKET_DATA: str = "historical_market_data"  # Deprecated
+    HISTORICAL_PAIR_CONVERTERS: str = "historical_pair_converters"
+    HISTORICAL_PRICE_CLOSE: str = "close"
+    HISTORICAL_PRICE_HIGH: str = "high"
+    HISTORICAL_PRICE_LOW: str = "low"
+    HISTORICAL_PRICE_NEAREST: str = "nearest"
+    HISTORICAL_PRICE_OPEN: str = "open"
     HOLDER: str = "holder"
     IN: str = "in"
     INCOME: str = "income"
@@ -100,6 +108,7 @@ _CRYPTO_FIELD_SET: Set[str] = {
 }
 
 _INTERNAL_FIELD_SET: Set[str] = {
+    Keyword.FIAT_TICKER.value,
     Keyword.IS_SPOT_PRICE_FROM_WEB.value,
     Keyword.PLUGIN.value,
     Keyword.RAW_DATA.value,
@@ -135,9 +144,22 @@ DIRECTION_2_TRANSACTION_TYPE_SET: Dict[str, Set[str]] = {
     },
 }
 
-BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {Keyword.TRANSACTION_HINTS.value, Keyword.IN_HEADER.value, Keyword.OUT_HEADER.value, Keyword.INTRA_HEADER.value}
+HISTORICAL_PRICE_KEYWORD_SET: Set[str] = {
+    Keyword.HISTORICAL_PRICE_CLOSE.value,
+    Keyword.HISTORICAL_PRICE_HIGH.value,
+    Keyword.HISTORICAL_PRICE_LOW.value,
+    Keyword.HISTORICAL_PRICE_NEAREST.value,
+    Keyword.HISTORICAL_PRICE_OPEN.value,
+}
 
-DEFAULT_CONFIGURATION: Dict[str, Dict[str, int]] = {
+BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
+    Keyword.TRANSACTION_HINTS.value,
+    Keyword.IN_HEADER.value,
+    Keyword.OUT_HEADER.value,
+    Keyword.INTRA_HEADER.value,
+}
+
+DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
     Keyword.IN_HEADER.value: {
         Keyword.TIMESTAMP.value: 0,
         Keyword.ASSET.value: 1,
@@ -214,3 +236,7 @@ def is_unknown_or_none(value: Optional[str]) -> bool:
 
 def is_transaction_type_valid(direction: str, transaction_type: str) -> bool:
     return transaction_type.lower() in DIRECTION_2_TRANSACTION_TYPE_SET[direction]
+
+
+def get_native_fiat() -> str:
+    return "USD"

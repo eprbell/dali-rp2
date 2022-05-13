@@ -19,17 +19,12 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Union
 from dateutil.parser import parse
 from rp2.configuration import to_string
 
-from dali.dali_configuration import Keyword, is_internal_field, is_unknown
+from dali.dali_configuration import Keyword, get_native_fiat, is_internal_field, is_unknown
 
 
 class StringAndDatetime(NamedTuple):
     string: str
     value: datetime
-
-
-class AssetAndTimestamp(NamedTuple):
-    asset: str
-    timestamp: datetime
 
 
 class AssetAndUniqueId(NamedTuple):
@@ -105,6 +100,7 @@ class AbstractTransaction:
         asset: str,
         notes: Optional[str] = None,
         is_spot_price_from_web: Optional[bool] = None,
+        fiat_ticker: Optional[str] = None,
     ) -> None:
         self.__plugin: str = self._validate_string_field(Keyword.PLUGIN.value, plugin, raw_data, disallow_empty=True, disallow_unknown=True)
         self.__unique_id: str = self._validate_string_field(Keyword.UNIQUE_ID.value, unique_id, raw_data, disallow_empty=True, disallow_unknown=False)
@@ -119,6 +115,8 @@ class AbstractTransaction:
         if is_spot_price_from_web and not isinstance(is_spot_price_from_web, bool):
             raise Exception(f"Internal error: {Keyword.IS_SPOT_PRICE_FROM_WEB.value} is not boolean: {is_spot_price_from_web}")
         self.__is_spot_price_from_web: bool = is_spot_price_from_web if is_spot_price_from_web else False
+        fiat_ticker = self._validate_optional_string_field("fiat_ticker", fiat_ticker, raw_data, disallow_empty=True, disallow_unknown=True)
+        self.__fiat_ticker: str = fiat_ticker if fiat_ticker is not None else get_native_fiat()
 
     def to_string(self, indent: int = 0, repr_format: bool = True, extra_data: Optional[List[str]] = None) -> str:
         class_specific_data: List[str] = []
@@ -205,6 +203,10 @@ class AbstractTransaction:
     @property
     def is_spot_price_from_web(self) -> bool:
         return self.__is_spot_price_from_web
+
+    @property
+    def fiat_ticker(self) -> str:
+        return self.__fiat_ticker
 
     @property
     def is_unresolved(self) -> bool:

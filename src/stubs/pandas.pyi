@@ -12,15 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from typing import Any, List, Optional, overload
+
+class Index:
+    def __init__(self, data: List[object], name: str) -> None: ...
+
+class _iLocIndexer:
+    @overload
+    def __getitem__(self, index: int) -> Series: ...
+    @overload
+    def __getitem__(self, index: slice) -> DataFrame: ...
 
 class DataFrame:
-    def __init__(self, name: str) -> None:
+    def __init__(self, data: Optional[dict[str, List[float]]] = None, index: Optional[Index] = None) -> None:
         self.index: Series
         ...
     def reset_index(self) -> DataFrame: ...
     @property
-    def iloc(self) -> Any: ...  # type: ignore
+    def iloc(self) -> _iLocIndexer: ...
 
 class Series:
     def __init__(self, name: str) -> None: ...

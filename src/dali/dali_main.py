@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Set, Type, Union
 from rp2.logger import LOG_FILE
 
 from dali.abstract_input_plugin import AbstractInputPlugin
+from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import AbstractTransaction, DirectionTypeAndNotes
 from dali.config_generator import generate_config_file
 from dali.dali_configuration import (
@@ -40,9 +41,11 @@ from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
 from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
+from dali.plugin.pair_converter.historic_crypto import PairConverterPlugin as HistoricCryptoPairConverterPlugin
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.4.8"
+
+_VERSION: str = "0.4.9"
 
 
 def input_loader() -> None:
@@ -57,13 +60,20 @@ def input_loader() -> None:
 
     _setup_paths(parser=parser, output_dir=args.output_dir)
 
+    if not Path(args.ini_file).exists():
+        print(f"Configuration file '{args.ini_file}' not found")
+        parser.print_help()
+        sys.exit(1)
+
     transactions: List[AbstractTransaction] = []
 
     try:
         ini_config: ConfigParser = ConfigParser()
         ini_config.read(args.ini_file)
 
-        package_found: bool = False
+        pair_converter_list: List[AbstractPairConverterPlugin] = []
+
+        input_plugin_found: bool = False
         section_name: str
         for section_name in ini_config.sections():
             # Plugin sections can have extra trailing words to make them unique: this way there can be multiple sections
@@ -76,16 +86,36 @@ def input_loader() -> None:
                     sys.exit(1)
                 if section_name == Keyword.TRANSACTION_HINTS.value:
                     dali_configuration[section_name] = _validate_transaction_hints_configuration(ini_config, section_name)
+                elif section_name == Keyword.HISTORICAL_MARKET_DATA.value:
+                    LOGGER.error(
+                        "Builtin section '%s' is deprecated: use pair converter plugins instead (see configuration file documentation)",
+                        normalized_section_name
+                    )
+                    sys.exit(1)
                 else:
                     dali_configuration[section_name] = _validate_header_configuration(ini_config, section_name)
                 continue
+
             # Plugin section
-            input_module = import_module(normalized_section_name)
-            if hasattr(input_module, "InputPlugin"):
-                plugin_configuration: Dict[str, Union[str, int, float, bool]] = _validate_plugin_configuration(
-                    ini_config, section_name, signature(input_module.InputPlugin)
-                )
-                input_plugin: AbstractInputPlugin = input_module.InputPlugin(**plugin_configuration)
+            plugin_module = import_module(normalized_section_name)
+            plugin_configuration: Dict[str, Union[str, int, float, bool]]
+            if hasattr(plugin_module, "PairConverterPlugin"):
+                plugin_configuration = _validate_plugin_configuration(ini_config, section_name, signature(plugin_module.PairConverterPlugin))
+                pair_converter_plugin: AbstractPairConverterPlugin = plugin_module.PairConverterPlugin(**plugin_configuration)
+                LOGGER.info("Initialized pair converter plugin '%s'", section_name)
+                LOGGER.debug("PairConverterPlugin object: '%s'", pair_converter_plugin)
+                if (
+                    not hasattr(pair_converter_plugin, "name")
+                    or not hasattr(pair_converter_plugin, "cache_key")
+                    or not hasattr(pair_converter_plugin, "get_historic_bar_from_native_source")
+                ):
+                    LOGGER.error("Plugin '%s' doesn't have all required methods. Exiting...", normalized_section_name)
+                    sys.exit(1)
+                pair_converter_list.append(pair_converter_plugin)
+
+            elif hasattr(plugin_module, "InputPlugin"):
+                plugin_configuration = _validate_plugin_configuration(ini_config, section_name, signature(plugin_module.InputPlugin))
+                input_plugin: AbstractInputPlugin = plugin_module.InputPlugin(**plugin_configuration)
                 LOGGER.info("Reading crypto data using plugin '%s'", section_name)
                 LOGGER.debug("InputPlugin object: '%s'", input_plugin)
                 if not hasattr(input_plugin, "load"):
@@ -109,11 +139,17 @@ def input_loader() -> None:
                         LOGGER.error("Plugin '%s' returned a non-transaction object: %s. Exiting...", normalized_section_name, str(transaction))  # type: ignore
                         sys.exit(1)
                 transactions.extend(plugin_transactions)
-            package_found = True
+                input_plugin_found = True
 
-        if not package_found:
-            LOGGER.error("No plugin configuration found in config file. Exiting...")
+        if not input_plugin_found:
+            LOGGER.error("No input plugin configuration found in config file. Exiting...")
             sys.exit(1)
+
+        if not pair_converter_list:
+            pair_converter_list.append(HistoricCryptoPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
+            LOGGER.info("No pair converter plugins found in configuration file: using Historic_Crypto/high as default")
+
+        dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
 
         LOGGER.info("Resolving transactions")
         resolved_transactions: List[AbstractTransaction] = resolve_transactions(transactions, dali_configuration, args.read_spot_price_from_web)
@@ -147,7 +183,7 @@ def _setup_argument_parser() -> ArgumentParser:
         "-c",
         "--use-cache",
         action="store_true",
-        help="Cache input plugin data load (developers only)",
+        help="Cache input plugin data load",
     )
     parser.add_argument(
         "-o",
