@@ -22,7 +22,7 @@
 
 import logging
 from csv import reader
-from typing import List
+from typing import List, Optional
 
 from rp2.logger import create_logger
 
@@ -83,9 +83,10 @@ class InputPlugin(AbstractInputPlugin):
         in_csv_file: str,
         out_csv_file: str,
         intra_csv_file: str,
+        native_fiat: Optional[str] = None,
     ) -> None:
 
-        super().__init__("")
+        super().__init__(account_holder="", native_fiat=native_fiat)
 
         self.__in_csv_file: str = in_csv_file
         self.__out_csv_file: str = out_csv_file

@@ -63,9 +63,10 @@ class InputPlugin(AbstractInputPlugin):
         account_holder: str,
         transaction_csv_file: str,
         trade_csv_file: Optional[str] = None,
+        native_fiat: Optional[str] = None,
     ) -> None:
 
-        super().__init__(account_holder)
+        super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__transaction_csv_file: str = transaction_csv_file
         self.__trade_csv_file: Optional[str] = trade_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")

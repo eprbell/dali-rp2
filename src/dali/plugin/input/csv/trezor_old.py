@@ -17,7 +17,7 @@
 import logging
 from csv import reader
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 import pytz
 from rp2.logger import create_logger
@@ -51,9 +51,10 @@ class InputPlugin(AbstractInputPlugin):
         currency: str,
         timezone: str,
         csv_file: str,
+        native_fiat: Optional[str] = None,
     ) -> None:
 
-        super().__init__(account_holder)
+        super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__account_nickname: str = account_nickname
         self.__currency: str = currency
         self.__timezone = pytz.timezone(timezone)
