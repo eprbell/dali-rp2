@@ -17,7 +17,7 @@ import os
 import pickle  # nosec
 from typing import Any
 
-CACHE_DIR: str = ".cache"
+CACHE_DIR: str = ".dali_cache"
 
 
 def load_from_cache(cache_name: str) -> Any:
