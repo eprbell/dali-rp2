@@ -58,6 +58,7 @@ class Keyword(Enum):
     IS_SPOT_PRICE_FROM_WEB: str = "is_spot_price_from_web"
     MINING: str = "mining"
     MOVE: str = "move"
+    NATIVE_FIAT: str = "native_fiat"
     NOTES: str = "notes"
     OUT: str = "out"
     OUT_HEADER: str = "out_header"
@@ -88,7 +89,8 @@ class Keyword(Enum):
 
 _keyword_values: Set[str] = {item.value for item in Keyword}
 
-_FIAT_SET: Set[str] = {"USD"}
+# List of supported fiat currencies
+_FIAT_SET: Set[str] = {"AUD", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "ILS", "INR", "JPY", "KRW", "SEK", "USD"}
 
 _FIAT_FIELD_SET: Set[str] = {
     Keyword.FIAT_FEE.value,
@@ -236,7 +238,3 @@ def is_unknown_or_none(value: Optional[str]) -> bool:
 
 def is_transaction_type_valid(direction: str, transaction_type: str) -> bool:
     return transaction_type.lower() in DIRECTION_2_TRANSACTION_TYPE_SET[direction]
-
-
-def get_native_fiat() -> str:
-    return "USD"
