@@ -24,7 +24,6 @@ from dali.abstract_transaction import AbstractTransaction
 from dali.dali_configuration import (
     Keyword,
     is_crypto_field,
-    is_fiat,
     is_fiat_field,
     is_internal_field,
 )
@@ -65,52 +64,6 @@ _TRANSACTION_CLASS_TO_TABLE: Dict[Type[AbstractTransaction], str] = {
     IntraTransaction: _INTRA,
 }
 
-_TABLE_TO_HEADER: Dict[str, Dict[str, str]] = {
-    _IN: {
-        Keyword.UNIQUE_ID.value: "Unique ID",
-        Keyword.TIMESTAMP.value: "Timestamp",
-        Keyword.ASSET.value: "Asset",
-        Keyword.EXCHANGE.value: "Exchange",
-        Keyword.HOLDER.value: "Holder",
-        Keyword.TRANSACTION_TYPE.value: "Transaction Type",
-        Keyword.SPOT_PRICE.value: "Spot Price",
-        Keyword.CRYPTO_IN.value: "Crypto In",
-        Keyword.CRYPTO_FEE.value: "Crypto Fee",
-        Keyword.FIAT_IN_NO_FEE.value: "USD In No Fee",
-        Keyword.FIAT_IN_WITH_FEE.value: "USD In With Fee",
-        Keyword.FIAT_FEE.value: "USD Fee",
-        Keyword.NOTES.value: "Notes",
-    },
-    _OUT: {
-        Keyword.UNIQUE_ID.value: "Unique ID",
-        Keyword.TIMESTAMP.value: "Timestamp",
-        Keyword.ASSET.value: "Asset",
-        Keyword.EXCHANGE.value: "Exchange",
-        Keyword.HOLDER.value: "Holder",
-        Keyword.TRANSACTION_TYPE.value: "Transaction Type",
-        Keyword.SPOT_PRICE.value: "Spot Price",
-        Keyword.CRYPTO_OUT_NO_FEE.value: "Crypto Out No Fee",
-        Keyword.CRYPTO_FEE.value: "Crypto Fee",
-        Keyword.CRYPTO_OUT_WITH_FEE.value: "Crypto Out With Fee",
-        Keyword.FIAT_OUT_NO_FEE.value: "USD Out No Fee",
-        Keyword.FIAT_FEE.value: "USD Fee",
-        Keyword.NOTES.value: "Notes",
-    },
-    _INTRA: {
-        Keyword.UNIQUE_ID.value: "Unique ID",
-        Keyword.TIMESTAMP.value: "Timestamp",
-        Keyword.ASSET.value: "Asset",
-        Keyword.FROM_EXCHANGE.value: "From Exchange",
-        Keyword.FROM_HOLDER.value: "From Holder",
-        Keyword.TO_EXCHANGE.value: "To Exchange",
-        Keyword.TO_HOLDER.value: "To Holder",
-        Keyword.SPOT_PRICE.value: "Spot Price",
-        Keyword.CRYPTO_SENT.value: "Crypto Sent",
-        Keyword.CRYPTO_RECEIVED.value: "Crypto Received",
-        Keyword.NOTES.value: "Notes",
-    },
-}
-
 
 def _transaction_sort_key(entry: AbstractTransaction) -> Tuple[str, int, datetime]:
     return (entry.asset, _TABLE_ORDER[_TRANSACTION_CLASS_TO_TABLE[entry.__class__]], entry.timestamp_value)
@@ -123,6 +76,54 @@ def generate_input_file(
     transactions: List[AbstractTransaction],
     global_configuration: Dict[str, Any],
 ) -> Any:
+
+    native_fiat: str = global_configuration[Keyword.NATIVE_FIAT.value]
+
+    _table_to_header: Dict[str, Dict[str, str]] = {
+        _IN: {
+            Keyword.UNIQUE_ID.value: "Unique ID",
+            Keyword.TIMESTAMP.value: "Timestamp",
+            Keyword.ASSET.value: "Asset",
+            Keyword.EXCHANGE.value: "Exchange",
+            Keyword.HOLDER.value: "Holder",
+            Keyword.TRANSACTION_TYPE.value: "Transaction Type",
+            Keyword.SPOT_PRICE.value: "Spot Price",
+            Keyword.CRYPTO_IN.value: "Crypto In",
+            Keyword.CRYPTO_FEE.value: "Crypto Fee",
+            Keyword.FIAT_IN_NO_FEE.value: f"{native_fiat} In No Fee",
+            Keyword.FIAT_IN_WITH_FEE.value: f"{native_fiat} In With Fee",
+            Keyword.FIAT_FEE.value: f"{native_fiat} Fee",
+            Keyword.NOTES.value: "Notes",
+        },
+        _OUT: {
+            Keyword.UNIQUE_ID.value: "Unique ID",
+            Keyword.TIMESTAMP.value: "Timestamp",
+            Keyword.ASSET.value: "Asset",
+            Keyword.EXCHANGE.value: "Exchange",
+            Keyword.HOLDER.value: "Holder",
+            Keyword.TRANSACTION_TYPE.value: "Transaction Type",
+            Keyword.SPOT_PRICE.value: "Spot Price",
+            Keyword.CRYPTO_OUT_NO_FEE.value: "Crypto Out No Fee",
+            Keyword.CRYPTO_FEE.value: "Crypto Fee",
+            Keyword.CRYPTO_OUT_WITH_FEE.value: "Crypto Out With Fee",
+            Keyword.FIAT_OUT_NO_FEE.value: f"{native_fiat} Out No Fee",
+            Keyword.FIAT_FEE.value: f"{native_fiat} Fee",
+            Keyword.NOTES.value: "Notes",
+        },
+        _INTRA: {
+            Keyword.UNIQUE_ID.value: "Unique ID",
+            Keyword.TIMESTAMP.value: "Timestamp",
+            Keyword.ASSET.value: "Asset",
+            Keyword.FROM_EXCHANGE.value: "From Exchange",
+            Keyword.FROM_HOLDER.value: "From Holder",
+            Keyword.TO_EXCHANGE.value: "To Exchange",
+            Keyword.TO_HOLDER.value: "To Holder",
+            Keyword.SPOT_PRICE.value: "Spot Price",
+            Keyword.CRYPTO_SENT.value: "Crypto Sent",
+            Keyword.CRYPTO_RECEIVED.value: "Crypto Received",
+            Keyword.NOTES.value: "Notes",
+        },
+    }
 
     if not isinstance(output_dir_path, str):
         raise RP2TypeError(f"Parameter output_dir_path is not of type string: {repr(output_dir_path)}")
@@ -162,7 +163,7 @@ def generate_input_file(
     for transaction in transactions:
         if not isinstance(transaction, AbstractTransaction):
             raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
-        if is_fiat(transaction.asset):
+        if transaction.asset == global_configuration[Keyword.NATIVE_FIAT.value]:
             continue
         table_type: str = _TRANSACTION_CLASS_TO_TABLE[transaction.__class__]
         if transaction.asset != current_asset:
@@ -180,7 +181,7 @@ def generate_input_file(
                 row_index += 2
             current_table = table_type
             _fill_cell(current_sheet, row_index, 0, current_table, visual_style="bold")
-            _fill_header_row(current_sheet, current_table, row_index + 1, _TABLE_TO_HEADER[current_table], global_configuration)
+            _fill_header_row(current_sheet, current_table, row_index + 1, _table_to_header[current_table], global_configuration)
             row_index += 2
 
         _fill_transaction_row(current_sheet, row_index, transaction, global_configuration)
