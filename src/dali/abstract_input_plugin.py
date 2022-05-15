@@ -26,10 +26,12 @@ class AbstractInputPlugin:
     def __init__(
         self,
         account_holder: str,
+        native_fiat: Optional[str],
     ) -> None:
         if not isinstance(account_holder, str):
             raise RP2TypeError(f"account_holder is not a string: {account_holder}")
         self.__account_holder: str = account_holder
+        self.__native_fiat: Optional[str] = native_fiat
 
     # pylint: disable=no-self-use
     def cache_key(self) -> Optional[str]:
@@ -57,3 +59,10 @@ class AbstractInputPlugin:
     @property
     def account_holder(self) -> str:
         return self.__account_holder
+
+    @property
+    def native_fiat(self) -> Optional[str]:
+        return self.__native_fiat
+
+    def is_native_fiat(self, currency: str) -> bool:
+        return currency == self.native_fiat
