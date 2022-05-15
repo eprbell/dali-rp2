@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import cProfile
+import os
 import sys
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from configparser import ConfigParser
@@ -20,6 +22,7 @@ from inspect import Signature, signature
 from pathlib import Path
 from typing import Any, Dict, List, Set, Type, Union
 
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import LOG_FILE
 
 from dali.abstract_input_plugin import AbstractInputPlugin
@@ -47,7 +50,14 @@ from dali.transaction_resolver import resolve_transactions
 _VERSION: str = "0.4.9"
 
 
-def input_loader() -> None:
+def dali_main(country: AbstractCountry) -> None:
+    if "RP2_ENABLE_PROFILER" in os.environ:
+        cProfile.runctx("_dali_main_internal(country)", globals(), locals())
+    else:
+        _dali_main_internal(country)
+
+
+def _dali_main_internal(country: AbstractCountry) -> None:
 
     args: Namespace
     parser: ArgumentParser
@@ -67,6 +77,8 @@ def input_loader() -> None:
     transactions: List[AbstractTransaction] = []
 
     try:
+        LOGGER.info("Country: %s", country.country_iso_code)
+
         ini_config: ConfigParser = ConfigParser()
         ini_config.read(args.ini_file)
 
@@ -87,13 +99,14 @@ def input_loader() -> None:
                     dali_configuration[section_name] = _validate_transaction_hints_configuration(ini_config, section_name)
                 elif section_name == Keyword.HISTORICAL_MARKET_DATA.value:
                     LOGGER.error(
-                        "Builtin section '%s' is deprecated: use pair converter plugins instead (see configuration file documentation)",
-                        normalized_section_name
+                        "Builtin section '%s' is deprecated: use pair converter plugins instead (see configuration file documentation)", normalized_section_name
                     )
                     sys.exit(1)
                 else:
                     dali_configuration[section_name] = _validate_header_configuration(ini_config, section_name)
                 continue
+
+            dali_configuration[Keyword.NATIVE_FIAT.value] = country.currency_iso_code.upper()
 
             # Plugin section
             plugin_module = import_module(normalized_section_name)
@@ -114,6 +127,10 @@ def input_loader() -> None:
 
             elif hasattr(plugin_module, "InputPlugin"):
                 plugin_configuration = _validate_plugin_configuration(ini_config, section_name, signature(plugin_module.InputPlugin))
+                if Keyword.NATIVE_FIAT.value not in plugin_configuration:
+                    LOGGER.error("No '%s' parameter in plugin '%s' constructor", Keyword.NATIVE_FIAT.value, normalized_section_name)
+                    sys.exit(1)
+                plugin_configuration[Keyword.NATIVE_FIAT.value] = dali_configuration[Keyword.NATIVE_FIAT.value]
                 input_plugin: AbstractInputPlugin = plugin_module.InputPlugin(**plugin_configuration)
                 LOGGER.info("Reading crypto data using plugin '%s'", section_name)
                 LOGGER.debug("InputPlugin object: '%s'", input_plugin)
