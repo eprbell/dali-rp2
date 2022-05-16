@@ -36,7 +36,7 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction, AssetAndUniqueId
-from dali.dali_configuration import Keyword, is_fiat
+from dali.dali_configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
@@ -127,10 +127,11 @@ class InputPlugin(AbstractInputPlugin):
         api_key: str,
         api_secret: str,
         api_passphrase: str,
+        native_fiat: Optional[str] = None,
         thread_count: Optional[int] = None,
     ) -> None:
 
-        super().__init__(account_holder)
+        super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__api_url: str = InputPlugin.__API_URL
         self.__auth = _CoinbaseProAuth(api_key, api_secret, api_passphrase)
         self.__session: Session = requests.Session()
@@ -296,8 +297,8 @@ class InputPlugin(AbstractInputPlugin):
         raw_data: str = f"{json.dumps(transaction)}//{json.dumps(fill)}"
 
         from_currency, to_currency = self._parse_product_id(fill[_PRODUCT_ID])
-        is_from_currency_fiat: bool = is_fiat(from_currency)
-        is_to_currency_fiat: bool = is_fiat(to_currency)
+        is_from_currency_fiat: bool = self.is_native_fiat(from_currency)
+        is_to_currency_fiat: bool = self.is_native_fiat(to_currency)
         self.__logger.debug("Fill: %s", json.dumps(fill))
         if (is_from_currency_fiat and not is_to_currency_fiat and fill_side == _SELL) or (  # pylint: disable=too-many-boolean-expressions
             not is_from_currency_fiat and is_to_currency_fiat and fill_side == _BUY
@@ -429,7 +430,7 @@ class InputPlugin(AbstractInputPlugin):
         raw_data: str = f"{json.dumps(transaction)}//{json.dumps(conversion)}"
         amount: str = conversion[_AMOUNT]
 
-        if not is_fiat(from_currency) and not is_fiat(to_currency):
+        if not self.is_native_fiat(from_currency) and not self.is_native_fiat(to_currency):
             raise Exception(f"Internal error: conversion without fiat currency ({from_currency} -> {to_currency}):{transaction}//{conversion}")
 
         self.__append_transaction(

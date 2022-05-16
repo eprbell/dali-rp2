@@ -29,6 +29,7 @@ class TestTrade:
             account_holder="tester",
             api_key="a",
             api_secret="b",
+            native_fiat="USD",
             thread_count=1,
         )
 

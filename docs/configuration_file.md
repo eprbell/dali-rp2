@@ -34,7 +34,7 @@
 The configuration file is in [INI format](https://en.wikipedia.org/wiki/INI_file) and it is used to initialize data loader plugins and configure DaLI's behavior. It contains a sequence of configuration sections, which are of two types:
 * builtin sections: they configure general DaLI behavior (format of the output ODS file, hints on how to generate certain transactions, etc.);
 * data loader plugin sections: they select data loader plugins to run (e.g. Coinbase REST, Trezor CSV, etc.) and contain their initialization parameters;
-* pair converter plugin sections: they are optional and select pair converter plugins to use for filling missing spot price and converting foreign fiat to USD.
+* pair converter plugin sections: they are optional and select pair converter plugins to use for filling missing spot price and converting foreign fiat to native fiat (e.g. USD for US, JPY for Japan, etc.).
 
 Look at [test_config.ini](../config/test_config.ini) for an example of a configuration file. For instructions on how to run the example read the [Running](../README.md#running) section of the README.md file.
 
@@ -245,7 +245,7 @@ unique_id   |timestamp                 |asset|from_exchange|from_holder|to_excha
 389ded74b35f|2020-03-01 11:25:18 +00:00|BTC  |Coinbase     |Alice      |FTX        |Alice    |15100     |0.5        |0.49
 
 ## Pair Converter Plugin Sections
-A pair converter plugin has the purpose of converting a currency to another (both crypto and fiat) and it is used to fill missing spot price and convert foreign fiat to USD. It is initialized with parameters from a plugin-specific section of the INI file. This section has the following format:
+A pair converter plugin has the purpose of converting a currency to another (both crypto and fiat) and it is used to fill missing spot price and convert foreign fiat to native fiat (e.g. USD for US, JPY for Japan, etc.). It is initialized with parameters from a plugin-specific section of the INI file. This section has the following format:
 <pre>
 [dali.plugin.price_converter.<em>&lt;plugin&gt;</em>]
 <em>&lt;parameter_1&gt;</em> = <em>&lt;value_1&gt;</em>

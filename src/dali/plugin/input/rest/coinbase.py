@@ -35,7 +35,7 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
-from dali.dali_configuration import Keyword, is_fiat
+from dali.dali_configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
@@ -149,10 +149,11 @@ class InputPlugin(AbstractInputPlugin):
         account_holder: str,
         api_key: str,
         api_secret: str,
+        native_fiat: Optional[str] = None,
         thread_count: Optional[int] = None,
     ) -> None:
 
-        super().__init__(account_holder)
+        super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__api_url: str = InputPlugin.__API_URL
         self.__auth: _CoinbaseAuth = _CoinbaseAuth(api_key, api_secret)
         self.__session: Session = requests.Session()
@@ -314,7 +315,7 @@ class InputPlugin(AbstractInputPlugin):
             fiat_out_no_fee: RP2Decimal
             # The fiat_fee is paid in the InTransaction, unless the InTransaction is fiat (which is ignored in RP2):
             # in this case the fiat_fee is paid in the OutTransaction
-            if not is_fiat(in_transaction.asset):
+            if not self.is_native_fiat(in_transaction.asset):
                 if not in_transaction.fiat_in_no_fee or not in_transaction.fiat_in_with_fee or not out_transaction.fiat_out_no_fee:
                     raise Exception(f"Internal error: swap transactions have incomplete fiat data: {in_transaction}//{out_transaction}")
                 fiat_in_no_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_in_no_fee)
@@ -617,8 +618,8 @@ class InputPlugin(AbstractInputPlugin):
         spot_price: RP2Decimal
         spot_price_string: str
 
-        if transaction[_NATIVE_AMOUNT][_CURRENCY] != "USD":
-            raise Exception(f"Internal error: native amount is not in USD {json.dumps(transaction)}")
+        if not self.is_native_fiat(transaction[_NATIVE_AMOUNT][_CURRENCY]):
+            raise Exception(f"Internal error: native amount is not denominated in {self.native_fiat} {json.dumps(transaction)}")
 
         raw_data: str = json.dumps(transaction)
         if not transaction_type in {_BUY, _SELL, _TRADE}:

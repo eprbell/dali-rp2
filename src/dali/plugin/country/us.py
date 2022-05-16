@@ -1,4 +1,4 @@
-# Copyright 2021 eprbell
+# Copyright 2022 eprbell
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-build/
-.dali_cache
-dist/
-.DS_Store
-log/*.log
-.~lock*
-.mypy_cache/
-output/
-*.pyc
-__pycache__/
-src/*.egg-info/
-.venv/
-.vscode/
+
+from rp2.plugin.country.us import US
+from dali.dali_main import dali_main
+
+
+# US-specific entry point
+def dali_entry() -> None:
+    dali_main(US())

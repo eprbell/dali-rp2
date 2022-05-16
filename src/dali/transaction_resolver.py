@@ -24,7 +24,7 @@ from dali.abstract_transaction import (
     AbstractTransaction,
     AssetAndUniqueId,
 )
-from dali.dali_configuration import Keyword, get_native_fiat, is_unknown, is_unknown_or_none
+from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
@@ -128,10 +128,16 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
     # the contract with RP2, which requires spot_price to be > 0. If this situation is detected and the user passed the read_spot_price_from_web, then
     # ignore the 0 and use a price read from the Internet.
     if is_unknown(transaction.spot_price) or RP2Decimal(transaction.spot_price) == ZERO:  # type: ignore
-        conversion: RateAndPairConverter = _get_pair_conversion_rate(transaction.timestamp_value, transaction.asset, get_native_fiat(), global_configuration)
+        conversion: RateAndPairConverter = _get_pair_conversion_rate(
+            timestamp=transaction.timestamp_value,
+            from_asset=transaction.asset,
+            to_asset=global_configuration[Keyword.NATIVE_FIAT.value],
+            global_configuration=global_configuration,
+        )
         if conversion.rate is None:
             raise Exception(
-                f"Spot price for {transaction.timestamp_value}:{transaction.asset}->{get_native_fiat()} not found on any pair converter plugin"
+                f"Spot price for {transaction.timestamp_value}:{transaction.asset}->{global_configuration[Keyword.NATIVE_FIAT.value]}"
+                " not found on any pair converter plugin"
             )
 
         notes: str = (
@@ -153,11 +159,20 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
     return transaction
 
 
-# Sometimes transactions on foreign exchanges are expressed in a fiat that is not native (USD): convert the fiat fields to native fiat
+# Sometimes transactions on foreign exchanges are expressed in a fiat that is not native (e.g. USD for USA, EUR for Germany, etc.):
+# convert the fiat fields to native fiat
 def _convert_fiat_fields_to_native_fiat(transaction: AbstractTransaction, global_configuration: Dict[str, Any]) -> AbstractTransaction:
-    from_fiat = transaction.fiat_ticker
-    to_fiat = get_native_fiat()
-    conversion: RateAndPairConverter = _get_pair_conversion_rate(transaction.timestamp_value, from_fiat, to_fiat, global_configuration)
+    from_fiat = transaction.fiat_ticker if transaction.fiat_ticker is not None else global_configuration[Keyword.NATIVE_FIAT.value]
+    to_fiat = global_configuration[Keyword.NATIVE_FIAT.value]
+    if from_fiat == to_fiat:
+        return transaction
+
+    conversion: RateAndPairConverter = _get_pair_conversion_rate(
+        timestamp=transaction.timestamp_value,
+        from_asset=from_fiat,
+        to_asset=to_fiat,
+        global_configuration=global_configuration,
+    )
     if conversion.rate is None:
         raise Exception(f"Conversion rate for {transaction.timestamp_value}:{from_fiat}->{to_fiat} not found on any pair converter plugin")
 
@@ -165,7 +180,7 @@ def _convert_fiat_fields_to_native_fiat(transaction: AbstractTransaction, global
     notes: str = f"Fiat conversion {from_fiat}->{to_fiat} using {conversion.pair_converter.name()} plugin; {transaction.notes if transaction.notes else ''}"
     init_parameters[Keyword.NOTES.value] = notes
     init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = transaction.is_spot_price_from_web
-    init_parameters[Keyword.FIAT_TICKER.value] = None
+    init_parameters[Keyword.FIAT_TICKER.value] = global_configuration[Keyword.NATIVE_FIAT.value]
 
     fiat_fields = []
     if isinstance(transaction, InTransaction):
@@ -212,7 +227,7 @@ def resolve_transactions(
         if not isinstance(transaction, AbstractTransaction):
             raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
 
-        if transaction.fiat_ticker != get_native_fiat():
+        if transaction.fiat_ticker not in {None, global_configuration[Keyword.NATIVE_FIAT.value]}:
             # Foreign exchanges may have transactions denominated in non-native fiat
             transaction = _convert_fiat_fields_to_native_fiat(transaction, global_configuration)
 

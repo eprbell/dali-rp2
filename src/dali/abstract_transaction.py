@@ -19,7 +19,7 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Union
 from dateutil.parser import parse
 from rp2.configuration import to_string
 
-from dali.dali_configuration import Keyword, get_native_fiat, is_internal_field, is_unknown
+from dali.dali_configuration import Keyword, is_internal_field, is_unknown
 
 
 class StringAndDatetime(NamedTuple):
@@ -115,8 +115,9 @@ class AbstractTransaction:
         if is_spot_price_from_web and not isinstance(is_spot_price_from_web, bool):
             raise Exception(f"Internal error: {Keyword.IS_SPOT_PRICE_FROM_WEB.value} is not boolean: {is_spot_price_from_web}")
         self.__is_spot_price_from_web: bool = is_spot_price_from_web if is_spot_price_from_web else False
-        fiat_ticker = self._validate_optional_string_field("fiat_ticker", fiat_ticker, raw_data, disallow_empty=True, disallow_unknown=True)
-        self.__fiat_ticker: str = fiat_ticker if fiat_ticker is not None else get_native_fiat()
+        self.__fiat_ticker: Optional[str] = self._validate_optional_string_field(
+            "fiat_ticker", fiat_ticker, raw_data, disallow_empty=True, disallow_unknown=True
+        )
 
     def to_string(self, indent: int = 0, repr_format: bool = True, extra_data: Optional[List[str]] = None) -> str:
         class_specific_data: List[str] = []
@@ -205,7 +206,7 @@ class AbstractTransaction:
         return self.__is_spot_price_from_web
 
     @property
-    def fiat_ticker(self) -> str:
+    def fiat_ticker(self) -> Optional[str]:
         return self.__fiat_ticker
 
     @property

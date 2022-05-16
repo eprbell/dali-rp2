@@ -28,6 +28,7 @@ class TestSwapFill:
             api_key="a",
             api_secret="b",
             api_passphrase="c",
+            native_fiat="USD",
             thread_count=1,
         )
 

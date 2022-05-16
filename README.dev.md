@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.4.9 Developer Guide
+# DaLI for RP2 v0.4.10 Developer Guide
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -169,7 +169,7 @@ While every commit and push are automatically tested as described, sometimes it'
 
 Logs are stored in the `log` directory. To generate debug logs, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
 ```
-LOG_LEVEL=DEBUG bin/dali -s -o output/ config/test_config.ini
+LOG_LEVEL=DEBUG bin/dali_us -s -o output/ config/test_config.ini
 ```
 
 ### Unit Tests
@@ -190,7 +190,7 @@ For this reason it's essential that all data loader plugins populate the `unique
 
 Another feature of the transaction resolver is filling in or converting certain fiat values, using the pair converter plugin list passed to it:
 * `spot_price`: sometimes the native sources read by data loader plugins don't provide this information. If instructed by the user with the `-c` option, the transaction resolver tries to retrieve this information from pair converter plugins;
-* foreign fiat values: transactions that occurred on foreign exchanges can have their fiat values denominated in non-USD fiat. When the transaction resolver detects this condition, it converts these foreign fiat values to USD, using pair converter plugins.
+* foreign fiat values: transactions that occurred on foreign exchanges can have their fiat values denominated in non-native fiat. When the transaction resolver detects this condition, it converts these foreign fiat values to native fiat (e.g. USD for US, JPY for Japan, etc.), using pair converter plugins.
 
 ### Plugin Development
 DaLI has a plugin architecture for data loaders and pair converters, which makes it extensible for new use cases:
@@ -221,6 +221,12 @@ Pair converter plugins live in the following directory:
 If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`.
 
 For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
+
+#### Country Plugin Development
+Country plugins are reused from RP2. To add support for a new country in DaLI:
+* [add a country plugin to RP2](https://github.com/eprbell/rp2/blob/main/README.dev.md#adding-support-for-a-new-country);
+* add a new Python file to the `src/dali/plugin/country` directory and name it after the [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) 2-letter code for the country;
+* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file.
 
 ### Plugin Laundry List
 When submitting a new data loader plugin open a [PR](https://github.com/eprbell/dali-rp2/pulls) and make sure all the following bullet points apply to your code:

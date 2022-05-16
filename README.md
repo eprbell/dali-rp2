@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.4.9
+# DaLI for RP2 v0.4.10
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -145,7 +145,7 @@ mv *.csv input
 
 Then generate the output files for rp2:
 ```console
-dali -s -o output -p test_ test_config.ini
+dali_us -s -o output -p test_ test_config.ini
  ```
 
 * `-s` option allows DaLI to retrieve spot price information from Coinbase Pro, when it's not available from the CSV files or REST services.
@@ -156,7 +156,7 @@ dali -s -o output -p test_ test_config.ini
 To print command usage information for the `dali` command:
 
 ```console
-dali --help
+dali_us --help
 ```
 
 Finally compute taxes with RP2 using the generated input files (using both FIFO and LIFO accounting methods):
