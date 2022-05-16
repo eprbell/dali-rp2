@@ -44,7 +44,6 @@ from dali.out_transaction import OutTransaction
 from dali.plugin.pair_converter.historic_crypto import PairConverterPlugin as HistoricCryptoPairConverterPlugin
 from dali.transaction_resolver import resolve_transactions
 
-
 _VERSION: str = "0.4.9"
 
 
@@ -183,7 +182,7 @@ def _setup_argument_parser() -> ArgumentParser:
         "-c",
         "--use-cache",
         action="store_true",
-        help="Cache input plugin data load",
+        help="Cache input plugin data load (developers only)",
     )
     parser.add_argument(
         "-o",
