@@ -146,7 +146,7 @@ class InputPlugin(AbstractInputPlugin):
         self.markets: List[str] = []
         ccxt_markets: Any = self.client.fetch_markets()
         for market in ccxt_markets:
-#            self.__logger.debug("Market: %s", json.dumps(market))
+            self.__logger.debug("Market: %s", json.dumps(market))
             self.markets.append(market[_ID])
 
         if self.username:
@@ -730,27 +730,59 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
 
-            transaction_notes = f"Buy side of conversion from " f"{conversion_info}" f"({out_asset} out-transaction unique id: {transaction[_ID]}"
+            # Is this a plain buy or a conversion?
+            if trade.quote_asset in self.client.options.legalMoney: # Binance specific param
+                transaction_notes = f"Fiat buy of {trade.base_asset} with {trade.quote_asset}"
+                fiat_in_no_fee = RP2Decimal(transaction[_COST])
+                fiat_fee = RP2Decimal(crypto_fee)
+                fiat_in_with_fee = fiat_in_no_fee + fiat_fee
+                spot_price = RP2Decimal(transaction[_PRICE])
 
-            in_transaction_list.append(
-                InTransaction(
-                    plugin=self.__BINANCE_COM,
-                    unique_id=transaction[_ID],
-                    raw_data=json.dumps(transaction),
-                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
-                    asset=in_asset,
-                    exchange=self.__BINANCE_COM,
-                    holder=self.account_holder,
-                    transaction_type=Keyword.BUY.value,
-                    spot_price=Keyword.UNKNOWN.value,
-                    crypto_in=str(crypto_in),
-                    crypto_fee=str(crypto_fee),
-                    fiat_in_no_fee=None,
-                    fiat_in_with_fee=None,
-                    fiat_fee=None,
-                    notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
+
+                in_transaction_list.append(
+                    InTransaction(
+                        plugin=self.__BINANCE_COM,
+                        unique_id=transaction[_ID],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                        asset=in_asset,
+                        exchange=self.__BINANCE_COM,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.BUY.value,
+                        spot_price=spot_price,
+                        crypto_in=str(crypto_in),
+                        crypto_fee=str(crypto_fee),
+                        fiat_in_no_fee=str(fiat_in_no_fee),
+                        fiat_in_with_fee=str(fiat_in_with_fee),
+                        fiat_fee=str(fiat_fee),
+                        fiat_ticker=trade.quote_asset,
+                        notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
+                    )
+                )    
+
+
+            else:
+                transaction_notes = f"Buy side of conversion from " f"{conversion_info}" f"({out_asset} out-transaction unique id: {transaction[_ID]}"
+
+                in_transaction_list.append(
+                    InTransaction(
+                        plugin=self.__BINANCE_COM,
+                        unique_id=transaction[_ID],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                        asset=in_asset,
+                        exchange=self.__BINANCE_COM,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.BUY.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_in=str(crypto_in),
+                        crypto_fee=str(crypto_fee),
+                        fiat_in_no_fee=None,
+                        fiat_in_with_fee=None,
+                        fiat_fee=None,
+                        notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
+                    )
                 )
-            )
 
     def _process_deposit(self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
 
@@ -847,31 +879,62 @@ class InputPlugin(AbstractInputPlugin):
         else:
             crypto_fee = ZERO
         crypto_out_with_fee: RP2Decimal = crypto_out_no_fee + crypto_fee
+        
+        # Is this a plain buy or a conversion?
+        if trade.quote_asset in self.client.options.legalMoney: # Binance specific param
+                fiat_in_no_fee: RP2Decimal = RP2Decimal(transaction[_COST])
+                fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
+                fiat_out_with_fee: RP2Decimal = fiat_in_no_fee + fiat_fee
+                spot_price: RP2Decimal = RP2Decimal(transaction[_PRICE])
 
-        # Binance does not report the value of transaction in fiat
-        out_transaction_list.append(
-            OutTransaction(
-                plugin=self.__BINANCE_COM,
-                unique_id=transaction[_ID],
-                raw_data=json.dumps(transaction),
-                timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
-                asset=out_asset,
-                exchange=self.__BINANCE_COM,
-                holder=self.account_holder,
-                transaction_type=Keyword.SELL.value,
-                spot_price=Keyword.UNKNOWN.value,
-                crypto_out_no_fee=str(crypto_out_no_fee),
-                crypto_fee=str(crypto_fee),
-                crypto_out_with_fee=str(crypto_out_with_fee),
-                fiat_out_no_fee=None,
-                fiat_fee=None,
-                notes=(
-                    f"{notes + '; ' if notes else ''} Sell side of conversion from "
-                    f"{conversion_info}"
-                    f"({in_asset} in-transaction unique id: {transaction[_ID]}"
-                ),
+            out_transaction_list.append(
+                OutTransaction(
+                    plugin=self.__BINANCE_COM,
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    asset=out_asset,
+                    exchange=self.__BINANCE_COM,
+                    holder=self.account_holder,
+                    transaction_type=Keyword.SELL.value,
+                    spot_price= str(spot_price),
+                    crypto_out_no_fee=str(crypto_out_no_fee),
+                    crypto_fee=str(crypto_fee),
+                    crypto_out_with_fee=str(crypto_out_with_fee),
+                    fiat_out_no_fee=str(fiat_out_no_fee),
+                    fiat_fee=str(fiat_fee),
+                    fiat_ticker=trade.quote_asset,
+                    notes=(
+                        f"{notes + ';' if notes else ''} Fiat sell of {trade.base_asset} with {trade.quote_asset}."
+                    ),
+                )
             )
-        )
+
+        else:
+            # Binance does not report the value of transaction in fiat
+            out_transaction_list.append(
+                OutTransaction(
+                    plugin=self.__BINANCE_COM,
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    asset=out_asset,
+                    exchange=self.__BINANCE_COM,
+                    holder=self.account_holder,
+                    transaction_type=Keyword.SELL.value,
+                    spot_price=Keyword.UNKNOWN.value,
+                    crypto_out_no_fee=str(crypto_out_no_fee),
+                    crypto_fee=str(crypto_fee),
+                    crypto_out_with_fee=str(crypto_out_with_fee),
+                    fiat_out_no_fee=None,
+                    fiat_fee=None,
+                    notes=(
+                        f"{notes + '; ' if notes else ''} Sell side of conversion from "
+                        f"{conversion_info}"
+                        f"({in_asset} in-transaction unique id: {transaction[_ID]}"
+                    ),
+                )
+            )
 
     def _process_transfer(self, transaction: Any, intra_transaction_list: List[IntraTransaction]) -> None:
 
