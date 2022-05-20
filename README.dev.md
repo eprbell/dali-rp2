@@ -264,6 +264,6 @@ Data-loader-specific list:
 13. the plugin uses `self.__logger.debug()` throughout its code to capture all native-format data (which is is useful for debugging). Note that `logger.debug()` calls only occur if the user sets `LOG_LEVEL=DEBUG`;
 14. CSV plugins have one or more [unit test](tests/);
 15. REST plugins have one or more [unit tests](tests/): use pytest-mock to simulate network calls (see [test_plugin_coinbase.py](tests/test_plugin_coinbase.py) for an example of this);
-ß
+
 ## Frequently Asked Developer Questions
 Read the [frequently asked developer questions](docs/developer_faq.md).
