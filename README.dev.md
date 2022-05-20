@@ -235,6 +235,7 @@ When submitting a new plugin open a [PR](https://github.com/eprbell/dali-rp2/pul
 5. the plugin lives in the appropriate subdirectory of `src/dali/plugin/`;
 
 Data-loader-specific list:
+
 6. the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
 7. the plugin creates transactions that have `unique_id` populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the [transaction resolver](#the-transaction-resolver);
 8. CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
