@@ -218,9 +218,7 @@ All pair converter plugins are subclasses of [AbstractPairConverterPlugin](src/d
 Pair converter plugins live in the following directory:
 * `src/dali/plugin/pair_converter`.
 
-If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`.
-
-For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
+For an example of pair converter look at the [Historic-Crypto](src/dali/plugin/pair_converter/historic_crypto.py) plugin.
 
 #### Country Plugin Development
 Country plugins are reused from RP2. To add support for a new country in DaLI:
