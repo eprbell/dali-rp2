@@ -153,7 +153,7 @@ dali_us -s -o output -p test_ test_config.ini
 * `-p` is the prefix of the output file.
 * `test_config.ini` is the configuration that ties the inputs together.
 
-To print command usage information for the `dali` command:
+To print command usage information for the `dali_us` command:
 
 ```console
 dali_us --help
