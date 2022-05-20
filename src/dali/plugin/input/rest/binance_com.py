@@ -65,6 +65,7 @@ _INFO: str = "info"
 _INSERTTIME: str = "insertTime"
 _ISDUST: str = "isDust"
 _ISFIATPAYMENT: str = "isFiatPayment"
+_LEGALMONEY: str = "legalMoney"
 _LIMIT: str = "limit"
 _OBTAINAMOUNT: str = "obtainAmount"
 _ORDER: str = "order"  # CCXT
@@ -128,10 +129,11 @@ class InputPlugin(AbstractInputPlugin):
         account_holder: str,
         api_key: str,
         api_secret: str,
+        native_fiat: str,
         username: Optional[str] = None,
     ) -> None:
 
-        super().__init__(account_holder)
+        super().__init__(account_holder, native_fiat)
         self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM}/{self.account_holder}")
         self.__cache_key: str = f"{self.__BINANCE_COM.lower()}-{account_holder}"
         self.client: ccxt.binance = ccxt.binance(
@@ -146,7 +148,7 @@ class InputPlugin(AbstractInputPlugin):
         self.markets: List[str] = []
         ccxt_markets: Any = self.client.fetch_markets()
         for market in ccxt_markets:
-            self.__logger.debug("Market: %s", json.dumps(market))
+#            self.__logger.debug("Market: %s", json.dumps(market))
             self.markets.append(market[_ID])
 
         if self.username:
@@ -705,6 +707,7 @@ class InputPlugin(AbstractInputPlugin):
 
             if transaction[_FEE][_CURRENCY] == in_asset:
                 crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
+                crypto_in = crypto_in - crypto_fee
             else:
                 crypto_fee = ZERO
 
@@ -731,13 +734,16 @@ class InputPlugin(AbstractInputPlugin):
                     )
 
             # Is this a plain buy or a conversion?
-            if trade.quote_asset in self.client.options.legalMoney: # Binance specific param
-                transaction_notes = f"Fiat buy of {trade.base_asset} with {trade.quote_asset}"
-                fiat_in_no_fee = RP2Decimal(transaction[_COST])
+            if trade.quote_asset in self.client.options[_LEGALMONEY]: # Binance specific param
+                fiat_in_no_fee = RP2Decimal(str(transaction[_COST]))
                 fiat_fee = RP2Decimal(crypto_fee)
-                fiat_in_with_fee = fiat_in_no_fee + fiat_fee
-                spot_price = RP2Decimal(transaction[_PRICE])
-
+                spot_price = RP2Decimal(str(transaction[_PRICE]))
+                if transaction[_SIDE] == _BUY:
+                    transaction_notes = f"Fiat buy of {trade.base_asset} with {trade.quote_asset}"
+                    fiat_in_with_fee = fiat_in_no_fee - (fiat_fee * spot_price)                    
+                elif transaction[_SIDE] == _SELL:
+                    transaction_notes = f"Fiat sell of {trade.base_asset} into {trade.quote_asset}"
+                    fiat_in_with_fee = fiat_in_no_fee - fiat_fee
 
                 in_transaction_list.append(
                     InTransaction(
@@ -749,12 +755,12 @@ class InputPlugin(AbstractInputPlugin):
                         exchange=self.__BINANCE_COM,
                         holder=self.account_holder,
                         transaction_type=Keyword.BUY.value,
-                        spot_price=spot_price,
+                        spot_price=str(spot_price),
                         crypto_in=str(crypto_in),
                         crypto_fee=str(crypto_fee),
                         fiat_in_no_fee=str(fiat_in_no_fee),
                         fiat_in_with_fee=str(fiat_in_with_fee),
-                        fiat_fee=str(fiat_fee),
+                        fiat_fee=None,
                         fiat_ticker=trade.quote_asset,
                         notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
                     )
@@ -881,11 +887,11 @@ class InputPlugin(AbstractInputPlugin):
         crypto_out_with_fee: RP2Decimal = crypto_out_no_fee + crypto_fee
         
         # Is this a plain buy or a conversion?
-        if trade.quote_asset in self.client.options.legalMoney: # Binance specific param
-                fiat_in_no_fee: RP2Decimal = RP2Decimal(transaction[_COST])
-                fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
-                fiat_out_with_fee: RP2Decimal = fiat_in_no_fee + fiat_fee
-                spot_price: RP2Decimal = RP2Decimal(transaction[_PRICE])
+        if trade.quote_asset in self.client.options[_LEGALMONEY]: # Binance specific param
+            fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
+            fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
+            fiat_out_with_fee: RP2Decimal = fiat_out_no_fee + fiat_fee
+            spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
 
             out_transaction_list.append(
                 OutTransaction(
