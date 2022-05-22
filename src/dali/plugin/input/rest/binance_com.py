@@ -53,7 +53,7 @@ _CRYPTOCURRENCY: str = "cryptoCurrency"
 _CURRENCY: str = "currency"  # CCXT only variable
 _DATA: str = "data"
 _DATETIME: str = "datetime"  # CCXT only variable
-_DEPOSIT: str = "deposit" # CCXT
+_DEPOSIT: str = "deposit"  # CCXT
 _DIVTIME: str = "divTime"
 _ENDTIME: str = "endTime"
 _ENINFO: str = "enInfo"
@@ -91,7 +91,7 @@ _TYPE: str = "type"
 _TXID: str = "txid"  # CCXT doesn't capitalize I
 _UPDATETIME: str = "updateTime"
 _USERNAME: str = "userName"
-_WITHDRAWAL: str = "withdrawal" # CCXT
+_WITHDRAWAL: str = "withdrawal"  # CCXT
 
 # Time period constants
 _NINETY_DAYS_IN_MS: int = 7776000000
@@ -148,7 +148,7 @@ class InputPlugin(AbstractInputPlugin):
         self.markets: List[str] = []
         ccxt_markets: Any = self.client.fetch_markets()
         for market in ccxt_markets:
-#            self.__logger.debug("Market: %s", json.dumps(market))
+            #            self.__logger.debug("Market: %s", json.dumps(market))
             self.markets.append(market[_ID])
 
         if self.username:
@@ -193,7 +193,6 @@ class InputPlugin(AbstractInputPlugin):
         self._process_gains(in_transactions)
         self._process_trades(in_transactions, out_transactions)
         self._process_withdrawals(out_transactions, intra_transactions)
-
 
         result.extend(in_transactions)
         result.extend(out_transactions)
@@ -561,9 +560,7 @@ class InputPlugin(AbstractInputPlugin):
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
-    def _process_withdrawals(
-            self, out_transactions: List[OutTransaction], intra_transactions: List[IntraTransaction]
-        ) -> None:
+    def _process_withdrawals(self, out_transactions: List[OutTransaction], intra_transactions: List[IntraTransaction]) -> None:
 
         # We need milliseconds for Binance
         current_start = self.start_time_ms
@@ -571,7 +568,7 @@ class InputPlugin(AbstractInputPlugin):
 
         # Crypto Withdrawls can only be pulled in 90 day windows
         current_end = current_start + _NINETY_DAYS_IN_MS
-        crypto_withdrawls = [] 
+        crypto_withdrawals: Any = []
 
         # Process crypto withdrawls (limited to 90 day windows), fetches 1000 transactions
         while current_start < now_time:
@@ -658,7 +655,7 @@ class InputPlugin(AbstractInputPlugin):
             for withdrawal in fiat_withdrawals[_DATA]:
                 self.__logger.debug("Withdrawal: %s", json.dumps(withdrawal))
                 if withdrawal[_STATUS] == "Completed":
-                    self._process_withdrawal(withdrawal, out_transactions)           
+                    self._process_withdrawal(withdrawal, out_transactions)
 
     ### Single Transaction Processing
 
@@ -734,13 +731,13 @@ class InputPlugin(AbstractInputPlugin):
                     )
 
             # Is this a plain buy or a conversion?
-            if trade.quote_asset in self.client.options[_LEGALMONEY]: # Binance specific param
+            if trade.quote_asset in self.client.options[_LEGALMONEY]:  # Binance specific param
                 fiat_in_no_fee = RP2Decimal(str(transaction[_COST]))
                 fiat_fee = RP2Decimal(crypto_fee)
                 spot_price = RP2Decimal(str(transaction[_PRICE]))
                 if transaction[_SIDE] == _BUY:
                     transaction_notes = f"Fiat buy of {trade.base_asset} with {trade.quote_asset}"
-                    fiat_in_with_fee = fiat_in_no_fee - (fiat_fee * spot_price)                    
+                    fiat_in_with_fee = fiat_in_no_fee - (fiat_fee * spot_price)
                 elif transaction[_SIDE] == _SELL:
                     transaction_notes = f"Fiat sell of {trade.base_asset} into {trade.quote_asset}"
                     fiat_in_with_fee = fiat_in_no_fee - fiat_fee
@@ -764,8 +761,7 @@ class InputPlugin(AbstractInputPlugin):
                         fiat_ticker=trade.quote_asset,
                         notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
                     )
-                )    
-
+                )
 
             else:
                 transaction_notes = f"Buy side of conversion from " f"{conversion_info}" f"({out_asset} out-transaction unique id: {transaction[_ID]}"
@@ -885,12 +881,11 @@ class InputPlugin(AbstractInputPlugin):
         else:
             crypto_fee = ZERO
         crypto_out_with_fee: RP2Decimal = crypto_out_no_fee + crypto_fee
-        
+
         # Is this a plain buy or a conversion?
-        if trade.quote_asset in self.client.options[_LEGALMONEY]: # Binance specific param
+        if trade.quote_asset in self.client.options[_LEGALMONEY]:  # Binance specific param
             fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
             fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
-            fiat_out_with_fee: RP2Decimal = fiat_out_no_fee + fiat_fee
             spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
 
             out_transaction_list.append(
@@ -903,16 +898,14 @@ class InputPlugin(AbstractInputPlugin):
                     exchange=self.__BINANCE_COM,
                     holder=self.account_holder,
                     transaction_type=Keyword.SELL.value,
-                    spot_price= str(spot_price),
+                    spot_price=str(spot_price),
                     crypto_out_no_fee=str(crypto_out_no_fee),
                     crypto_fee=str(crypto_fee),
                     crypto_out_with_fee=str(crypto_out_with_fee),
                     fiat_out_no_fee=str(fiat_out_no_fee),
                     fiat_fee=str(fiat_fee),
                     fiat_ticker=trade.quote_asset,
-                    notes=(
-                        f"{notes + ';' if notes else ''} Fiat sell of {trade.base_asset} with {trade.quote_asset}."
-                    ),
+                    notes=(f"{notes + ';' if notes else ''} Fiat sell of {trade.base_asset} with {trade.quote_asset}."),
                 )
             )
 
@@ -980,9 +973,9 @@ class InputPlugin(AbstractInputPlugin):
                     crypto_sent=str(amount),
                     crypto_received=Keyword.UNKNOWN.value,
                 )
-            ) 
+            )
         else:
-            self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))          
+            self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
 
     def _process_withdrawal(self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
 

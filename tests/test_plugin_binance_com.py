@@ -179,7 +179,7 @@ class TestBinance:
         assert RP2Decimal(str(fiat_deposit.crypto_fee)) == RP2Decimal("0.20")
         assert fiat_deposit.fiat_in_no_fee is None
         assert fiat_deposit.fiat_in_with_fee is None
-        assert fiat_deposit.fiat_fee is None 
+        assert fiat_deposit.fiat_fee is None
 
     # pylint: disable=no-self-use
     def test_trades(self, mocker: Any) -> None:
@@ -191,7 +191,7 @@ class TestBinance:
         )
 
         plugin.markets = ["ETHBTC"]
- 
+
         mocker.patch.object(plugin.client, "fetch_my_trades").return_value = [
             # Trade using BNB for fee payment
             {
@@ -309,7 +309,7 @@ class TestBinance:
         # One Sell of quote asset (for Buy order) +
         # One Buy of base asset (for Buy order) +
         # One Sell of quote asset (for Sell order) +
-        # One Buy of base asset (for Sell order) + 
+        # One Buy of base asset (for Sell order) +
         # One Buy of base asset (for fiat buy) +
         # One Sell of quote asset (for fiat buy) +
         # One Sell of quote asset (for fiat sell) +
@@ -323,10 +323,10 @@ class TestBinance:
         buy_conversion_in: InTransaction = result[1]  # type: ignore
         sell_conversion_order_out: OutTransaction = result[8]  # type: ignore
         sell_conversion_order_in: InTransaction = result[2]  # type: ignore
-        buy_fiat_order_out: OutTransaction = result[9] # type: ignore
-        buy_fiat_order_in: InTransaction = result[3] # type: ignore
-        sell_fiat_order_out: OutTransaction = result[10] # type: ignore
-        sell_fiat_order_in: InTransaction = result[4] # type: ignore
+        buy_fiat_order_out: OutTransaction = result[9]  # type: ignore
+        buy_fiat_order_in: InTransaction = result[3]  # type: ignore
+        sell_fiat_order_out: OutTransaction = result[10]  # type: ignore
+        sell_fiat_order_in: InTransaction = result[4]  # type: ignore
 
         # Buy with BNB as fee payment
         assert bnb_sell_transaction.asset == "BTC"
@@ -405,12 +405,12 @@ class TestBinance:
         assert buy_fiat_order_out.asset == "GBP"
         assert int(parser.parse(buy_fiat_order_out.timestamp).timestamp()) * 1000 == 1502962949000
         assert buy_fiat_order_out.transaction_type == Keyword.SELL.value
-        assert RP2Decimal(buy_fiat_order_out.spot_price) == RP2Decimal("23000.01") 
+        assert RP2Decimal(buy_fiat_order_out.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_out.crypto_out_no_fee) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_out.crypto_fee) == RP2Decimal("0")
         assert RP2Decimal(str(buy_fiat_order_out.crypto_out_with_fee)) == RP2Decimal("23000.01")
-        assert RP2Decimal(buy_fiat_order_out.fiat_out_no_fee) == RP2Decimal("23000.01")
-        assert RP2Decimal(buy_fiat_order_out.fiat_fee) == RP2Decimal("0")
+        assert RP2Decimal(str(buy_fiat_order_out.fiat_out_no_fee)) == RP2Decimal("23000.01")
+        assert RP2Decimal(str(buy_fiat_order_out.fiat_fee)) == RP2Decimal("0")
 
         assert buy_fiat_order_in.asset == "BTC"
         assert int(parser.parse(buy_fiat_order_in.timestamp).timestamp()) * 1000 == 1502962949000
@@ -418,20 +418,20 @@ class TestBinance:
         assert RP2Decimal(buy_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_in.crypto_in) == RP2Decimal("0.998")
         assert RP2Decimal(str(buy_fiat_order_in.crypto_fee)) == RP2Decimal("0.002")
-        assert RP2Decimal(buy_fiat_order_in.fiat_in_no_fee) == RP2Decimal("23000.01")
-        assert RP2Decimal(buy_fiat_order_in.fiat_in_with_fee) == RP2Decimal("22954.00998")
+        assert RP2Decimal(str(buy_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("23000.01")
+        assert RP2Decimal(str(buy_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("22954.00998")
         assert buy_fiat_order_in.fiat_fee is None
 
         # Fiat sell with quote asset as a fee
         assert sell_fiat_order_out.asset == "BTC"
         assert int(parser.parse(sell_fiat_order_out.timestamp).timestamp()) * 1000 == 1502962950000
         assert sell_fiat_order_out.transaction_type == Keyword.SELL.value
-        assert RP2Decimal(sell_fiat_order_out.spot_price) == RP2Decimal("23000.01") 
+        assert RP2Decimal(sell_fiat_order_out.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(sell_fiat_order_out.crypto_out_no_fee) == RP2Decimal("1")
         assert RP2Decimal(sell_fiat_order_out.crypto_fee) == RP2Decimal("0")
         assert RP2Decimal(str(sell_fiat_order_out.crypto_out_with_fee)) == RP2Decimal("1")
-        assert RP2Decimal(sell_fiat_order_out.fiat_out_no_fee) == RP2Decimal("23000.01")
-        assert RP2Decimal(sell_fiat_order_out.fiat_fee) == RP2Decimal("0")
+        assert RP2Decimal(str(sell_fiat_order_out.fiat_out_no_fee)) == RP2Decimal("23000.01")
+        assert RP2Decimal(str(sell_fiat_order_out.fiat_fee)) == RP2Decimal("0")
 
         assert sell_fiat_order_in.asset == "GBP"
         assert int(parser.parse(sell_fiat_order_in.timestamp).timestamp()) * 1000 == 1502962950000
@@ -439,8 +439,8 @@ class TestBinance:
         assert RP2Decimal(sell_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(sell_fiat_order_in.crypto_in) == RP2Decimal("22960.01")
         assert RP2Decimal(str(sell_fiat_order_in.crypto_fee)) == RP2Decimal("40")
-        assert RP2Decimal(sell_fiat_order_in.fiat_in_no_fee) == RP2Decimal("23000.01")
-        assert RP2Decimal(sell_fiat_order_in.fiat_in_with_fee) == RP2Decimal("22960.01")
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("23000.01")
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("22960.01")
         assert sell_fiat_order_in.fiat_fee is None
 
     # pylint: disable=no-self-use
@@ -633,14 +633,14 @@ class TestBinance:
         assert len(result) == 2
 
         crypto_withdrawal_transaction: IntraTransaction = result[1]  # type: ignore
-        fiat_withdrawal: InTransaction = result[0]  # type: ignore
+        fiat_withdrawal: OutTransaction = result[0]  # type: ignore
 
         assert fiat_withdrawal.asset == "EUR"
         assert int(parser.parse(fiat_withdrawal.timestamp).timestamp()) * 1000 == 1627501026000
         assert fiat_withdrawal.transaction_type == Keyword.SELL.value
         assert RP2Decimal(fiat_withdrawal.spot_price) == RP2Decimal("1")
         assert RP2Decimal(fiat_withdrawal.crypto_out_no_fee) == RP2Decimal("15.00")
-        assert RP2Decimal(fiat_withdrawal.crypto_fee) == RP2Decimal("0.20")
+        assert RP2Decimal(str(fiat_withdrawal.crypto_fee)) == RP2Decimal("0.20")
         assert fiat_withdrawal.fiat_out_no_fee is None
         assert fiat_withdrawal.fiat_fee is None
 
