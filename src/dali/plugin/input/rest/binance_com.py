@@ -20,13 +20,12 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
-import datetime as dt
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
-import ccxt
+from ccxt import binance
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -44,7 +43,7 @@ _ALGONAME: str = "algoName"
 _AMOUNT: str = "amount"
 _ASSET: str = "asset"
 _BEGINTIME: str = "beginTime"
-_BUY: str = "buy"  # CCXT
+_BUY: str = "buy"  # CCXT only variable
 _COIN: str = "coin"
 _COINNAME: str = "coinName"
 _COST: str = "cost"  # CCXT only variable
@@ -53,13 +52,13 @@ _CRYPTOCURRENCY: str = "cryptoCurrency"
 _CURRENCY: str = "currency"  # CCXT only variable
 _DATA: str = "data"
 _DATETIME: str = "datetime"  # CCXT only variable
-_DEPOSIT: str = "deposit"  # CCXT
+_DEPOSIT: str = "deposit"  # CCXT only variable
 _DIVTIME: str = "divTime"
 _ENDTIME: str = "endTime"
 _ENINFO: str = "enInfo"
 _FEE: str = "fee"
 _FIATCURRENCY: str = "fiatCurrency"
-_ID: str = "id"  # CCXT
+_ID: str = "id"  # CCXT only variable
 _INDICATEDAMOUNT: str = "indicatedAmount"
 _INFO: str = "info"
 _INSERTTIME: str = "insertTime"
@@ -68,21 +67,21 @@ _ISFIATPAYMENT: str = "isFiatPayment"
 _LEGALMONEY: str = "legalMoney"
 _LIMIT: str = "limit"
 _OBTAINAMOUNT: str = "obtainAmount"
-_ORDER: str = "order"  # CCXT
+_ORDER: str = "order"  # CCXT only variable
 _ORDERNO: str = "orderNo"
 _PAGEINDEX: str = "pageIndex"
 _PAGESIZE: str = "pageSize"
 _PRICE: str = "price"
 _PROFITAMOUNT: str = "profitAmount"
 _ROWS: str = "rows"
-_SELL: str = "sell"  # CCXT
-_SIDE: str = "side"  # CCXT
+_SELL: str = "sell"  # CCXT only variable
+_SIDE: str = "side"  # CCXT only variable
 _STARTTIME: str = "startTime"
 _STATUS: str = "status"
 _SOURCEAMOUNT: str = "sourceAmount"
 _SYMBOL: str = "symbol"
 _TIME: str = "time"
-_TIMESTAMP: str = "timestamp"  # CCXT
+_TIMESTAMP: str = "timestamp"  # CCXT only variable
 _TRANID: str = "tranId"
 _TRANSACTIONTYPE: str = "transactionType"
 _TOTAL: str = "total"
@@ -91,11 +90,20 @@ _TYPE: str = "type"
 _TXID: str = "txid"  # CCXT doesn't capitalize I
 _UPDATETIME: str = "updateTime"
 _USERNAME: str = "userName"
-_WITHDRAWAL: str = "withdrawal"  # CCXT
+_WITHDRAWAL: str = "withdrawal"  # CCXT only variable
 
 # Time period constants
 _NINETY_DAYS_IN_MS: int = 7776000000
 _THIRTY_DAYS_IN_MS: int = 2592000000
+_MS_IN_SECOND: int = 1000
+
+# Record limits
+_DEPOSIT_RECORD_LIMIT: int = 1000
+_DIVIDEND_RECORD_LIMIT: int = 500
+_DUST_TRADE_RECORD_LIMIT: int = 100
+_MINING_PAGE_LIMIT: int = 200
+_TRADE_RECORD_LIMIT: int = 1000
+_WITHDRAWAL_RECORD_LIMIT: int = 1000
 
 # Types of Binance Dividends
 _BNBVAULT = "BNB Vault"
@@ -136,7 +144,7 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder, native_fiat)
         self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM}/{self.account_holder}")
         self.__cache_key: str = f"{self.__BINANCE_COM.lower()}-{account_holder}"
-        self.client: ccxt.binance = ccxt.binance(
+        self.client: binance = binance(
             {
                 "apiKey": api_key,
                 "secret": api_secret,
@@ -160,11 +168,11 @@ class InputPlugin(AbstractInputPlugin):
 
         # We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
         self.start_time: datetime = datetime(2017, 7, 13, 0, 0, 0, 0)
-        self.start_time_ms: int = int(self.start_time.timestamp()) * 1000
+        self.start_time_ms: int = int(self.start_time.timestamp()) * _MS_IN_SECOND
 
     @staticmethod
     def _rp2timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
-        rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / 1000), dt.timezone.utc)
+        rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
 
         # RP2 Timestamp has a space between the UTC offset and seconds
         # Standard Python format does not
@@ -211,7 +219,7 @@ class InputPlugin(AbstractInputPlugin):
 
         # We need milliseconds for Binance
         current_start = self.start_time_ms
-        now_time = int(datetime.now().timestamp()) * 1000
+        now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # Crypto Deposits can only be pulled in 90 day windows
         current_end = current_start + _NINETY_DAYS_IN_MS
@@ -296,13 +304,13 @@ class InputPlugin(AbstractInputPlugin):
                 self._process_transfer(deposit, intra_transactions)
 
             # If user made more than 1000 transactions in a 90 day period we need to shrink the window.
-            if len(crypto_deposits) < 1000:
+            if len(crypto_deposits) < _DEPOSIT_RECORD_LIMIT:
                 current_start = current_end + 1
                 current_end = current_start + _NINETY_DAYS_IN_MS
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([999])
-                current_start = int(crypto_deposits[999][_TIMESTAMP]) + 1  # times are inclusive
+                current_start = int(crypto_deposits[_DEPOSIT_RECORD_LIMIT - 1][_TIMESTAMP]) + 1  # times are inclusive
                 current_end = current_start + _NINETY_DAYS_IN_MS
 
         # Process actual fiat deposits (no limit on the date range)
@@ -341,7 +349,7 @@ class InputPlugin(AbstractInputPlugin):
 
         # We need milliseconds for Binance
         current_start = self.start_time_ms
-        now_time = int(datetime.now().timestamp()) * 1000
+        now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # We will pull in 30 day periods. This allows for 16 assets with daily dividends.
         current_end = current_start + _THIRTY_DAYS_IN_MS
@@ -349,7 +357,7 @@ class InputPlugin(AbstractInputPlugin):
         while current_start < now_time:
 
             # CCXT doesn't have a standard way to pull income, we must use the underlying API endpoint
-            dividends = self.client.sapiGetAssetAssetDividend(params=({_STARTTIME: current_start, _ENDTIME: current_end, _LIMIT: 500}))
+            dividends = self.client.sapiGetAssetAssetDividend(params=({_STARTTIME: current_start, _ENDTIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT}))
             # {
             #     "rows":[
             #         {
@@ -379,16 +387,15 @@ class InputPlugin(AbstractInputPlugin):
                     self._process_gain(dividend, Keyword.INTEREST, in_transactions)
                 else:
                     self.__logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_ENINFO], self.ISSUES_URL)
-                    self._process_gain(dividend, Keyword.INCOME, in_transactions)
 
             # If user received more than 500 dividends in a 30 day period we need to shrink the window.
-            if dividends[_TOTAL] < 500:
+            if dividends[_TOTAL] < _DIVIDEND_RECORD_LIMIT:
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([499])
-                current_start = int(dividends[_ROWS][499][_DIVTIME]) + 1  # times are inclusive
+                current_start = int(dividends[_ROWS][_DIVIDEND_RECORD_LIMIT - 1][_DIVTIME]) + 1  # times are inclusive
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
         ### Mining Income
@@ -398,7 +405,9 @@ class InputPlugin(AbstractInputPlugin):
             # Binance uses pages for mining payments
             current_page = 1
             while True:
-                results = self.client.sapiGetMiningPaymentList(params=({_ALGO: algo, _USERNAME: self.username, _PAGEINDEX: current_page, _PAGESIZE: 200}))
+                results = self.client.sapiGetMiningPaymentList(
+                    params=({_ALGO: algo, _USERNAME: self.username, _PAGEINDEX: current_page, _PAGESIZE: _MINING_PAGE_LIMIT})
+                )
                 # {
                 #   "code": 0,
                 #   "msg": "",
@@ -458,7 +467,7 @@ class InputPlugin(AbstractInputPlugin):
                                 self.ISSUES_URL,
                             )
 
-                    if len(profits) == 200:
+                    if len(profits) == _MINING_PAGE_LIMIT:
                         current_page += 1
                     else:
                         break
@@ -476,7 +485,7 @@ class InputPlugin(AbstractInputPlugin):
             test: bool = True
             #       while True:
             while test:
-                market_trades = self.client.fetch_my_trades(symbol=market, since=since, limit=1000)
+                market_trades = self.client.fetch_my_trades(symbol=market, since=since, limit=_TRADE_RECORD_LIMIT)
                 #   {
                 #       'info':         { ... },                    // the original decoded JSON as is
                 #       'id':           '12345-67890:09876/54321',  // string trade id
@@ -507,16 +516,16 @@ class InputPlugin(AbstractInputPlugin):
                     self._process_sell(trade, out_transactions)
                     self._process_buy(trade, in_transactions, out_transactions)
                     test = False
-                if len(market_trades) < 1000:
+                if len(market_trades) < _TRADE_RECORD_LIMIT:
                     break
                 # Times are inclusive
-                since = int(market_trades[999][_TIMESTAMP]) + 1
+                since = int(market_trades[_TRADE_RECORD_LIMIT - 1][_TIMESTAMP]) + 1
 
         ### Dust Trades
 
         # We need milliseconds for Binance
         current_start = self.start_time_ms
-        now_time = int(datetime.now().timestamp()) * 1000
+        now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # We will pull in 30 day periods
         # If the user has more than 100 dust trades in a 30 day period this will break.
@@ -529,7 +538,7 @@ class InputPlugin(AbstractInputPlugin):
             # Binance only returns 100 dust trades per call. If we hit the limit we will have to crawl
             # over each 'dribblet'. Each dribblet can have multiple assets converted into BNB at the same time.
             # If the user converts more than 100 assets at one time, we can not retrieve accurate records.
-            if len(dust_trades) == 100:
+            if len(dust_trades) == _DUST_TRADE_RECORD_LIMIT:
                 current_dribblet: Any = []
                 current_dribblet_time: int = int(dust_trades[0][_DIVTIME])
                 for dust in dust_trades:
@@ -537,7 +546,7 @@ class InputPlugin(AbstractInputPlugin):
                     dust[_ID] = dust[_ORDER]
                     if dust[_DIVTIME] == current_dribblet_time:
                         current_dribblet.append(dust)
-                    elif len(current_dribblet) < 101:
+                    elif len(current_dribblet) < (_DUST_TRADE_RECORD_LIMIT + 1):
                         for dribblet_piece in current_dribblet:
                             self._process_sell(dribblet_piece, out_transactions)
                             self._process_buy(dribblet_piece, in_transactions, out_transactions)
@@ -564,7 +573,7 @@ class InputPlugin(AbstractInputPlugin):
 
         # We need milliseconds for Binance
         current_start = self.start_time_ms
-        now_time = int(datetime.now().timestamp()) * 1000
+        now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # Crypto Withdrawls can only be pulled in 90 day windows
         current_end = current_start + _NINETY_DAYS_IN_MS
@@ -618,13 +627,13 @@ class InputPlugin(AbstractInputPlugin):
                 self._process_transfer(withdrawal, intra_transactions)
 
             # If user made more than 1000 transactions in a 90 day period we need to shrink the window.
-            if len(crypto_withdrawals) < 1000:
+            if len(crypto_withdrawals) < _WITHDRAWAL_RECORD_LIMIT:
                 current_start = current_end + 1
                 current_end = current_start + _NINETY_DAYS_IN_MS
             else:
                 # Binance sends latest record first ([0])
                 # CCXT sorts by timestamp, so latest record is last ([999])
-                current_start = int(crypto_withdrawals[999][_TIMESTAMP]) + 1  # times are inclusive
+                current_start = int(crypto_withdrawals[_WITHDRAWAL_RECORD_LIMIT - 1][_TIMESTAMP]) + 1  # times are inclusive
                 current_end = current_start + _NINETY_DAYS_IN_MS
 
         # Process actual fiat withdrawls (no limit on the date range)
