@@ -29,7 +29,7 @@ from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import AbstractTransaction, DirectionTypeAndNotes
 from dali.config_generator import generate_config_file
-from dali.dali_configuration import (
+from dali.configuration import (
     DEFAULT_CONFIGURATION,
     DIRECTION_2_TRANSACTION_TYPE_SET,
     DIRECTION_SET,

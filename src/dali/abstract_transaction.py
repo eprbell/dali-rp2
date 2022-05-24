@@ -19,7 +19,7 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Union
 from dateutil.parser import parse
 from rp2.configuration import to_string
 
-from dali.dali_configuration import Keyword, is_internal_field, is_unknown
+from dali.configuration import Keyword, is_internal_field, is_unknown
 
 
 class StringAndDatetime(NamedTuple):
