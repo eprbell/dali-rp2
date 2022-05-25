@@ -86,6 +86,7 @@ _TRANID: str = "tranId"
 _TRANSACTIONTYPE: str = "transactionType"
 _TOTAL: str = "total"
 _TOTALFEE: str = "totalFee"
+_TOTALNUM: str = "totalNum"
 _TYPE: str = "type"
 _TXID: str = "txid"  # CCXT doesn't capitalize I
 _UPDATETIME: str = "updateTime"
@@ -109,10 +110,14 @@ _WITHDRAWAL_RECORD_LIMIT: int = 1000
 _BNBVAULT = "BNB Vault"
 _ETHSTAKING = "ETH 2.0 Staking"
 _FLEXIBLESAVINGS = "Flexible Savings"
+_LAUNCHPOOL = "Launchpool"
 _LOCKEDSAVINGS = "Locked Savings"
 _LOCKEDSTAKING = "Locked Staking"
+_SOLOAIRDROP = "SOLO airdrop"
+
+_AIRDROP_LIST = [_SOLOAIRDROP]
 _INTEREST_LIST = [_FLEXIBLESAVINGS, _LOCKEDSAVINGS]
-_STAKING_LIST = [_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT]
+_STAKING_LIST = [_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT, _LAUNCHPOOL]
 
 
 class _ProcessAccountResult(NamedTuple):
@@ -152,19 +157,9 @@ class InputPlugin(AbstractInputPlugin):
         )
         self.username = username
 
-        # We have to know what markets are on Binance so that we can pull orders using the market
+        # We have to know what markets and algos are on Binance so that we can pull orders using the market
         self.markets: List[str] = []
-        ccxt_markets: Any = self.client.fetch_markets()
-        for market in ccxt_markets:
-            #            self.__logger.debug("Market: %s", json.dumps(market))
-            self.markets.append(market[_ID])
-
-        if self.username:
-            self.algos: List[str] = []
-            binance_algos = self.client.sapiGetMiningPubAlgoList()
-            for algo in binance_algos[_DATA]:
-                self.__logger.debug("Algo: %s", json.dumps(algo))
-                self.algos.append(algo[_ALGONAME])
+        self.algos: List[str] = []
 
         # We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
         self.start_time: datetime = datetime(2017, 7, 13, 0, 0, 0, 0)
@@ -196,6 +191,17 @@ class InputPlugin(AbstractInputPlugin):
         in_transactions: List[InTransaction] = []
         out_transactions: List[OutTransaction] = []
         intra_transactions: List[IntraTransaction] = []
+
+        ccxt_markets: Any = self.client.fetch_markets()
+        for market in ccxt_markets:
+            self.__logger.debug("Market: %s", json.dumps(market))
+            self.markets.append(market[_ID])
+
+        if self.username:
+            binance_algos = self.client.sapiGetMiningPubAlgoList()
+            for algo in binance_algos[_DATA]:
+                self.__logger.debug("Algo: %s", json.dumps(algo))
+                self.algos.append(algo[_ALGONAME])
 
         self._process_deposits(in_transactions, out_transactions, intra_transactions)
         self._process_gains(in_transactions)
@@ -385,11 +391,13 @@ class InputPlugin(AbstractInputPlugin):
                     self._process_gain(dividend, Keyword.STAKING, in_transactions)
                 elif dividend[_ENINFO] in _INTEREST_LIST:
                     self._process_gain(dividend, Keyword.INTEREST, in_transactions)
+                elif dividend[_ENINFO] in _AIRDROP_LIST:
+                    self._process_gain(dividend, Keyword.AIRDROP, in_transactions)
                 else:
                     self.__logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_ENINFO], self.ISSUES_URL)
 
             # If user received more than 500 dividends in a 30 day period we need to shrink the window.
-            if dividends[_TOTAL] < _DIVIDEND_RECORD_LIMIT:
+            if int(dividends[_TOTAL]) < _DIVIDEND_RECORD_LIMIT:
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
             else:
@@ -450,7 +458,9 @@ class InputPlugin(AbstractInputPlugin):
                 #   }
                 # }
 
-                if _DATA in results:
+                if results[_DATA][_TOTALNUM] != "0":
+                    # For testing - REMOVE
+                    self.__logger.debug(json.dumps(results))
                     profits: List[Dict[str, Union[int, str]]] = results[_DATA][_ACCOUNTPROFITS]
                     for result in profits:
                         self.__logger.debug("Mining profit: %s", json.dumps(result))
@@ -482,9 +492,7 @@ class InputPlugin(AbstractInputPlugin):
         # max limit is 1000
         for market in self.markets:
             since: int = self.start_time_ms
-            test: bool = True
-            #       while True:
-            while test:
+            while True:
                 market_trades = self.client.fetch_my_trades(symbol=market, since=since, limit=_TRADE_RECORD_LIMIT)
                 #   {
                 #       'info':         { ... },                    // the original decoded JSON as is
@@ -515,7 +523,6 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.debug("Trade: %s", json.dumps(trade))
                     self._process_sell(trade, out_transactions)
                     self._process_buy(trade, in_transactions, out_transactions)
-                    test = False
                 if len(market_trades) < _TRADE_RECORD_LIMIT:
                     break
                 # Times are inclusive
@@ -556,7 +563,7 @@ class InputPlugin(AbstractInputPlugin):
                         current_end = current_start + _THIRTY_DAYS_IN_MS
                         break
                     else:
-                        raise Exception(f"Too many assets dusted at the same time: " f"{self._rp2timestamp_from_ms_epoch(str(current_dribblet_time))}")
+                        raise Exception(f"Internal error: too many assets dusted at the same time: " f"{self._rp2timestamp_from_ms_epoch(str(current_dribblet_time))}")
             else:
 
                 for dust in dust_trades:
@@ -685,11 +692,11 @@ class InputPlugin(AbstractInputPlugin):
                     exchange=self.__BINANCE_COM,
                     holder=self.account_holder,
                     transaction_type=Keyword.BUY.value,
-                    spot_price=str(RP2Decimal(transaction[_SOURCEAMOUNT]) / RP2Decimal(transaction[_OBTAINAMOUNT])),
+                    spot_price=str(RP2Decimal(transaction[_PRICE])),
                     crypto_in=transaction[_OBTAINAMOUNT],
                     crypto_fee=None,
-                    fiat_in_no_fee=str(transaction[_SOURCEAMOUNT]),
-                    fiat_in_with_fee=str(RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE])),
+                    fiat_in_no_fee=str(RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE])),
+                    fiat_in_with_fee=str(transaction[_SOURCEAMOUNT]),
                     fiat_fee=str(RP2Decimal(transaction[_TOTALFEE])),
                     fiat_ticker=transaction[_FIATCURRENCY],
                     notes=(f"Buy transaction for fiat payment orderNo - " f"{transaction[_ORDERNO]}"),
@@ -741,15 +748,15 @@ class InputPlugin(AbstractInputPlugin):
 
             # Is this a plain buy or a conversion?
             if trade.quote_asset in self.client.options[_LEGALMONEY]:  # Binance specific param
-                fiat_in_no_fee = RP2Decimal(str(transaction[_COST]))
+                fiat_in_with_fee = RP2Decimal(str(transaction[_COST]))
                 fiat_fee = RP2Decimal(crypto_fee)
                 spot_price = RP2Decimal(str(transaction[_PRICE]))
                 if transaction[_SIDE] == _BUY:
                     transaction_notes = f"Fiat buy of {trade.base_asset} with {trade.quote_asset}"
-                    fiat_in_with_fee = fiat_in_no_fee - (fiat_fee * spot_price)
+                    fiat_in_no_fee = fiat_in_with_fee - (fiat_fee * spot_price)
                 elif transaction[_SIDE] == _SELL:
                     transaction_notes = f"Fiat sell of {trade.base_asset} into {trade.quote_asset}"
-                    fiat_in_with_fee = fiat_in_no_fee - fiat_fee
+                    fiat_in_no_fee = fiat_in_with_fee - fiat_fee
 
                 in_transaction_list.append(
                     InTransaction(
@@ -816,6 +823,7 @@ class InputPlugin(AbstractInputPlugin):
                 fiat_in_no_fee=None,
                 fiat_in_with_fee=None,
                 fiat_fee=None,
+                fiat_ticker=transaction[_FIATCURRENCY],
                 notes=notes,
             )
         )
@@ -1006,6 +1014,7 @@ class InputPlugin(AbstractInputPlugin):
                 crypto_fee=str(fee),
                 fiat_out_no_fee=None,
                 fiat_fee=None,
+                fiat_ticker=transaction[_FIATCURRENCY],
                 notes=notes,
             )
         )

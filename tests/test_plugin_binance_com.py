@@ -36,6 +36,7 @@ class TestBinance:
             native_fiat="USD",
         )
 
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
         mocker.patch.object(plugin.client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
             "message": "success",
@@ -156,13 +157,13 @@ class TestBinance:
         assert fiat_in_transaction.asset == "LUNA"
         assert int(parser.parse(fiat_in_transaction.timestamp).timestamp()) * 1000 == 1624529919000
         assert fiat_in_transaction.transaction_type == Keyword.BUY.value
-        assert RP2Decimal(fiat_in_transaction.spot_price) == RP2Decimal("20.0") / RP2Decimal("4.462")
+        assert RP2Decimal(fiat_in_transaction.spot_price) == RP2Decimal("4.437472")
         assert RP2Decimal(fiat_in_transaction.crypto_in) == RP2Decimal("4.462")
         assert fiat_in_transaction.crypto_fee is None
-        assert RP2Decimal(str(fiat_in_transaction.fiat_in_no_fee)) == RP2Decimal("20.0")
-        assert RP2Decimal(str(fiat_in_transaction.fiat_in_with_fee)) == RP2Decimal("19.8")
+        assert RP2Decimal(str(fiat_in_transaction.fiat_in_no_fee)) == RP2Decimal("19.8")
+        assert RP2Decimal(str(fiat_in_transaction.fiat_in_with_fee)) == RP2Decimal("20.0")
         assert RP2Decimal(str(fiat_in_transaction.fiat_fee)) == RP2Decimal("0.2")
-        # assert fiat_in_transaction.fiat_iso_code == "EUR"
+        assert fiat_in_transaction.fiat_ticker == "EUR"
 
         assert crypto_deposit_transaction.asset == "PAXG"
         assert int(parser.parse(crypto_deposit_transaction.timestamp).timestamp()) * 1000 == 1599621997000
@@ -180,6 +181,7 @@ class TestBinance:
         assert fiat_deposit.fiat_in_no_fee is None
         assert fiat_deposit.fiat_in_with_fee is None
         assert fiat_deposit.fiat_fee is None
+        assert fiat_deposit.fiat_ticker == "EUR"
 
     # pylint: disable=no-self-use
     def test_trades(self, mocker: Any) -> None:
@@ -190,8 +192,7 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        plugin.markets = ["ETHBTC"]
-
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
         mocker.patch.object(plugin.client, "fetch_my_trades").return_value = [
             # Trade using BNB for fee payment
             {
@@ -411,6 +412,7 @@ class TestBinance:
         assert RP2Decimal(str(buy_fiat_order_out.crypto_out_with_fee)) == RP2Decimal("23000.01")
         assert RP2Decimal(str(buy_fiat_order_out.fiat_out_no_fee)) == RP2Decimal("23000.01")
         assert RP2Decimal(str(buy_fiat_order_out.fiat_fee)) == RP2Decimal("0")
+        assert buy_fiat_order_out.fiat_ticker == "GBP"
 
         assert buy_fiat_order_in.asset == "BTC"
         assert int(parser.parse(buy_fiat_order_in.timestamp).timestamp()) * 1000 == 1502962949000
@@ -418,8 +420,8 @@ class TestBinance:
         assert RP2Decimal(buy_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_in.crypto_in) == RP2Decimal("0.998")
         assert RP2Decimal(str(buy_fiat_order_in.crypto_fee)) == RP2Decimal("0.002")
-        assert RP2Decimal(str(buy_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("23000.01")
-        assert RP2Decimal(str(buy_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("22954.00998")
+        assert RP2Decimal(str(buy_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("22954.00998")
+        assert RP2Decimal(str(buy_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("23000.01")
         assert buy_fiat_order_in.fiat_fee is None
 
         # Fiat sell with quote asset as a fee
@@ -439,9 +441,10 @@ class TestBinance:
         assert RP2Decimal(sell_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(sell_fiat_order_in.crypto_in) == RP2Decimal("22960.01")
         assert RP2Decimal(str(sell_fiat_order_in.crypto_fee)) == RP2Decimal("40")
-        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("23000.01")
-        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("22960.01")
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("22960.01")
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("23000.01")
         assert sell_fiat_order_in.fiat_fee is None
+        assert sell_fiat_order_in.fiat_ticker == "GBP"
 
     # pylint: disable=no-self-use
     def test_gains(self, mocker: Any) -> None:
@@ -449,13 +452,11 @@ class TestBinance:
             account_holder="tester",
             api_key="a",
             api_secret="b",
+            username="user",
             native_fiat="USD",
         )
-
-        # Bypassing algo call
-        plugin.algos = ["sha256"]
-        plugin.username = "user"
-
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
+        mocker.patch.object(plugin.client, "sapiGetMiningPubAlgoList").return_value = {'data':[{'algoName':'sha256'}]}
         mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "sapiGetAssetAssetDividend").return_value = {
             "rows": [
@@ -545,14 +546,15 @@ class TestBinance:
         assert mining_deposit.fiat_fee is None
 
     # pylint: disable=no-self-use
-    def test_withdrawls(self, mocker: Any) -> None:
+    def test_withdrawals(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             api_key="a",
             api_secret="b",
             native_fiat="USD",
         )
-
+        
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
         mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "fetch_withdrawals").return_value = [
             {
@@ -629,7 +631,7 @@ class TestBinance:
         result = plugin.load()
 
         # 1 crypto Transfer +
-        # 1 fiat withdrawl = 2
+        # 1 fiat withdrawal = 2
         assert len(result) == 2
 
         crypto_withdrawal_transaction: IntraTransaction = result[1]  # type: ignore
@@ -643,6 +645,7 @@ class TestBinance:
         assert RP2Decimal(str(fiat_withdrawal.crypto_fee)) == RP2Decimal("0.20")
         assert fiat_withdrawal.fiat_out_no_fee is None
         assert fiat_withdrawal.fiat_fee is None
+        assert fiat_withdrawal.fiat_ticker == "EUR"
 
         assert crypto_withdrawal_transaction.asset == "PAXG"
         assert int(parser.parse(crypto_withdrawal_transaction.timestamp).timestamp()) * 1000 == 1599621997000
