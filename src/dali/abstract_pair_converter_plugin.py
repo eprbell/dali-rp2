@@ -19,7 +19,7 @@ from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2TypeError
 
 from dali.cache import load_from_cache, save_to_cache
-from dali.dali_configuration import HISTORICAL_PRICE_KEYWORD_SET
+from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 

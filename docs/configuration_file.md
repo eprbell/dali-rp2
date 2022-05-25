@@ -247,7 +247,7 @@ unique_id   |timestamp                 |asset|from_exchange|from_holder|to_excha
 ## Pair Converter Plugin Sections
 A pair converter plugin has the purpose of converting a currency to another (both crypto and fiat) and it is used to fill missing spot price and convert foreign fiat to native fiat (e.g. USD for US, JPY for Japan, etc.). It is initialized with parameters from a plugin-specific section of the INI file. This section has the following format:
 <pre>
-[dali.plugin.price_converter.<em>&lt;plugin&gt;</em>]
+[dali.plugin.pair_converter.<em>&lt;plugin&gt;</em>]
 <em>&lt;parameter_1&gt;</em> = <em>&lt;value_1&gt;</em>
 ...
 <em>&lt;parameter_n&gt;</em> = <em>&lt;value_n&gt;</em>
@@ -262,7 +262,7 @@ This plugin is based on the Historic_Crypto Python library.
 
 Initialize this plugin section as follows:
 <pre>
-[dali.plugin.price_converter.historic_crypto</em>]
+[dali.plugin.pair_converter.historic_crypto</em>]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
 </pre>
 

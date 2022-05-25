@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Set
 
 from dali.abstract_transaction import AbstractTransaction
-from dali.dali_configuration import Keyword
+from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
