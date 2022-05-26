@@ -462,8 +462,6 @@ class InputPlugin(AbstractInputPlugin):
                 # }
 
                 if results[_DATA][_TOTALNUM] != "0":
-                    # For testing - REMOVE
-                    self.__logger.debug(json.dumps(results))
                     profits: List[Dict[str, Union[int, str]]] = results[_DATA][_ACCOUNTPROFITS]
                     for result in profits:
                         self.__logger.debug("Mining profit: %s", json.dumps(result))
