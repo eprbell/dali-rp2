@@ -474,24 +474,24 @@ class TestBinance:
                 "accountProfits": [
                     {
                         "time": 1586188800000,  # Mining date
-                        "type": 31,  # 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,
+                        "type": "31",  # 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,
                         # 32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
                         "hashTransfer": None,  # Transferred Hashrate
                         "transferAmount": None,  # Transferred Income
                         "dayHashRate": 129129903378244,  # Daily Hashrate
                         "profitAmount": 8.6083060304,  # Earnings Amount
                         "coinName": "BTC",  # Coin Type
-                        "status": 2,  # Status：0:Unpaid， 1:Paying  2：Paid
+                        "status": "2",  # Status：0:Unpaid， 1:Paying  2：Paid
                     },
                     {
                         "time": 1607529600000,
                         "coinName": "BTC",
-                        "type": 0,
+                        "type": "0", # String
                         "dayHashRate": 9942053925926,
                         "profitAmount": 0.85426469,
                         "hashTransfer": 200000000000,
                         "transferAmount": 0.02180958,
-                        "status": 2,
+                        "status": "2",
                     },
                 ],
                 "totalNum": 2,  # Total Rows

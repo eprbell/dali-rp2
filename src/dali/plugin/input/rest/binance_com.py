@@ -23,6 +23,7 @@
 import json
 import logging
 from datetime import datetime, timezone
+from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
 from ccxt import binance
@@ -423,34 +424,34 @@ class InputPlugin(AbstractInputPlugin):
                 #     "accountProfits": [
                 #       {
                 #         "time": 1586188800000,            // Mining date
-                #         "type": 31, // 0:Mining Wallet,5:Mining Address,7:Pool Savings,
+                #         "type": "31", // 0:Mining Wallet,5:Mining Address,7:Pool Savings,
                 #           8:Transferred,31:Income Transfer ,32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
                 #         "hashTransfer": null,            // Transferred Hashrate
                 #         "transferAmount": null,          // Transferred Income
                 #         "dayHashRate": 129129903378244,  // Daily Hashrate
                 #         "profitAmount": 8.6083060304,   //Earnings Amount
                 #         "coinName":"BTC",              // Coin Type
-                #         "status": 2    //Status：0:Unpaid， 1:Paying  2：Paid
+                #         "status": "2"    //Status：0:Unpaid， 1:Paying  2：Paid
                 #       },
                 #       {
                 #         "time": 1607529600000,
                 #         "coinName": "BTC",
-                #         "type": 0,
+                #         "type": "0", // String
                 #         "dayHashRate": 9942053925926,
                 #         "profitAmount": 0.85426469,
                 #         "hashTransfer": 200000000000,
                 #         "transferAmount": 0.02180958,
-                #         "status": 2
+                #         "status": "2"
                 #       },
                 #       {
                 #         "time": 1607443200000,
                 #         "coinName": "BTC",
-                #         "type": 31,
+                #         "type": "31",
                 #         "dayHashRate": 200000000000,
                 #         "profitAmount": 0.02905916,
                 #         "hashTransfer": null,
                 #         "transferAmount": null,
-                #         "status": 2
+                #         "status": "2"
                 #       }
                 #     ],
                 #     "totalNum": 3,          // Total Rows
@@ -467,7 +468,7 @@ class InputPlugin(AbstractInputPlugin):
 
                         # Currently the plugin only supports standard mining deposits
                         # Payment must also be made (status=2) in order to be counted
-                        if result[_TYPE] == 0 and result[_STATUS] == 2:
+                        if result[_TYPE] == "0" and result[_STATUS] == "2":
                             self._process_gain(result, Keyword.MINING, in_transactions)
                         else:
                             self.__logger.error(
@@ -524,6 +525,7 @@ class InputPlugin(AbstractInputPlugin):
                     self._process_sell(trade, out_transactions)
                     self._process_buy(trade, in_transactions, out_transactions)
                 if len(market_trades) < _TRADE_RECORD_LIMIT:
+                    sleep(0.1) # Prevents requestTimeOut from too many requests
                     break
                 # Times are inclusive
                 since = int(market_trades[_TRADE_RECORD_LIMIT - 1][_TIMESTAMP]) + 1
