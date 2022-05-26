@@ -15,7 +15,7 @@
 from typing import Callable, Dict, List, Optional, Union
 
 from dali.abstract_transaction import AbstractTransaction
-from dali.dali_configuration import Keyword, is_transaction_type_valid
+from dali.configuration import Keyword, is_transaction_type_valid
 
 
 class OutTransaction(AbstractTransaction):
