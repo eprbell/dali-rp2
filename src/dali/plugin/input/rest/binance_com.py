@@ -20,6 +20,8 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
+# pylint: disable=too-many-lines
+
 import json
 import logging
 from datetime import datetime, timezone
