@@ -34,7 +34,7 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
-from dali.dali_configuration import Keyword
+from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
@@ -527,7 +527,7 @@ class InputPlugin(AbstractInputPlugin):
                     self._process_sell(trade, out_transactions)
                     self._process_buy(trade, in_transactions, out_transactions)
                 if len(market_trades) < _TRADE_RECORD_LIMIT:
-                    sleep(0.1) # Prevents requestTimeOut from too many requests
+                    sleep(0.1)  # Prevents requestTimeOut from too many requests
                     break
                 # Times are inclusive
                 since = int(market_trades[_TRADE_RECORD_LIMIT - 1][_TIMESTAMP]) + 1
@@ -567,7 +567,9 @@ class InputPlugin(AbstractInputPlugin):
                         current_end = current_start + _THIRTY_DAYS_IN_MS
                         break
                     else:
-                        raise Exception(f"Internal error: too many assets dusted at the same time: " f"{self._rp2timestamp_from_ms_epoch(str(current_dribblet_time))}")
+                        raise Exception(
+                            f"Internal error: too many assets dusted at the same time: " f"{self._rp2timestamp_from_ms_epoch(str(current_dribblet_time))}"
+                        )
             else:
 
                 for dust in dust_trades:

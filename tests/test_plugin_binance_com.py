@@ -18,7 +18,7 @@ from typing import Any
 from dateutil import parser
 from rp2.rp2_decimal import RP2Decimal
 
-from dali.dali_configuration import Keyword
+from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
@@ -36,7 +36,7 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
         mocker.patch.object(plugin.client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
             "message": "success",
@@ -192,7 +192,7 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
         mocker.patch.object(plugin.client, "fetch_my_trades").return_value = [
             # Trade using BNB for fee payment
             {
@@ -455,8 +455,8 @@ class TestBinance:
             username="user",
             native_fiat="USD",
         )
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
-        mocker.patch.object(plugin.client, "sapiGetMiningPubAlgoList").return_value = {'data':[{'algoName':'sha256'}]}
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin.client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
         mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "sapiGetAssetAssetDividend").return_value = {
             "rows": [
@@ -486,7 +486,7 @@ class TestBinance:
                     {
                         "time": 1607529600000,
                         "coinName": "BTC",
-                        "type": "0", # String
+                        "type": "0",  # String
                         "dayHashRate": 9942053925926,
                         "profitAmount": 0.85426469,
                         "hashTransfer": 200000000000,
@@ -553,8 +553,8 @@ class TestBinance:
             api_secret="b",
             native_fiat="USD",
         )
-        
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
+
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
         mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "fetch_withdrawals").return_value = [
             {
