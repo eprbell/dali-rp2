@@ -104,11 +104,11 @@ def _resolve_optional_fields(
     )
 
 
-def _get_pair_conversion_rate(timestamp: datetime, from_asset: str, to_asset: str, global_configuration: Dict[str, Any]) -> RateAndPairConverter:
+def _get_pair_conversion_rate(timestamp: datetime, from_asset: str, to_asset: str, exchange: str, global_configuration: Dict[str, Any]) -> RateAndPairConverter:
     rate: Optional[RP2Decimal] = None
     pair_converter: Optional[AbstractPairConverterPlugin] = None
     for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
-        rate = cast(AbstractPairConverterPlugin, pair_converter).get_conversion_rate(timestamp, from_asset, to_asset)
+        rate = cast(AbstractPairConverterPlugin, pair_converter).get_conversion_rate(timestamp, from_asset, to_asset, exchange)
         if rate:
             break
 
@@ -117,6 +117,13 @@ def _get_pair_conversion_rate(timestamp: datetime, from_asset: str, to_asset: st
 
     return RateAndPairConverter(rate, pair_converter)
 
+
+def _get_originating_exchange(transaction: AbstractTransaction) -> str:
+    if isinstance(transaction, (InTransaction, OutTransaction)):
+        return transaction.exchange
+    if isinstance(transaction, IntraTransaction):
+        return transaction.from_exchange
+    raise Exception(f"Internal error: not a transaction: {transaction}")
 
 def _update_spot_price_from_web(transaction: AbstractTransaction, global_configuration: Dict[str, Any]) -> AbstractTransaction:
     init_parameters: Dict[str, Any] = transaction.constructor_parameter_dictionary
@@ -132,6 +139,7 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
             timestamp=transaction.timestamp_value,
             from_asset=transaction.asset,
             to_asset=global_configuration[Keyword.NATIVE_FIAT.value],
+            exchange=_get_originating_exchange(transaction),
             global_configuration=global_configuration,
         )
         if conversion.rate is None:
@@ -171,6 +179,7 @@ def _convert_fiat_fields_to_native_fiat(transaction: AbstractTransaction, global
         timestamp=transaction.timestamp_value,
         from_asset=from_fiat,
         to_asset=to_fiat,
+        exchange=_get_originating_exchange(transaction),
         global_configuration=global_configuration,
     )
     if conversion.rate is None:
