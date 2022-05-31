@@ -18,6 +18,7 @@
 * added country plugin infrastructure (US is the default country plugin)
 * updated generators and rest of the code to use the native fiat from the country plugin (previously it was hard coded as USD)
 * the dali script has been renamed to dali_us to support the new country plugin architecture
+* added exchange hint to pair converter API
 * renamed cache folder from .cache to .dali_cache
 * updated documentation to reflect latest changes
 
