@@ -20,10 +20,7 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2TypeError, RP2ValueError
 
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
-from dali.abstract_transaction import (
-    AbstractTransaction,
-    AssetAndUniqueId,
-)
+from dali.abstract_transaction import AbstractTransaction, AssetAndUniqueId
 from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
@@ -545,7 +542,8 @@ def _resolve_intra_intra_transaction(
 
     notes = f"{notes}; " if notes else ""
     notes += f"{transaction1.notes}; " if transaction1.notes else ""
-    notes += f"{transaction2.notes}; " if transaction2.notes else ""
+    if transaction1.notes != transaction2.notes:
+        notes += f"{transaction2.notes}; " if transaction2.notes else ""
 
     return IntraTransaction(
         plugin=__RESOLVER,
