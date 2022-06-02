@@ -107,7 +107,7 @@ pip install dali-rp2
 * `pip install dali-rp2`
 
 ## Running
-DaLI reads in a user-prepared configuration file in [INI format](https://en.wikipedia.org/wiki/INI_file), which is used to initialize data loaders (plugins) and configure DaLI's behavior. The format of the configuration file is described in detail in the [configuration file](https://github.com/eprbell/dali-rp2/tree/main/docs/configuration_file.md) documentation.
+DaLI reads in a user-prepared configuration file in [INI format](https://en.wikipedia.org/wiki/INI_file), which is used to initialize data loaders and configure DaLI's behavior. The format of the configuration file is described in detail in the [configuration file](https://github.com/eprbell/dali-rp2/tree/main/docs/configuration_file.md) documentation.
 
 An example of a configuration file can be found in [test_config.ini](https://github.com/eprbell/dali-rp2/tree/main/config/test_config.ini).
 
@@ -148,12 +148,12 @@ Then generate the output files for rp2:
 dali_us -s -o output -p test_ test_config.ini
  ```
 
-* `-s` option allows DaLI to retrieve spot price information from Coinbase Pro, when it's not available from the CSV files or REST services.
+* `-s` option allows DaLI to retrieve spot price information from the Internet, when it's not available from the CSV files or REST services.
 * `-o` option specifies the directory where the ODS output file is generated.
 * `-p` is the prefix of the output file.
 * `test_config.ini` is the configuration that ties the inputs together.
 
-To print command usage information for the `dali` command:
+To print command usage information for the `dali_us` command:
 
 ```console
 dali_us --help

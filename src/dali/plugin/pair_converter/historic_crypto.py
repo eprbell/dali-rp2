@@ -32,7 +32,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
     def cache_key(self) -> str:
         return self.name()
 
-    def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+    def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         result: Optional[HistoricalBar] = None
         time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
         # Coinbase API expects UTC timestamps only, see the forum discussion here:

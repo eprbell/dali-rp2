@@ -20,6 +20,8 @@
   * [What are the Design Guidelines?](#what-are-the-design-guidelines)
   * [What is the Best Way to Get Started on DaLI Development?](#what-is-the-best-way-to-get-started-on-dali-development)
   * [How to Develop a DaLI Data Loader Plugin?](#how-to-develop-a-dali-data-loader-plugin)
+  * [How to Develop a DaLI Pair Converter Plugin?](#how-to-develop-a-dali-pair-converter-plugin)
+  * [How to Develop a DaLI Country Plugin?](#how-to-develop-a-dali-country-plugin)
   * [How Does DaLI Merge Transactions Between Different Exchanges/Wallets?](#how-does-dali-merge-transactions-between-different-exchangeswallets)
   * [Why the Strange Directory Structure with Src?](#why-the-strange-directory-structure-with-src)
 
@@ -35,6 +37,12 @@ Read the [design guidelines](../README.dev.md#design-guidelines) section of the 
 Read the [contribution guidelines](../CONTRIBUTING.md#contributing-to-the-repository) and the [developer documentation](../README.dev.md) (especially the Internal Design section). Then look for an unassigned [issue](https://github.com/eprbell/dali-rp2/issues) that is marked as `good first issue`, or ask the project maintainers.
 
 ### How to Develop a DaLI Data Loader Plugin?
+Read the [Internal Design](../README.dev.md#internal-design) section of the Developer Documentation (and in particular the Plugin subsections).
+
+### How to Develop a DaLI Pair Converter Plugin?
+Read the [Internal Design](../README.dev.md#internal-design) section of the Developer Documentation (and in particular the Plugin subsections).
+
+### How to Develop a DaLI Country Plugin?
 Read the [Internal Design](../README.dev.md#internal-design) section of the Developer Documentation (and in particular the Plugin subsections).
 
 ### How Does DaLI Merge Transactions Between Different Exchanges/Wallets?

@@ -19,7 +19,7 @@ from typing import NamedTuple, cast
 from rp2.rp2_error import RP2ValueError
 from rp2.rp2_decimal import RP2Decimal
 
-from dali.dali_configuration import Keyword
+from dali.configuration import Keyword
 
 
 class HistoricalBar(NamedTuple):

@@ -33,6 +33,7 @@
   * [Design Guidelines](#design-guidelines)
   * [Development Workflow](#development-workflow)
   * [Unit Tests](#unit-tests)
+* **[Creating a Release](#creating-a-release)**
 * **[Internal Design](#internal-design)**
   * [The Transaction Resolver](#the-transaction-resolver)
   * [Plugin Development](#plugin-development)
@@ -175,6 +176,23 @@ LOG_LEVEL=DEBUG bin/dali_us -s -o output/ config/test_config.ini
 ### Unit Tests
 Unit tests are in the [tests](tests) directory. Please add unit tests for any new code.
 
+## Creating a Release
+This section is for project maintainers.
+
+To create a new release:
+* add a section named as the new version in CHANGELOG.md
+* use the output of `git log` to collect significant changes since last version and add them to CHANGELOG.md as a list of brief bullet points
+* `git add CHANGELOG.md`
+* `git commit -m "Updated with latest changes" CHANGELOG.md`
+* `bumpversion patch` (or `bumpversion minor` or `bumpversion major`)
+* `git push`
+* wait for all tests to pass successfully on Github
+* add a tag in Github (named the same as the version but with a `v` in front, e.g. `v1.0.4`):  click on "Releases" and then "Draft a new release"
+
+To create a Pypi distribution:
+* `make distribution`
+* `make upload_distribution`
+
 ## Internal Design
 DaLI's control flow is as follows (see [dali_main.py](src/dali/dali_main.py)):
 * parse the INI configuration file which includes plugin initialization parameters and global configuration sections;
@@ -218,9 +236,7 @@ All pair converter plugins are subclasses of [AbstractPairConverterPlugin](src/d
 Pair converter plugins live in the following directory:
 * `src/dali/plugin/pair_converter`.
 
-If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`.
-
-For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
+For an example of pair converter look at the [Historic-Crypto](src/dali/plugin/pair_converter/historic_crypto.py) plugin.
 
 #### Country Plugin Development
 Country plugins are reused from RP2. To add support for a new country in DaLI:
@@ -229,16 +245,22 @@ Country plugins are reused from RP2. To add support for a new country in DaLI:
 * in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file.
 
 ### Plugin Laundry List
-When submitting a new data loader plugin open a [PR](https://github.com/eprbell/dali-rp2/pulls) and make sure all the following bullet points apply to your code:
+When submitting a new plugin open a [PR](https://github.com/eprbell/dali-rp2/pulls) and make sure all the following bullet points apply to your code:
 1. the plugin is privacy-focused: it doesn't send user data anywhere;
 2. the plugin follows the [contribution guidelines](CONTRIBUTING.md#contributing-to-the-repository);
-3. the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
-4. the plugin creates transactions that have `unique_id` populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the [transaction resolver](#the-transaction-resolver);
-5. CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
+3. the plugin has one or more [unit test](tests/);
+4. the plugin and its initialization parameters are documented in a section of [docs/configuration_file.md](docs/configuration_file.md).
+5. the plugin lives in the appropriate subdirectory of `src/dali/plugin/`;
+
+Data-loader-specific list:
+
+6. the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
+7. the plugin creates transactions that have `unique_id` populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the [transaction resolver](#the-transaction-resolver);
+8. CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
     ```
     # CSV Format: timestamp; type; transaction_id; address; fee; total
     ```
-6. REST plugins have three comments at the beginning of the file, containing links to:
+9. REST plugins have three comments at the beginning of the file, containing links to:
   * REST API documentation
   * authentication procedure documentation
   * URL of the REST endpoint
@@ -249,19 +271,18 @@ When submitting a new data loader plugin open a [PR](https://github.com/eprbell/
     # Authentication: https://developers.coinbase.com/docs/wallet/api-key-authentication
     # Endpoint: https://api.coinbase.com
 ```
-7. the plugin's `load()` method is implemented and returns a list of AbstractTransaction subclasses;
-8. the plugin's `__init__()` method calls the superclass constructor:
+10. the plugin's `load()` method is implemented and returns a list of AbstractTransaction subclasses;
+11. the plugin's `__init__()` method calls the superclass constructor:
     ```
     super().__init__(account_holder)
     ```
-9. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameters to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
+12. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameters to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
     ```
-10. the plugin uses `self.__logger.debug()` throughout its code to capture all native-format data (which is is useful for debugging). Note that `logger.debug()` calls only occur if the user sets `LOG_LEVEL=DEBUG`;
-11. CSV plugins have one or more [unit test](tests/);
-12. REST plugins have one or more [unit tests](tests/): use pytest-mock to simulate network calls (see [test_plugin_coinbase.py](tests/test_plugin_coinbase.py) for an example of this);
-13. the plugin and its initialization parameters are documented in s section in [docs/configuration_file.md](docs/configuration_file.md#data-loader-plugin-sections).
+13. the plugin uses `self.__logger.debug()` throughout its code to capture all native-format data (which is is useful for debugging). Note that `logger.debug()` calls only occur if the user sets `LOG_LEVEL=DEBUG`;
+14. CSV plugins have one or more [unit test](tests/);
+15. REST plugins have one or more [unit tests](tests/): use pytest-mock to simulate network calls (see [test_plugin_coinbase.py](tests/test_plugin_coinbase.py) for an example of this);
 
 ## Frequently Asked Developer Questions
 Read the [frequently asked developer questions](docs/developer_faq.md).
