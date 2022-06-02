@@ -56,7 +56,7 @@ class TestHistoricCryptoPlugin:
         )
 
         # Read price without cache
-        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD")
+        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "Coinbase")
 
         assert data
         assert data.timestamp == BAR_TIMESTAMP
@@ -68,7 +68,7 @@ class TestHistoricCryptoPlugin:
         assert data.volume == BAR_VOLUME
 
         # Read price again, but populate plugin cache this time
-        value = plugin.get_conversion_rate(BAR_TIMESTAMP, "BTC", "USD")
+        value = plugin.get_conversion_rate(BAR_TIMESTAMP, "BTC", "USD", "Coinbase")
         assert value
         assert value == BAR_HIGH
 
@@ -98,5 +98,5 @@ class TestHistoricCryptoPlugin:
 
         mocker.patch.object(plugin, "get_historic_bar_from_native_source").return_value = None
 
-        data = plugin.get_historic_bar_from_native_source(timestamp, "EUR", "JPY")
+        data = plugin.get_historic_bar_from_native_source(timestamp, "EUR", "JPY", "Coinbase")
         assert data is None
