@@ -16,6 +16,7 @@ from typing import NamedTuple, Optional
 
 import pytest
 
+from dali.configuration import Keyword
 from dali.intra_transaction import IntraTransaction
 from dali.transaction_resolver import _resolve_intra_intra_transaction
 
@@ -42,18 +43,18 @@ intra_transaction_notes_test_cases = [
 
 
 @pytest.mark.parametrize("prior_notes, notes1, notes2, resolved_notes", intra_transaction_notes_test_cases)
-def test_resolve_intra_intra_transaction_notes(prior_notes: Optional[str], notes1: Optional[str], notes2: Optional[str], resolved_notes: Optional[str]) -> None:
-    """Verify resolved notes matches expected value."""
+def test_resolve_intra_intra_transaction(prior_notes: Optional[str], notes1: Optional[str], notes2: Optional[str], resolved_notes: Optional[str]) -> None:
+    """Verify resolved transaction matches expected values."""
     transaction1 = IntraTransaction(
         plugin="plugin",
         unique_id="unique_id",
         raw_data="raw_data1",
         asset="asset",
         timestamp="2022-01-01 00:00:00+00:00",
-        from_exchange="from_exchange",
-        from_holder="from_holder",
-        to_exchange="to_exchange",
-        to_holder="to_holder",
+        from_exchange="from_exchange1",
+        from_holder="from_holder1",
+        to_exchange=Keyword.UNKNOWN.value,
+        to_holder=Keyword.UNKNOWN.value,
         spot_price=None,
         crypto_sent="1.0",
         crypto_received="1.0",
@@ -66,15 +67,20 @@ def test_resolve_intra_intra_transaction_notes(prior_notes: Optional[str], notes
         raw_data="raw_data2",
         asset="asset",
         timestamp="2022-01-01 00:00:00+00:00",
-        from_exchange="from_exchange",
-        from_holder="from_holder",
-        to_exchange="to_exchange",
-        to_holder="to_holder",
-        spot_price=None,
+        from_exchange=Keyword.UNKNOWN.value,
+        from_holder=Keyword.UNKNOWN.value,
+        to_exchange="to_exchange2",
+        to_holder="to_holder2",
+        spot_price="1000.0",
         crypto_sent="1.0",
         crypto_received="1.0",
         notes=notes2,
     )
 
     resolved = _resolve_intra_intra_transaction(transaction1, transaction2, prior_notes)
+    assert resolved.from_exchange == "from_exchange1"
+    assert resolved.from_holder == "from_holder1"
+    assert resolved.to_exchange == "to_exchange2"
+    assert resolved.to_holder == "to_holder2"
+    assert resolved.spot_price == "1000.0"
     assert resolved.notes == resolved_notes
