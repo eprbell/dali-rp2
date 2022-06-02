@@ -21,7 +21,7 @@ from rp2.rp2_error import RP2TypeError, RP2ValueError
 
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import AbstractTransaction, AssetAndUniqueId
-from dali.dali_configuration import Keyword, is_unknown, is_unknown_or_none
+from dali.configuration import Keyword, is_unknown, is_unknown_or_none
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
