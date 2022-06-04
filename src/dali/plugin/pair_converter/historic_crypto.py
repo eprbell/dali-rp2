@@ -16,16 +16,13 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from Historic_Crypto import HistoricalData
-
 from rp2.rp2_decimal import RP2Decimal
 
-from dali.historical_bar import HistoricalBar
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
+from dali.historical_bar import HistoricalBar
 
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
-
-    # pylint: disable=no-self-use
     def name(self) -> str:
         return "Historic-Crypto"
 

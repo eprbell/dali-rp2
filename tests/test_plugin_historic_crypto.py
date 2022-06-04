@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta, timezone
 import os
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from rp2.rp2_decimal import RP2Decimal
@@ -23,7 +23,6 @@ from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.historic_crypto import PairConverterPlugin
-
 
 BAR_DURATION: timedelta = timedelta(seconds=60)
 BAR_TIMESTAMP: datetime = datetime(2020, 6, 1, 0, 0).replace(tzinfo=timezone.utc)
@@ -35,8 +34,6 @@ BAR_VOLUME: RP2Decimal = RP2Decimal("1")
 
 
 class TestHistoricCryptoPlugin:
-
-    # pylint: disable=no-self-use
     def test_historical_prices(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
@@ -91,7 +88,6 @@ class TestHistoricCryptoPlugin:
         assert data.close == BAR_CLOSE
         assert data.volume == BAR_VOLUME
 
-    # pylint: disable=no-self-use
     def test_missing_historical_prices(self, mocker: Any) -> None:
         plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         timestamp = datetime(2020, 6, 1, 0, 0)
