@@ -22,8 +22,6 @@ from dali.plugin.input.rest.coinbase import InputPlugin
 
 
 class TestTrade:
-
-    # pylint: disable=no-self-use
     def test_eth2_stake(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",

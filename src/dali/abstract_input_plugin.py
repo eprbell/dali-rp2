@@ -33,7 +33,6 @@ class AbstractInputPlugin:
         self.__account_holder: str = account_holder
         self.__native_fiat: Optional[str] = native_fiat
 
-    # pylint: disable=no-self-use
     def cache_key(self) -> Optional[str]:
         return None
 
