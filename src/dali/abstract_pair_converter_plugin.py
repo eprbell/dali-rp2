@@ -23,14 +23,21 @@ from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 
+import requests
+from requests.models import Response
+from requests.sessions import Session
+
+_SUCCESS = "success"
 
 class AssetPairAndTimestamp(NamedTuple):
     timestamp: datetime
     from_asset: str
     to_asset: str
-
+    exchange: str
 
 class AbstractPairConverterPlugin:
+    ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
+    __TIMEOUT: int = 30
     def __init__(self, historical_price_type: str) -> None:
         if not isinstance(historical_price_type, str):
             raise RP2TypeError(f"historical_price_type is not a string: {historical_price_type}")
@@ -41,6 +48,7 @@ class AbstractPairConverterPlugin:
         result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
         self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
+        self.__session: Session = requests.Session()
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -62,7 +70,7 @@ class AbstractPairConverterPlugin:
     def get_conversion_rate(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[RP2Decimal]:
         result: Optional[RP2Decimal] = None
         historical_bar: Optional[HistoricalBar] = None
-        key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset)
+        key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange)
         log_message_qualifier: str = ""
         if key in self.__cache:
             historical_bar = self.__cache[key]
@@ -87,3 +95,18 @@ class AbstractPairConverterPlugin:
             )
 
         return result
+
+    def get_fiat_exchange_rate(self, timestamp:datetime, from_asset:str, to_asset:str) -> Optional[RP2Decimal]:
+        result: Optional[RP2Decimal] = None
+        params: Dict[str, Any] = {"base":from_asset, "symbols":to_asset}
+        # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
+        response: Response = self.__session.get(f"https://api.exchangerate.host/{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+        data: Any = response.json()
+        if data[_SUCCESS]:
+            return RP2Decimal(str(data[_RATES][to_asset]))
+        else:
+            return None
+
+
+
+
