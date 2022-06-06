@@ -27,7 +27,7 @@ from dali.plugin.pair_converter.ccxt_converter import PairConverterPlugin
 
 BAR_DURATION: str = "1m"
 BAR_EXCHANGE: str = "Binance.com"
-BAR_TIMESTAMP: datetime = 1504541580000
+BAR_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580)
 BAR_LOW: RP2Decimal = RP2Decimal("4230.0")
 BAR_HIGH: RP2Decimal = RP2Decimal("4240.6")
 BAR_OPEN: RP2Decimal = RP2Decimal("4235.4")
@@ -57,7 +57,12 @@ class TestCcxtConverterPlugin:
                 "secret": "secret",
             }
         )
-        mocker.patch.object(exchange, "fetch_ohlcv").return_value = [
+        mocker.patch.object(plugin, "exchange_markets").return_value = {BAR_EXCHANGE:
+            [
+                "BTCUSDT",
+            ]
+        }
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
                 BAR_OPEN,       # (O)pen price, float
@@ -67,12 +72,11 @@ class TestCcxtConverterPlugin:
                 BAR_VOLUME      # (V)olume (in terms of the base currency), float
             ],
         ]
-        mocker.patch.object(plugin, "exchanges").return_value = {BAR_EXCHANGE: exchange}
+        mocker.patch.object(plugin, "exchanges", {BAR_EXCHANGE: exchange})
 
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", BAR_EXCHANGE)
 
         assert data
-        assert data.timestamp == BAR_TIMESTAMP
         assert data.timestamp == BAR_TIMESTAMP
         assert data.low == BAR_LOW
         assert data.high == BAR_HIGH
@@ -111,5 +115,5 @@ class TestCcxtConverterPlugin:
 
         mocker.patch.object(plugin, "get_historic_bar_from_native_source").return_value = None
 
-        data = plugin.get_historic_bar_from_native_source(timestamp, "EUR", "JPY", BAR_EXCHANGE)
+        data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", BAR_EXCHANGE)
         assert data is None	
