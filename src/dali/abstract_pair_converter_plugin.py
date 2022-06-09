@@ -101,6 +101,21 @@ class AbstractPairConverterPlugin:
         params: Dict[str, Any] = {"base":from_asset, "symbols":to_asset}
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
         response: Response = self.__session.get(f"https://api.exchangerate.host/{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+        # {
+        #     'motd': 
+        #         {
+        #             'msg': 'If you or your company ...', 
+        #             'url': 'https://exchangerate.host/#/donate'
+        #         }, 
+        #     'success': True, 
+        #     'historical': True, 
+        #     'base': 'EUR', 
+        #     'date': '2020-04-04', 
+        #     'rates': 
+        #         {
+        #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
+        #         }
+        # }
         data: Any = response.json()
         if data[_SUCCESS]:
             return RP2Decimal(str(data[_RATES][to_asset]))
