@@ -117,3 +117,122 @@ class TestCcxtConverterPlugin:
 
         data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", BAR_EXCHANGE)
         assert data is None	
+
+    # Some crypto assets have no fiat or stable coin pair; they are only paired with BTC or ETH (e.g. EZ or BETH)
+    # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
+    def test_no_fiat_pair(self, mocker: Any) -> None:  
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        mocker.patch.object(plugin, "exchange_markets").return_value = {TEST_EXCHANGE:
+            [
+                "BETHETH",
+                "ETHUSDT",
+            ]
+        }
+        def no_fiat_fetchOHLCV(self, symbol: str) -> List[List[float, int]]:
+            if symbol == "BETHETH":
+                return [
+                    [
+                        BETHETH_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                        BETHETH_OPEN,       # (O)pen price, float
+                        BETHETH_HIGH,       # (H)ighest price, float
+                        BETHETH_LOW,        # (L)owest price, float
+                        BETHETH_CLOSE,      # (C)losing price, float
+                        BETHETH_VOLUME      # (V)olume (in terms of the base currency), float
+                    ],
+                ]
+            elif symbol == "ETHUSDT":
+                return [
+                    [
+                        BETHETH_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                        ETHUSDT_OPEN,       # (O)pen price, float
+                        ETHUSDT_HIGH,       # (H)ighest price, float
+                        ETHUSDT_LOW,        # (L)owest price, float
+                        ETHUSDT_CLOSE,      # (C)losing price, float
+                        ETHUSDT_VOLUME      # (V)olume (in terms of the base currency), float
+                    ],
+                ] 
+
+        mocker.patch.object(exchange, "fetchOHLCV").side_effect = no_fiat_fetchOHLCV
+        mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
+
+        data = plugin.get_historic_bar_from_native_source(BETHETH_TIMESTAMP, "BETH", "USD", TEST_EXCHANGE)
+
+        assert data        
+        assert data.timestamp == BETHETH_TIMESTAMP
+        assert data.low == BETHETH_LOW * ETHUSDT_LOW
+        assert data.high == BETHETH_HIGH * ETHUSDT_HIGH
+        assert data.open == BETHETH_OPEN * ETHUSDT_OPEN
+        assert data.close == BETHETH_CLOSE * ETHUSDT_CLOSE
+        assert data.volume == BETHETH_VOLUME
+
+    # Test to make sure the default stable coin is not used with a fiat market that does exist on the exchange
+    def test_nonusd_fiat_pair(self, mocker: Any) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        mocker.patch.object(plugin, "exchange_markets").return_value = {TEST_EXCHANGE:
+            [
+                "BTCGBP",
+            ]
+        }
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+            [
+                BTCGBP_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                BTCGBP_OPEN,       # (O)pen price, float
+                BTCGBP_HIGH,       # (H)ighest price, float
+                BTCGBP_LOW,        # (L)owest price, float
+                BTCGBP_CLOSE,      # (C)losing price, float
+                BTCGBP_VOLUME      # (V)olume (in terms of the base currency), float
+            ],
+        ]
+        mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
+
+        data = plugin.get_historic_bar_from_native_source(BTCGBP_TIMESTAMP, "BTC", "GBP", TEST_EXCHANGE)
+
+        assert data
+        assert data.timestamp == BTCGBP_TIMESTAMP
+        assert data.low == BTCGBP_LOW
+        assert data.high == BTCGBP_HIGH
+        assert data.open == BTCGBP_OPEN
+        assert data.close == BTCGBP_CLOSE
+        assert data.volume == BTCGBP_VOLUME
+
+    # Plugin should hand off the handling of a fiat to fiat pair to the fiat converter
+    def test_fiat_pair(self, mocker: Any) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+
+        # Need to be mocked to prevent logger spam
+        mocker.patch.object(plugin, "exchange_markets").return_value = {TEST_EXCHANGE:
+            [
+                "WHATEVER",
+            ]
+        }
+        mocker.patch.object(plugin, "get_fiat_exchange_rate").return_value = EUR_USD_RATE
+        mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
+
+        data = plugin.get_historic_bar_from_native_source(EUR_USD_TIMESTAMP, "EUR", "USD", TEST_EXCHANGE)
+
+        assert data
+        assert data.timestamp == EUR_USD_TIMESTAMP
+        assert data.low == EUR_USD_RATE
+        assert data.high == EUR_USD_RATE
+        assert data.open == EUR_USD_RATE
+        assert data.close == EUR_USD_RATE
+        assert data.volume == EUR_USD_RATE
+        assert plugin.get_fiat_exchange_rate.called_once()
