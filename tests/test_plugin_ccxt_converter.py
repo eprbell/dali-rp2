@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta, timezone # CHECK
+from datetime import datetime
 import os
-from typing import Any
+from typing import Any, List, Union
 
 from ccxt import binance
 
@@ -25,14 +25,46 @@ from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.plugin.pair_converter.ccxt_converter import PairConverterPlugin
 
+# Default exchange
+TEST_EXCHANGE: str = "Binance.com"
+
+# BTCUSDT conversion
 BAR_DURATION: str = "1m"
-BAR_EXCHANGE: str = "Binance.com"
 BAR_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580)
 BAR_LOW: RP2Decimal = RP2Decimal("4230.0")
 BAR_HIGH: RP2Decimal = RP2Decimal("4240.6")
 BAR_OPEN: RP2Decimal = RP2Decimal("4235.4")
 BAR_CLOSE: RP2Decimal = RP2Decimal("4230.7")
 BAR_VOLUME: RP2Decimal = RP2Decimal("37.72941911")
+
+# Missing Fiat Test
+JPY_USD_RATE: RP2Decimal = RP2Decimal("115")
+
+# No Fiat pair conversion
+BETHETH_TIMESTAMP: datetime = datetime.fromtimestamp(1504541590)
+BETHETH_LOW: RP2Decimal = RP2Decimal("0.9722")
+BETHETH_HIGH: RP2Decimal = RP2Decimal("0.9739")
+BETHETH_OPEN: RP2Decimal = RP2Decimal("0.9736")
+BETHETH_CLOSE: RP2Decimal = RP2Decimal("0.9735")
+BETHETH_VOLUME: RP2Decimal = RP2Decimal("309")
+
+ETHUSDT_LOW: RP2Decimal = RP2Decimal("1753.75")
+ETHUSDT_HIGH: RP2Decimal = RP2Decimal("1764.70")
+ETHUSDT_OPEN: RP2Decimal = RP2Decimal("1755.81")
+ETHUSDT_CLOSE: RP2Decimal = RP2Decimal("1763.03")
+ETHUSDT_VOLUME: RP2Decimal = RP2Decimal("434")
+
+# Non-USD Fiat pair conversion
+BTCGBP_TIMESTAMP: datetime = datetime.fromtimestamp(1504541600)
+BTCGBP_LOW: RP2Decimal = RP2Decimal("3379.06")
+BTCGBP_HIGH: RP2Decimal = RP2Decimal("3387.53")
+BTCGBP_OPEN: RP2Decimal = RP2Decimal("3383.29")
+BTCGBP_CLOSE: RP2Decimal = RP2Decimal("3379.66")
+BTCGBP_VOLUME: RP2Decimal = RP2Decimal("37.72941911")
+
+# Fiat to Fiat Test
+EUR_USD_RATE: RP2Decimal = RP2Decimal("1.0847")
+EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400)
 
 class TestCcxtConverterPlugin:
 
@@ -57,11 +89,13 @@ class TestCcxtConverterPlugin:
                 "secret": "secret",
             }
         )
-        mocker.patch.object(plugin, "exchange_markets").return_value = {BAR_EXCHANGE:
-            [
-                "BTCUSDT",
-            ]
-        }
+        mocker.patch.object(plugin, "exchange_markets", {
+            TEST_EXCHANGE:
+                [
+                    "BTCUSDT",
+                ]
+            }
+        )
         mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
@@ -72,9 +106,9 @@ class TestCcxtConverterPlugin:
                 BAR_VOLUME      # (V)olume (in terms of the base currency), float
             ],
         ]
-        mocker.patch.object(plugin, "exchanges", {BAR_EXCHANGE: exchange})
+        mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
 
-        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", BAR_EXCHANGE)
+        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
 
         assert data
         assert data.timestamp == BAR_TIMESTAMP
@@ -85,7 +119,7 @@ class TestCcxtConverterPlugin:
         assert data.volume == BAR_VOLUME
 
         # Read price again, but populate plugin cache this time
-        value = plugin.get_conversion_rate(BAR_TIMESTAMP, "BTC", "USD", BAR_EXCHANGE)
+        value = plugin.get_conversion_rate(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
         assert value
         assert value == BAR_HIGH
 
@@ -94,7 +128,7 @@ class TestCcxtConverterPlugin:
 
         # Load plugin cache and verify
         cache = load_from_cache(plugin.cache_key())
-        key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD", BAR_EXCHANGE)
+        key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
         assert len(cache) == 1, str(cache)
         assert key in cache
         data = cache[key]
@@ -115,27 +149,29 @@ class TestCcxtConverterPlugin:
 
         mocker.patch.object(plugin, "get_historic_bar_from_native_source").return_value = None
 
-        data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", BAR_EXCHANGE)
+        data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", TEST_EXCHANGE)
         assert data is None	
 
     # Some crypto assets have no fiat or stable coin pair; they are only paired with BTC or ETH (e.g. EZ or BETH)
     # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
     def test_no_fiat_pair(self, mocker: Any) -> None:  
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, '{"BETH":"BETHETH"}')
         exchange = binance(
             {
                 "apiKey": "key",
                 "secret": "secret",
             }
         )
-        mocker.patch.object(plugin, "exchange_markets").return_value = {TEST_EXCHANGE:
-            [
-                "BETHETH",
-                "ETHUSDT",
-            ]
-        }
-        def no_fiat_fetchOHLCV(self, symbol: str) -> List[List[float, int]]:
-            if symbol == "BETHETH":
+        mocker.patch.object(plugin, "exchange_markets", {
+            TEST_EXCHANGE:
+                [
+                    "BETHETH",
+                    "ETHUSDT",
+                ]
+            }
+        )
+        def no_fiat_fetchOHLCV(symbol: str, timeframe: str, timestamp: int, candles: int) -> List[List[Union[float, int]]]:
+            if symbol == "BETH/ETH":
                 return [
                     [
                         BETHETH_TIMESTAMP,  # UTC timestamp in milliseconds, integer
@@ -146,7 +182,7 @@ class TestCcxtConverterPlugin:
                         BETHETH_VOLUME      # (V)olume (in terms of the base currency), float
                     ],
                 ]
-            elif symbol == "ETHUSDT":
+            elif symbol == "ETH/USDT":
                 return [
                     [
                         BETHETH_TIMESTAMP,  # UTC timestamp in milliseconds, integer
@@ -180,11 +216,7 @@ class TestCcxtConverterPlugin:
                 "secret": "secret",
             }
         )
-        mocker.patch.object(plugin, "exchange_markets").return_value = {TEST_EXCHANGE:
-            [
-                "BTCGBP",
-            ]
-        }
+        mocker.patch.object(plugin, "exchange_markets", {TEST_EXCHANGE:["BTCGBP"]})
         mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 BTCGBP_TIMESTAMP,  # UTC timestamp in milliseconds, integer
@@ -218,11 +250,7 @@ class TestCcxtConverterPlugin:
         )
 
         # Need to be mocked to prevent logger spam
-        mocker.patch.object(plugin, "exchange_markets").return_value = {TEST_EXCHANGE:
-            [
-                "WHATEVER",
-            ]
-        }
+        mocker.patch.object(plugin, "exchange_markets", {TEST_EXCHANGE:["WHATEVER"]})
         mocker.patch.object(plugin, "get_fiat_exchange_rate").return_value = EUR_USD_RATE
         mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
 
