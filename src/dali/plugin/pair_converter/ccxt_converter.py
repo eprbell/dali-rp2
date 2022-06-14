@@ -79,6 +79,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
 
+        # If both assets are fiat, skip further processing
+        if from_asset in self.fiat_list and to_asset in self.fiat_list:
+            return self.get_fiat_exchange_rate(timestamp, from_asset, to_asset)
+
         # Caching of exchanges
         if exchange not in self.exchanges:
             if exchange in _EXCHANGEDICT:

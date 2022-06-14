@@ -23,6 +23,7 @@ from rp2.rp2_decimal import RP2Decimal
 from dali.abstract_pair_converter_plugin import AssetPairAndTimestamp
 from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
+from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.ccxt_converter import PairConverterPlugin
 
 # Default exchange
@@ -205,7 +206,7 @@ class TestCcxtConverterPlugin:
         assert data.high == BETHETH_HIGH * ETHUSDT_HIGH
         assert data.open == BETHETH_OPEN * ETHUSDT_OPEN
         assert data.close == BETHETH_CLOSE * ETHUSDT_CLOSE
-        assert data.volume == BETHETH_VOLUME
+        assert data.volume == BETHETH_VOLUME 
 
     # Test to make sure the default stable coin is not used with a fiat market that does exist on the exchange
     def test_nonusd_fiat_pair(self, mocker: Any) -> None:
@@ -251,7 +252,15 @@ class TestCcxtConverterPlugin:
 
         # Need to be mocked to prevent logger spam
         mocker.patch.object(plugin, "exchange_markets", {TEST_EXCHANGE:["WHATEVER"]})
-        mocker.patch.object(plugin, "get_fiat_exchange_rate").return_value = EUR_USD_RATE
+        mocker.patch.object(plugin, "get_fiat_exchange_rate").return_value = HistoricalBar(
+            duration=86400,
+            timestamp=EUR_USD_TIMESTAMP,
+            open=RP2Decimal(str(EUR_USD_RATE)),
+            high=RP2Decimal(str(EUR_USD_RATE)),
+            low=RP2Decimal(str(EUR_USD_RATE)),
+            close=RP2Decimal(str(EUR_USD_RATE)),
+            volume=Keyword.UNKNOWN.value,
+        )
         mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
 
         data = plugin.get_historic_bar_from_native_source(EUR_USD_TIMESTAMP, "EUR", "USD", TEST_EXCHANGE)
@@ -262,5 +271,5 @@ class TestCcxtConverterPlugin:
         assert data.high == EUR_USD_RATE
         assert data.open == EUR_USD_RATE
         assert data.close == EUR_USD_RATE
-        assert data.volume == EUR_USD_RATE
+        assert data.volume == Keyword.UNKNOWN.value
         assert plugin.get_fiat_exchange_rate.called_once()

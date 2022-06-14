@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, NamedTuple, Optional, cast
 
 from rp2.rp2_decimal import RP2Decimal
@@ -27,7 +27,12 @@ import requests
 from requests.models import Response
 from requests.sessions import Session
 
+# exchangerates.host keywords
 _SUCCESS = "success"
+_SYMBOLS = "symbols"
+_RATES = "rates"
+
+_DAYS_IN_S = 86400
 
 class AssetPairAndTimestamp(NamedTuple):
     timestamp: datetime
@@ -49,6 +54,32 @@ class AbstractPairConverterPlugin:
         self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
+        self.fiat_list: List[str] = []
+
+        response: Response = self.__session.get(f"https://api.exchangerate.host/symbols", timeout=self.__TIMEOUT)         
+        # {
+        #     'motd': 
+        #         {
+        #             'msg': 'If you or your company ...', 
+        #             'url': 'https://exchangerate.host/#/donate'
+        #         }, 
+        #     'success': True, 
+        #     'symbols': 
+        #         {
+        #             'AED': 
+        #                 {
+        #                     'description': 'United Arab Emirates Dirham', 
+        #                     'code': 'AED'
+        #                 },
+        #             ...
+        #         }
+        # }
+        data: Any = response.json()
+        if data[_SUCCESS]:
+            for fiat_iso in data[_SYMBOLS]:
+                # Exchangerate.hosts inappropriately includes BTC
+                if fiat_iso != "BTC":
+                    self.fiat_list.append(fiat_iso)
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -118,7 +149,15 @@ class AbstractPairConverterPlugin:
         # }
         data: Any = response.json()
         if data[_SUCCESS]:
-            return RP2Decimal(str(data[_RATES][to_asset]))
+            return HistoricalBar(
+                        duration=_DAYS_IN_S,
+                        timestamp=timestamp,
+                        open=RP2Decimal(str(data[_RATES][to_asset])),
+                        high=RP2Decimal(str(data[_RATES][to_asset])),
+                        low=RP2Decimal(str(data[_RATES][to_asset])),
+                        close=RP2Decimal(str(data[_RATES][to_asset])),
+                        volume=0,
+                    )
         else:
             return None
 
