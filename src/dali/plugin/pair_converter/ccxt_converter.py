@@ -50,7 +50,7 @@ class StableCoin(NamedTuple):
     symbol: str
     fiat_code: str
 
-# Default Stable coins
+# Default Stable coin for each exchange
 # This should be the stable coin with the most volume on the exchange
 _DEFAULTSTABLEDICT = {
     _BINANCE:StableCoin(symbol="USDT", fiat_code="USD"),
@@ -107,16 +107,19 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND) 
         historical_data: List[float,int] = []
         bridge_asset: str = None
-        pricing_alt_used: bool = False
-        original_to_asset: str = to_asset
+        bridge_fiat: str = None
 
         market_symbol = from_asset + to_asset
 
         # Use the default stable coin if the fiat market doesn't exist
         # If stable coin market doesn't exist find alt trading pair
         if market_symbol not in current_markets:
-            to_asset = _DEFAULTSTABLEDICT[exchange].symbol
-            market_symbol = from_asset + to_asset
+            if _DEFAULTSTABLEDICT[exchange].fiat_code == to_asset:
+                to_asset = _DEFAULTSTABLEDICT[exchange].symbol
+                market_symbol = from_asset + to_asset
+            elif to_asset in self.fiat_list:
+                bridge_fiat = _DEFAULTSTABLEDICT[exchange].symbol
+                market_symbol = from_asset + bridge_fiat
 
         result: Optional[HistoricalBar] = None
         retry_count: int = 0
@@ -145,10 +148,15 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 else:
                     return None
 
-            market_symbol = bridge_asset + to_asset
+            # Check for the bridge fiat if one exists, otherwise use the to_asset
+            market_symbol = bridge_asset + (to_asset if bridge_fiat is None else bridge_fiat)
             if market_symbol not in current_markets:
-                to_asset = _DEFAULTSTABLEDICT[exchange].symbol
-                market_symbol = bridge_asset + to_asset
+                if bridge_fiat is not None:
+                    bridge_fiat = _DEFAULTSTABLEDICT[exchange].symbol
+                    market_symbol = bridge_asset + bridge_fiat
+                else:
+                    to_asset = _DEFAULTSTABLEDICT[exchange].symbol
+                    market_symbol = bridge_asset + to_asset
 
                 if market_symbol not in current_markets:
                     self.__logger.error("Internal Error: Too many pricing alternatives for asset: %s. Please open an issue at %s", from_asset, self.ISSUES_URL)
@@ -171,7 +179,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 # ]
 
                 if bridge_data:
-                    historical_data: List[List[Union[float, int]]] = current_exchange.fetchOHLCV(f"{bridge_asset}/{to_asset}", timeframe, ms_timestamp, 1) 
+                    historical_data: List[List[Union[float, int]]] = current_exchange.fetchOHLCV(f"{bridge_asset}/{(to_asset if bridge_fiat is None else bridge_fiat)}", timeframe, ms_timestamp, 1) 
                     if historical_data:
                         result = HistoricalBar(
                             duration= _TIMEGRANULARITY_IN_S[retry_count],
@@ -192,7 +200,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             while retry_count < len(_TIMEGRANULARITY):
 
                 timeframe = _TIMEGRANULARITY[retry_count]
-                historical_data: List[List[Union[float, int]]] = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1) 
+                historical_data: List[List[Union[float, int]]] = current_exchange.fetchOHLCV(f"{from_asset}/{(to_asset if bridge_fiat is None else bridge_fiat)}", timeframe, ms_timestamp, 1) 
                 # If there is no candle the list will be empty
                 if historical_data: 
                     result = HistoricalBar(
@@ -207,6 +215,18 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     break
 
                 retry_count += 1
+
+        if bridge_fiat is not None:
+            fiat_exchange_rate: HistoricalBar = self.get_fiat_exchange_rate(timestamp, bridge_fiat, to_asset)
+            result = HistoricalBar(
+                duration=result.duration,
+                timestamp=result.timestamp,
+                open=result.open * fiat_exchange_rate.open,
+                high=result.high * fiat_exchange_rate.high,
+                low=result.low * fiat_exchange_rate.low,
+                close=result.close * fiat_exchange_rate.close,
+                volume=result.volume,
+            )    
 
         return result
 

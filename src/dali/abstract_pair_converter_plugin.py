@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from datetime import date, datetime, timedelta
+import traceback
 from typing import Dict, NamedTuple, Optional, cast
 
 from rp2.rp2_decimal import RP2Decimal
@@ -56,30 +57,34 @@ class AbstractPairConverterPlugin:
         self.__session: Session = requests.Session()
         self.fiat_list: List[str] = []
 
-        response: Response = self.__session.get(f"https://api.exchangerate.host/symbols", timeout=self.__TIMEOUT)         
-        # {
-        #     'motd': 
-        #         {
-        #             'msg': 'If you or your company ...', 
-        #             'url': 'https://exchangerate.host/#/donate'
-        #         }, 
-        #     'success': True, 
-        #     'symbols': 
-        #         {
-        #             'AED': 
-        #                 {
-        #                     'description': 'United Arab Emirates Dirham', 
-        #                     'code': 'AED'
-        #                 },
-        #             ...
-        #         }
-        # }
-        data: Any = response.json()
-        if data[_SUCCESS]:
-            for fiat_iso in data[_SYMBOLS]:
-                # Exchangerate.hosts inappropriately includes BTC
-                if fiat_iso != "BTC":
-                    self.fiat_list.append(fiat_iso)
+        try:
+            response: Response = self.__session.get(f"https://api.exchangerate.host/symbols", timeout=self.__TIMEOUT)         
+            # {
+            #     'motd': 
+            #         {
+            #             'msg': 'If you or your company ...', 
+            #             'url': 'https://exchangerate.host/#/donate'
+            #         }, 
+            #     'success': True, 
+            #     'symbols': 
+            #         {
+            #             'AED': 
+            #                 {
+            #                     'description': 'United Arab Emirates Dirham', 
+            #                     'code': 'AED'
+            #                 },
+            #             ...
+            #         }
+            # }
+            data: Any = response.json()
+            if data[_SUCCESS]:
+                for fiat_iso in data[_SYMBOLS]:
+                    # Exchangerate.hosts inappropriately includes BTC
+                    if fiat_iso != "BTC":
+                        self.fiat_list.append(fiat_iso)
+        except:
+            LOGGER.debug(f"Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
+            traceback.print_exc()
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -131,36 +136,39 @@ class AbstractPairConverterPlugin:
         result: Optional[RP2Decimal] = None
         params: Dict[str, Any] = {"base":from_asset, "symbols":to_asset}
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
-        response: Response = self.__session.get(f"https://api.exchangerate.host/{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
-        # {
-        #     'motd': 
-        #         {
-        #             'msg': 'If you or your company ...', 
-        #             'url': 'https://exchangerate.host/#/donate'
-        #         }, 
-        #     'success': True, 
-        #     'historical': True, 
-        #     'base': 'EUR', 
-        #     'date': '2020-04-04', 
-        #     'rates': 
-        #         {
-        #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
-        #         }
-        # }
-        data: Any = response.json()
-        if data[_SUCCESS]:
-            return HistoricalBar(
-                        duration=_DAYS_IN_S,
-                        timestamp=timestamp,
-                        open=RP2Decimal(str(data[_RATES][to_asset])),
-                        high=RP2Decimal(str(data[_RATES][to_asset])),
-                        low=RP2Decimal(str(data[_RATES][to_asset])),
-                        close=RP2Decimal(str(data[_RATES][to_asset])),
-                        volume=0,
-                    )
-        else:
-            return None
-
+        try:
+            response: Response = self.__session.get(f"https://api.exchangerate.host/{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+            # {
+            #     'motd': 
+            #         {
+            #             'msg': 'If you or your company ...', 
+            #             'url': 'https://exchangerate.host/#/donate'
+            #         }, 
+            #     'success': True, 
+            #     'historical': True, 
+            #     'base': 'EUR', 
+            #     'date': '2020-04-04', 
+            #     'rates': 
+            #         {
+            #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
+            #         }
+            # }
+            data: Any = response.json()
+            if data[_SUCCESS]:
+                return HistoricalBar(
+                            duration=_DAYS_IN_S,
+                            timestamp=timestamp,
+                            open=RP2Decimal(str(data[_RATES][to_asset])),
+                            high=RP2Decimal(str(data[_RATES][to_asset])),
+                            low=RP2Decimal(str(data[_RATES][to_asset])),
+                            close=RP2Decimal(str(data[_RATES][to_asset])),
+                            volume=0,
+                        )
+            else:
+                return None
+        except:
+            LOGGER.debug(f"Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
+            traceback.print_exc()
 
 
 

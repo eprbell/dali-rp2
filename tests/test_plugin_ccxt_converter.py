@@ -69,6 +69,26 @@ EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400)
 
 class TestCcxtConverterPlugin:
 
+    def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any) -> None:
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        mocker.patch.object(plugin, "exchange_markets", {TEST_EXCHANGE:["BTCUSDT"]})
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+            [
+                BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                BAR_OPEN,       # (O)pen price, float
+                BAR_HIGH,       # (H)ighest price, float
+                BAR_LOW,        # (L)owest price, float
+                BAR_CLOSE,      # (C)losing price, float
+                BAR_VOLUME      # (V)olume (in terms of the base currency), float
+            ],
+        ]
+        mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
+
     # pylint: disable=no-self-use
     def test_invalid_exchange(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
@@ -84,30 +104,7 @@ class TestCcxtConverterPlugin:
 
         # Reinstantiate plugin now that cache is gone
         plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        exchange = binance(
-            {
-                "apiKey": "key",
-                "secret": "secret",
-            }
-        )
-        mocker.patch.object(plugin, "exchange_markets", {
-            TEST_EXCHANGE:
-                [
-                    "BTCUSDT",
-                ]
-            }
-        )
-        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
-            [
-                BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
-                BAR_OPEN,       # (O)pen price, float
-                BAR_HIGH,       # (H)ighest price, float
-                BAR_LOW,        # (L)owest price, float
-                BAR_CLOSE,      # (C)losing price, float
-                BAR_VOLUME      # (V)olume (in terms of the base currency), float
-            ],
-        ]
-        mocker.patch.object(plugin, "exchanges", {TEST_EXCHANGE: exchange})
+        self.__btcusdt_mock(plugin, mocker)
 
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
 
@@ -143,7 +140,6 @@ class TestCcxtConverterPlugin:
         assert data.close == BAR_CLOSE
         assert data.volume == BAR_VOLUME
 
-    # pylint: disable=no-self-use
     def test_missing_historical_prices(self, mocker: Any) -> None:
         plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         timestamp = datetime(2020, 6, 1, 0, 0)
@@ -152,6 +148,30 @@ class TestCcxtConverterPlugin:
 
         data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", TEST_EXCHANGE)
         assert data is None	
+
+    def test_missing_fiat_pair(self, mocker: Any) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        self.__btcusdt_mock(plugin, mocker)
+
+        mocker.patch.object(plugin, "get_fiat_exchange_rate").return_value = HistoricalBar(
+            duration=86400,
+            timestamp=BAR_TIMESTAMP,
+            open=RP2Decimal(str(JPY_USD_RATE)),
+            high=RP2Decimal(str(JPY_USD_RATE)),
+            low=RP2Decimal(str(JPY_USD_RATE)),
+            close=RP2Decimal(str(JPY_USD_RATE)),
+            volume=Keyword.UNKNOWN.value,
+        )
+
+        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "JPY", TEST_EXCHANGE)
+
+        assert data
+        assert data.timestamp == BAR_TIMESTAMP
+        assert data.low == BAR_LOW * JPY_USD_RATE
+        assert data.high == BAR_HIGH * JPY_USD_RATE
+        assert data.open == BAR_OPEN * JPY_USD_RATE
+        assert data.close == BAR_CLOSE * JPY_USD_RATE
+        assert data.volume == BAR_VOLUME
 
     # Some crypto assets have no fiat or stable coin pair; they are only paired with BTC or ETH (e.g. EZ or BETH)
     # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
@@ -241,6 +261,7 @@ class TestCcxtConverterPlugin:
         assert data.volume == BTCGBP_VOLUME
 
     # Plugin should hand off the handling of a fiat to fiat pair to the fiat converter
+    # pylint: disable=no-self-use
     def test_fiat_pair(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         exchange = binance(
@@ -272,4 +293,4 @@ class TestCcxtConverterPlugin:
         assert data.open == EUR_USD_RATE
         assert data.close == EUR_USD_RATE
         assert data.volume == Keyword.UNKNOWN.value
-        assert plugin.get_fiat_exchange_rate.called_once()
+        plugin.get_fiat_exchange_rate.assert_called_once()  # type: ignore
