@@ -40,3 +40,9 @@ class binance(Exchange):
     def sapiGetFiatPayments(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapiGetMiningPaymentList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapiGetMiningPubAlgoList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+
+class coinbase(Exchange):
+    def __init__(self, config: Dict[str, str]) -> None: ...
+
+class coinbasepro(Exchange):
+    def __init__(self, config: Dict[str, str]) -> None: ...

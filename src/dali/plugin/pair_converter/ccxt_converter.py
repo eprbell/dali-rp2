@@ -13,48 +13,50 @@
 # limitations under the License.
 
 import json
+import logging
 import re
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, NamedTuple, Optional, Set, Union
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, NamedTuple, Set, Optional
-
+from ccxt import binance
+from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
-from ccxt import binance, coinbase, coinbasepro
-from rp2.logger import create_logger
-
-from dali.historical_bar import HistoricalBar
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
+from dali.historical_bar import HistoricalBar
 
 # Native format keywords
 _ID: str = "id"
 
 # Time in ms
 _MINUTE: str = "1m"
-_FIVEMINUTE: str  = "5m"
+_FIVEMINUTE: str = "5m"
 _FIFTEENMINUTE: str = "15m"
 _ONEHOUR: str = "1h"
 _FOURHOUR: str = "4h"
 _ONEDAY: str = "1d"
-_TIMEGRANULARITY: List[int] = [_MINUTE, _FIVEMINUTE, _FIFTEENMINUTE, _ONEHOUR, _FOURHOUR, _ONEDAY]
-_TIMEGRANULARITY_IN_S: List[int] =[60, 300, 900, 3600, 14400, 86400]
+_TIMEGRANULARITY: List[str] = [_MINUTE, _FIVEMINUTE, _FIFTEENMINUTE, _ONEHOUR, _FOURHOUR, _ONEDAY]
+_TIMEGRANULARITY_IN_S: List[int] = [60, 300, 900, 3600, 14400, 86400]
 
 # Currently supported exchanges
-_BINANCE: str = "Binance.com" 
-_EXCHANGEDICT: Dict[str, Any] = {_BINANCE:binance}
+_BINANCE: str = "Binance.com"
+_EXCHANGEDICT: Dict[str, Any] = {_BINANCE: binance}
 
 # Time constants
 _MS_IN_SECOND: int = 1000
+
 
 class StableCoin(NamedTuple):
     symbol: str
     fiat_code: str
 
+
 # Default Stable coin for each exchange
 # This should be the stable coin with the most volume on the exchange
 _DEFAULTSTABLEDICT = {
-    _BINANCE:StableCoin(symbol="USDT", fiat_code="USD"),
-} 
+    _BINANCE: StableCoin(symbol="USDT", fiat_code="USD"),
+}
+
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
 
@@ -63,11 +65,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
     def __init__(self, historical_price_type: str, pricing_alt: Optional[str] = None) -> None:
         super().__init__(historical_price_type=historical_price_type)
         self.__logger: logging.Logger = create_logger(f"CCXT converter using {historical_price_type}")
-        self.pricing_alt: Dict[str,str] = {}
+        self.pricing_alt: Dict[str, str] = {}
         if pricing_alt is not None:
             self.pricing_alt = json.loads(pricing_alt)
 
-        self.exchanges: Dict[Any] = {}
+        self.exchanges: Dict[str, Any] = {}
         self.exchange_markets: Dict[str, List[str]] = {}
         self.exchange_quote_assets: Dict[str, Set[str]] = {}
 
@@ -88,26 +90,23 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             if exchange in _EXCHANGEDICT:
                 current_exchange: Any = _EXCHANGEDICT[exchange]()
                 current_markets: List[str] = []
-                current_quote_assets: Set[str] = {}
 
                 for market in current_exchange.fetch_markets():
                     self.__logger.debug("Market: %s", market)
                     current_markets.append(market[_ID])
-                    current_quote_assets.add(market[_QUOTE])
                 self.exchanges[exchange] = current_exchange
                 self.exchange_markets[exchange] = current_markets
-                self.exchange_quote_assets[exchange] = current_quote_assets
             else:
                 self.__logger.error("WARNING: Unrecognized Exchange: %s. Please open an issue at %s", exchange, self.ISSUES_URL)
                 return None
         else:
             current_exchange = self.exchanges[exchange]
-            current_markets = self.exchange_markets[exchange] 
+            current_markets = self.exchange_markets[exchange]
 
-        ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND) 
-        historical_data: List[float,int] = []
-        bridge_asset: str = None
-        bridge_fiat: str = None
+        ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
+        historical_data: List[List[Union[float, int]]] = []
+        bridge_asset: Optional[str] = None
+        bridge_fiat: Optional[str] = None
 
         market_symbol = from_asset + to_asset
 
@@ -124,21 +123,21 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         result: Optional[HistoricalBar] = None
         retry_count: int = 0
 
-        # If the asset is not priced in the exchange's default stable coin, alternative pricing must be used.                
+        # If the asset is not priced in the exchange's default stable coin, alternative pricing must be used.
         if market_symbol not in current_markets:
 
             if from_asset in self.pricing_alt:
                 market_symbol = self.pricing_alt[from_asset]
 
                 # Retrieve the intermediate to_asset from the market given in the ini file.
-                bridge_asset = market_symbol[len(from_asset):]
+                bridge_asset = market_symbol[len(from_asset) :]
 
             else:
                 # Search for any market that has from_asset as a base asset
-                r = re.compile(f"{from_asset}.*")
-                pricing_alt_markets: List[str] = list(filter(r.match, current_markets))
+                regex = re.compile(f"{from_asset}.*")
+                pricing_alt_markets: List[str] = list(filter(regex.match, current_markets))
                 if pricing_alt_markets:
-                    bridge_asset = pricing_alt_markets[0] 
+                    bridge_asset = pricing_alt_markets[0]
 
                 # No alternative market was found.
                 # This means the asset is on the user's wallet on the exchange, but not traded on the exchange
@@ -179,10 +178,12 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 # ]
 
                 if bridge_data:
-                    historical_data: List[List[Union[float, int]]] = current_exchange.fetchOHLCV(f"{bridge_asset}/{(to_asset if bridge_fiat is None else bridge_fiat)}", timeframe, ms_timestamp, 1) 
+                    historical_data = current_exchange.fetchOHLCV(
+                        f"{bridge_asset}/{(to_asset if bridge_fiat is None else bridge_fiat)}", timeframe, ms_timestamp, 1
+                    )
                     if historical_data:
                         result = HistoricalBar(
-                            duration= _TIMEGRANULARITY_IN_S[retry_count],
+                            duration=timedelta(seconds=_TIMEGRANULARITY_IN_S[retry_count]),
                             timestamp=datetime.fromtimestamp(ms_timestamp / _MS_IN_SECOND),
                             open=RP2Decimal(str(historical_data[0][1])) * RP2Decimal(str(bridge_data[0][1])),
                             high=RP2Decimal(str(historical_data[0][2])) * RP2Decimal(str(bridge_data[0][2])),
@@ -200,11 +201,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             while retry_count < len(_TIMEGRANULARITY):
 
                 timeframe = _TIMEGRANULARITY[retry_count]
-                historical_data: List[List[Union[float, int]]] = current_exchange.fetchOHLCV(f"{from_asset}/{(to_asset if bridge_fiat is None else bridge_fiat)}", timeframe, ms_timestamp, 1) 
+                historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{(to_asset if bridge_fiat is None else bridge_fiat)}", timeframe, ms_timestamp, 1)
                 # If there is no candle the list will be empty
-                if historical_data: 
+                if historical_data:
                     result = HistoricalBar(
-                        duration=_TIMEGRANULARITY_IN_S[retry_count],
+                        duration=timedelta(seconds=_TIMEGRANULARITY_IN_S[retry_count]),
                         timestamp=datetime.fromtimestamp(ms_timestamp / _MS_IN_SECOND),
                         open=RP2Decimal(str(historical_data[0][1])),
                         high=RP2Decimal(str(historical_data[0][2])),
@@ -217,16 +218,16 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 retry_count += 1
 
         if bridge_fiat is not None:
-            fiat_exchange_rate: HistoricalBar = self.get_fiat_exchange_rate(timestamp, bridge_fiat, to_asset)
-            result = HistoricalBar(
-                duration=result.duration,
-                timestamp=result.timestamp,
-                open=result.open * fiat_exchange_rate.open,
-                high=result.high * fiat_exchange_rate.high,
-                low=result.low * fiat_exchange_rate.low,
-                close=result.close * fiat_exchange_rate.close,
-                volume=result.volume,
-            )    
+            fiat_exchange_rate: Optional[HistoricalBar] = self.get_fiat_exchange_rate(timestamp, bridge_fiat, to_asset)
+            if fiat_exchange_rate is not None:
+                result = HistoricalBar(
+                    duration=result.duration,  # type: ignore
+                    timestamp=result.timestamp,  # type: ignore
+                    open=result.open * fiat_exchange_rate.open,  # type: ignore
+                    high=result.high * fiat_exchange_rate.high,  # type: ignore
+                    low=result.low * fiat_exchange_rate.low,  # type: ignore
+                    close=result.close * fiat_exchange_rate.close,  # type: ignore
+                    volume=result.volume,  # type: ignore
+                )
 
         return result
-

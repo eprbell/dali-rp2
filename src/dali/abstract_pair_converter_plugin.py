@@ -12,21 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import date, datetime, timedelta
 import traceback
-from typing import Dict, NamedTuple, Optional, cast
+from datetime import datetime, timedelta
+from json import JSONDecodeError
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
-from rp2.rp2_decimal import RP2Decimal
+import requests
+from requests.models import Response
+from requests.sessions import Session
+from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2TypeError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
-
-import requests
-from requests.models import Response
-from requests.sessions import Session
 
 # exchangerates.host keywords
 _SUCCESS = "success"
@@ -35,15 +35,18 @@ _RATES = "rates"
 
 _DAYS_IN_S = 86400
 
+
 class AssetPairAndTimestamp(NamedTuple):
     timestamp: datetime
     from_asset: str
     to_asset: str
     exchange: str
 
+
 class AbstractPairConverterPlugin:
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __TIMEOUT: int = 30
+
     def __init__(self, historical_price_type: str) -> None:
         if not isinstance(historical_price_type, str):
             raise RP2TypeError(f"historical_price_type is not a string: {historical_price_type}")
@@ -58,19 +61,19 @@ class AbstractPairConverterPlugin:
         self.fiat_list: List[str] = []
 
         try:
-            response: Response = self.__session.get(f"https://api.exchangerate.host/symbols", timeout=self.__TIMEOUT)         
+            response: Response = self.__session.get("https://api.exchangerate.host/symbols", timeout=self.__TIMEOUT)
             # {
-            #     'motd': 
+            #     'motd':
             #         {
-            #             'msg': 'If you or your company ...', 
+            #             'msg': 'If you or your company ...',
             #             'url': 'https://exchangerate.host/#/donate'
-            #         }, 
-            #     'success': True, 
-            #     'symbols': 
+            #         },
+            #     'success': True,
+            #     'symbols':
             #         {
-            #             'AED': 
+            #             'AED':
             #                 {
-            #                     'description': 'United Arab Emirates Dirham', 
+            #                     'description': 'United Arab Emirates Dirham',
             #                     'code': 'AED'
             #                 },
             #             ...
@@ -82,8 +85,8 @@ class AbstractPairConverterPlugin:
                     # Exchangerate.hosts inappropriately includes BTC
                     if fiat_iso != "BTC":
                         self.fiat_list.append(fiat_iso)
-        except:
-            LOGGER.debug(f"Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
+        except JSONDecodeError:
+            LOGGER.debug("Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
             traceback.print_exc()
 
     def name(self) -> str:
@@ -132,43 +135,40 @@ class AbstractPairConverterPlugin:
 
         return result
 
-    def get_fiat_exchange_rate(self, timestamp:datetime, from_asset:str, to_asset:str) -> Optional[RP2Decimal]:
-        result: Optional[RP2Decimal] = None
-        params: Dict[str, Any] = {"base":from_asset, "symbols":to_asset}
+    def get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+        result: Optional[HistoricalBar] = None
+        params: Dict[str, Any] = {"base": from_asset, "symbols": to_asset}
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
         try:
             response: Response = self.__session.get(f"https://api.exchangerate.host/{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
             # {
-            #     'motd': 
+            #     'motd':
             #         {
-            #             'msg': 'If you or your company ...', 
+            #             'msg': 'If you or your company ...',
             #             'url': 'https://exchangerate.host/#/donate'
-            #         }, 
-            #     'success': True, 
-            #     'historical': True, 
-            #     'base': 'EUR', 
-            #     'date': '2020-04-04', 
-            #     'rates': 
+            #         },
+            #     'success': True,
+            #     'historical': True,
+            #     'base': 'EUR',
+            #     'date': '2020-04-04',
+            #     'rates':
             #         {
             #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
             #         }
             # }
             data: Any = response.json()
             if data[_SUCCESS]:
-                return HistoricalBar(
-                            duration=_DAYS_IN_S,
-                            timestamp=timestamp,
-                            open=RP2Decimal(str(data[_RATES][to_asset])),
-                            high=RP2Decimal(str(data[_RATES][to_asset])),
-                            low=RP2Decimal(str(data[_RATES][to_asset])),
-                            close=RP2Decimal(str(data[_RATES][to_asset])),
-                            volume=0,
-                        )
-            else:
-                return None
-        except:
-            LOGGER.debug(f"Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
+                result = HistoricalBar(
+                    duration=timedelta(seconds=_DAYS_IN_S),
+                    timestamp=timestamp,
+                    open=RP2Decimal(str(data[_RATES][to_asset])),
+                    high=RP2Decimal(str(data[_RATES][to_asset])),
+                    low=RP2Decimal(str(data[_RATES][to_asset])),
+                    close=RP2Decimal(str(data[_RATES][to_asset])),
+                    volume=ZERO,
+                )
+        except JSONDecodeError:
+            LOGGER.debug("Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
             traceback.print_exc()
 
-
-
+        return result
