@@ -110,7 +110,7 @@ class InputPlugin(AbstractInputPlugin):
                 if quantity_number == ZERO and fee_number > ZERO:
                     self.__logger.warning("Possible dusting attack (fee > 0, total amount = 0): %s", raw_data)
                     continue
-                if transaction_type in {_SENT, _RECV}:
+                if transaction_type in {_SENT, _RECV}:  # Need example data for sent transactions, untested as of 7/9/2022
                     result.append(
                         IntraTransaction(
                             plugin=self.__LEDGER,
@@ -123,7 +123,6 @@ class InputPlugin(AbstractInputPlugin):
                             to_exchange=self.__account_nickname if transaction_type == _RECV else Keyword.UNKNOWN.value,
                             to_holder=self.account_holder if transaction_type == _RECV else Keyword.UNKNOWN.value,
                             spot_price=spot_price,
-                            # TODO: verify sent transactions fees, need example data
                             crypto_sent=str(quantity_number + fee_number) if transaction_type == _SENT else Keyword.UNKNOWN.value,
                             crypto_received=str(quantity_number) if transaction_type == _RECV else Keyword.UNKNOWN.value,
                             notes=None,
