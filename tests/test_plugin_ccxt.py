@@ -153,12 +153,12 @@ class TestCcxtPlugin:
                 2,  # (V)olume (in terms of the base currency), float
             ],
         ]
-        
-        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "JPY", TEST_EXCHANGE)
 
-        assert plugin._PairConverterPlugin__exchanges
-        assert plugin._PairConverterPlugin__exchange_markets
-        assert plugin._PairConverterPlugin__exchange_graphs
+        plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "JPY", TEST_EXCHANGE)
+
+        assert plugin.exchanges is not None
+        assert plugin.exchange_markets is not None
+        assert plugin.exchange_graphs is not None
 
     def test_invalid_exchange(self) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
@@ -188,7 +188,7 @@ class TestCcxtPlugin:
         # Read price again, but populate plugin cache this time
         value = plugin.get_conversion_rate(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
         assert value
-        assert value == BAR_HIGH
+        assert value == BAR_HIGH * USDTUSD_HIGH
 
         # Save plugin cache
         plugin.save_historical_price_cache()
@@ -203,11 +203,11 @@ class TestCcxtPlugin:
         assert data
         assert data.timestamp == BAR_TIMESTAMP
         assert data.timestamp == BAR_TIMESTAMP
-        assert data.low == BAR_LOW
-        assert data.high == BAR_HIGH
-        assert data.open == BAR_OPEN
-        assert data.close == BAR_CLOSE
-        assert data.volume == BAR_VOLUME
+        assert data.low == BAR_LOW * USDTUSD_LOW
+        assert data.high == BAR_HIGH * USDTUSD_HIGH
+        assert data.open == BAR_OPEN * USDTUSD_OPEN
+        assert data.close == BAR_CLOSE * USDTUSD_CLOSE
+        assert data.volume == BAR_VOLUME + USDTUSD_VOLUME
 
     def test_missing_historical_prices(self, mocker: Any) -> None:
         plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
@@ -245,7 +245,7 @@ class TestCcxtPlugin:
     # Some crypto assets have no fiat or stable coin pair; they are only paired with BTC or ETH (e.g. EZ or BETH)
     # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
     def test_no_fiat_pair(self, mocker: Any) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, '{"BETH":"BETHETH"}')
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         exchange = binance(
             {
                 "apiKey": "key",

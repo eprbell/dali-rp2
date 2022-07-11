@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import traceback
 from datetime import datetime, timedelta
 from json import JSONDecodeError
 from typing import Any, Dict, List, NamedTuple, Optional, cast
@@ -29,11 +28,19 @@ from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 
 # exchangerates.host keywords
-_SUCCESS = "success"
-_SYMBOLS = "symbols"
-_RATES = "rates"
+_SUCCESS: str = "success"
+_SYMBOLS: str = "symbols"
+_RATES: str = "rates"
 
-_DAYS_IN_S = 86400
+# exchangerates.host urls
+_EXCHANGE_BASE: str = "https://api.exchangerate.host/"
+_EXCHANGE_SYMBOLS: str = "https://api.exchangerate.host/symbols"
+
+_DAYS_IN_SECONDS: int = 86400
+_FIAT_EXCHANGE: str = "Exchangerate.host"
+
+# First on the list has the most priority
+_FIAT_PRIORITY: List[str] = ["USD", "JPY", "EUR", "GBP", "AUD"]
 
 
 class AssetPairAndTimestamp(NamedTuple):
@@ -58,36 +65,8 @@ class AbstractPairConverterPlugin:
         self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
-        self.fiat_list: List[str] = []
+        self.__fiat_list: List[str] = []
 
-        try:
-            response: Response = self.__session.get("https://api.exchangerate.host/symbols", timeout=self.__TIMEOUT)
-            # {
-            #     'motd':
-            #         {
-            #             'msg': 'If you or your company ...',
-            #             'url': 'https://exchangerate.host/#/donate'
-            #         },
-            #     'success': True,
-            #     'symbols':
-            #         {
-            #             'AED':
-            #                 {
-            #                     'description': 'United Arab Emirates Dirham',
-            #                     'code': 'AED'
-            #                 },
-            #             ...
-            #         }
-            # }
-            data: Any = response.json()
-            if data[_SUCCESS]:
-                for fiat_iso in data[_SYMBOLS]:
-                    # Exchangerate.hosts inappropriately includes BTC
-                    if fiat_iso != "BTC":
-                        self.fiat_list.append(fiat_iso)
-        except JSONDecodeError:
-            LOGGER.debug("Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
-            traceback.print_exc()
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -98,6 +77,10 @@ class AbstractPairConverterPlugin:
     @property
     def historical_price_type(self) -> str:
         return self.__historical_price_type
+
+    @property
+    def fiat_list(self) -> List[str]:
+        return self.__fiat_list
 
     # The exchange parameter is a hint on which exchange to use for price lookups. The plugin is free to use it or ignore it.
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
@@ -135,12 +118,81 @@ class AbstractPairConverterPlugin:
 
         return result
 
+    def __build_fiat_list(self) -> None:
+        try:
+            response: Response = self.__session.get(_EXCHANGE_SYMBOLS, timeout=self.__TIMEOUT)
+            # {
+            #     'motd':
+            #         {
+            #             'msg': 'If you or your company ...',
+            #             'url': 'https://exchangerate.host/#/donate'
+            #         },
+            #     'success': True,
+            #     'symbols':
+            #         {
+            #             'AED':
+            #                 {
+            #                     'description': 'United Arab Emirates Dirham',
+            #                     'code': 'AED'
+            #                 },
+            #             ...
+            #         }
+            # }
+            data: Any = response.json()
+            if data[_SUCCESS]:
+                self.__fiat_list = [fiat_iso for fiat_iso in data[_SYMBOLS] if fiat_iso != "BTC"]
+            else:
+                if "message" in data:
+                    LOGGER.error("Error %d: %s: %s", response.status_code, _EXCHANGE_SYMBOLS, data["message"])
+                response.raise_for_status()
+
+
+        except JSONDecodeError as exc:
+            LOGGER.debug("Fetching of fiat symbols failed. The server might be down. Please try again later.")
+            raise Exception('JSON decode error') from exc
+
+    def add_fiat_graph_to(self, graph:Dict[str, List[str]], markets:Dict[str, List[str]]) -> None:
+        if not self.__fiat_list:
+            self.__build_fiat_list()
+
+        for fiat in self.__fiat_list:
+            to_fiat_list: List[str] = self.__fiat_list.copy()
+            to_fiat_list.remove(fiat)
+            if graph.get(fiat):
+                for to_be_added_fiat in to_fiat_list:
+                    # add a pair if it doesn't exist
+                    if to_be_added_fiat not in graph[fiat]:
+                        graph[fiat].append(to_be_added_fiat)
+            else:
+                graph[fiat] = to_fiat_list
+
+            for to_fiat in to_fiat_list:
+                fiat_market = fiat + to_fiat
+                markets[fiat_market] = [_FIAT_EXCHANGE]
+
+            # Add prioritized fiat at the beginning
+            for priority_fiat in reversed(_FIAT_PRIORITY):
+                if priority_fiat in graph[fiat]:
+                    graph[fiat].insert(0, graph[fiat].pop(graph[fiat].index(priority_fiat)))
+
+            LOGGER.debug("Added to assets for %s: %s", fiat, graph[fiat])
+
+
+    def this_is_fiat_pair(self, from_asset:str, to_asset: str) -> bool:
+        return (self.this_is_fiat(from_asset) and self.this_is_fiat(to_asset))
+
+    def this_is_fiat(self, asset: str) -> bool:
+        if not self.__fiat_list:
+            self.__build_fiat_list()
+
+        return asset in self.__fiat_list
+
     def get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
         result: Optional[HistoricalBar] = None
         params: Dict[str, Any] = {"base": from_asset, "symbols": to_asset}
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
         try:
-            response: Response = self.__session.get(f"https://api.exchangerate.host/{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+            response: Response = self.__session.get(f"{_EXCHANGE_BASE}{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
             # {
             #     'motd':
             #         {
@@ -159,7 +211,7 @@ class AbstractPairConverterPlugin:
             data: Any = response.json()
             if data[_SUCCESS]:
                 result = HistoricalBar(
-                    duration=timedelta(seconds=_DAYS_IN_S),
+                    duration=timedelta(seconds=_DAYS_IN_SECONDS),
                     timestamp=timestamp,
                     open=RP2Decimal(str(data[_RATES][to_asset])),
                     high=RP2Decimal(str(data[_RATES][to_asset])),
@@ -167,8 +219,9 @@ class AbstractPairConverterPlugin:
                     close=RP2Decimal(str(data[_RATES][to_asset])),
                     volume=ZERO,
                 )
-        except JSONDecodeError:
-            LOGGER.debug("Internal Error: Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
-            traceback.print_exc()
+
+        except JSONDecodeError as exc:
+            LOGGER.debug("Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
+            raise Exception('JSON decode error') from exc
 
         return result
