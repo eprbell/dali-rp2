@@ -14,24 +14,24 @@
 
 from typing import Dict, List, Optional
 
-class BFS():
 
+class BFS:
     @staticmethod
     def bfs_cyclic(graph: Dict[str, List[str]], start: str, end: str) -> Optional[List[str]]:
 
         # maintain a queue of paths
-        queue = []
-        visited = []
+        queue: List[List[str]] = []
+        visited: List[str] = []
 
         # push the first path into the queue
         queue.append([start])
 
         while queue:
             # get the first path from the queue
-            path = queue.pop(0)
+            path: List[str] = queue.pop(0)
 
             # get the last node from the path
-            node = path[-1]
+            node: str = path[-1]
 
             # path found
             if node == end:
@@ -42,7 +42,7 @@ class BFS():
 
                 # prevents an infinite loop.
                 if adjacent not in visited:
-                    new_path = list(path)
+                    new_path: List[str] = list(path)
                     new_path.append(adjacent)
                     queue.append(new_path)
                     visited.append(adjacent)
