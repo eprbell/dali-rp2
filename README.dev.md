@@ -242,7 +242,8 @@ For an example of pair converter look at the [Historic-Crypto](src/dali/plugin/p
 Country plugins are reused from RP2. To add support for a new country in DaLI:
 * [add a country plugin to RP2](https://github.com/eprbell/rp2/blob/main/README.dev.md#adding-support-for-a-new-country);
 * add a new Python file to the `src/dali/plugin/country` directory and name it after the [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) 2-letter code for the country;
-* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file.
+* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file;
+* add a console script to setup.cfg pointing the new country dali_entry (see the US example in the console_scripts section of setup.cfg).
 
 ### Plugin Laundry List
 When submitting a new plugin open a [PR](https://github.com/eprbell/dali-rp2/pulls) and make sure all the following bullet points apply to your code:
