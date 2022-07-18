@@ -868,7 +868,7 @@ class InputPlugin(AbstractInputPlugin):
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.__BINANCE_COM,
-                    unique_id=str(transaction[_TRANID]),
+                    unique_id=str(transaction[_ID]),  # Binance sometimes has two ids for one tranid
                     raw_data=json.dumps(transaction),
                     timestamp=self._rp2timestamp_from_ms_epoch(transaction[_DIVTIME]),
                     asset=transaction[_ASSET],
