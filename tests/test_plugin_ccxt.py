@@ -30,19 +30,19 @@ TEST_EXCHANGE: str = "Binance.com"
 ALT_EXCHANGE: str = "Kraken"
 FIAT_EXHANGE: str = "fiat"
 TEST_GRAPH: Dict[str, List[str]] = {
-    "BETH" : ["ETH"],
-    "BTC"  : ["USDT", "GBP"],
-    "ETH"  : ["USDT"],
-    "USDT" : ["USD"],
-    "USD"  : ["JPY"],
+    "BETH": ["ETH"],
+    "BTC": ["USDT", "GBP"],
+    "ETH": ["USDT"],
+    "USDT": ["USD"],
+    "USD": ["JPY"],
 }
 TEST_MARKETS: Dict[str, List[str]] = {
-    "BTCUSDT":[TEST_EXCHANGE],
-    "BTCGBP":[TEST_EXCHANGE],
-    "BETHETH":[TEST_EXCHANGE],
-    "ETHUSDT":[TEST_EXCHANGE],
-    "USDTUSD":[ALT_EXCHANGE],
-    "USDJPY":[FIAT_EXHANGE],
+    "BTCUSDT": [TEST_EXCHANGE],
+    "BTCGBP": [TEST_EXCHANGE],
+    "BETHETH": [TEST_EXCHANGE],
+    "ETHUSDT": [TEST_EXCHANGE],
+    "USDTUSD": [ALT_EXCHANGE],
+    "USDJPY": [FIAT_EXHANGE],
 }
 
 # BTCUSDT conversion

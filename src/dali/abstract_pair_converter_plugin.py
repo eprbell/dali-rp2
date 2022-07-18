@@ -37,10 +37,11 @@ _EXCHANGE_BASE: str = "https://api.exchangerate.host/"
 _EXCHANGE_SYMBOLS: str = "https://api.exchangerate.host/symbols"
 
 _DAYS_IN_SECONDS: int = 86400
-_FIAT_EXCHANGE: str = "Exchangerate.host"
+_FIAT_EXCHANGE: str = "exchangerate.host"
 
 # First on the list has the most priority
-_FIAT_PRIORITY: List[str] = ["USD", "JPY", "EUR", "GBP", "AUD"]
+# This is hard-coded for now based on volume of each of these markets for BTC on Coinmarketcap.com
+_FIAT_PRIORITY: List[str] = ["USD", "JPY", "KRW", "EUR", "GBP", "AUD"]
 
 
 class AssetPairAndTimestamp(NamedTuple):
@@ -66,7 +67,6 @@ class AbstractPairConverterPlugin:
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
         self.__fiat_list: List[str] = []
-
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -118,7 +118,7 @@ class AbstractPairConverterPlugin:
 
         return result
 
-    def __build_fiat_list(self) -> None:
+    def _build_fiat_list(self) -> None:
         try:
             response: Response = self.__session.get(_EXCHANGE_SYMBOLS, timeout=self.__TIMEOUT)
             # {
@@ -146,14 +146,13 @@ class AbstractPairConverterPlugin:
                     LOGGER.error("Error %d: %s: %s", response.status_code, _EXCHANGE_SYMBOLS, data["message"])
                 response.raise_for_status()
 
-
         except JSONDecodeError as exc:
             LOGGER.debug("Fetching of fiat symbols failed. The server might be down. Please try again later.")
-            raise Exception('JSON decode error') from exc
+            raise Exception("JSON decode error") from exc
 
-    def add_fiat_graph_to(self, graph:Dict[str, List[str]], markets:Dict[str, List[str]]) -> None:
+    def _add_fiat_graph_to(self, graph: Dict[str, List[str]], markets: Dict[str, List[str]]) -> None:
         if not self.__fiat_list:
-            self.__build_fiat_list()
+            self._build_fiat_list()
 
         for fiat in self.__fiat_list:
             to_fiat_list: List[str] = self.__fiat_list.copy()
@@ -177,17 +176,16 @@ class AbstractPairConverterPlugin:
 
             LOGGER.debug("Added to assets for %s: %s", fiat, graph[fiat])
 
+    def _is_fiat_pair(self, from_asset: str, to_asset: str) -> bool:
+        return self._is_fiat(from_asset) and self._is_fiat(to_asset)
 
-    def this_is_fiat_pair(self, from_asset:str, to_asset: str) -> bool:
-        return (self.this_is_fiat(from_asset) and self.this_is_fiat(to_asset))
-
-    def this_is_fiat(self, asset: str) -> bool:
+    def _is_fiat(self, asset: str) -> bool:
         if not self.__fiat_list:
-            self.__build_fiat_list()
+            self._build_fiat_list()
 
         return asset in self.__fiat_list
 
-    def get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+    def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
         result: Optional[HistoricalBar] = None
         params: Dict[str, Any] = {"base": from_asset, "symbols": to_asset}
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
@@ -222,6 +220,6 @@ class AbstractPairConverterPlugin:
 
         except JSONDecodeError as exc:
             LOGGER.debug("Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
-            raise Exception('JSON decode error') from exc
+            raise Exception("JSON decode error") from exc
 
         return result
