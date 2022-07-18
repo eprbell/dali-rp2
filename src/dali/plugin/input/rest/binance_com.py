@@ -168,6 +168,9 @@ class InputPlugin(AbstractInputPlugin):
         self.start_time: datetime = datetime(2017, 7, 13, 0, 0, 0, 0)
         self.start_time_ms: int = int(self.start_time.timestamp()) * _MS_IN_SECOND
 
+    def cache_key(self) -> Optional[str]:
+        return self.__cache_key
+
     @staticmethod
     def _rp2timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
         rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
@@ -364,6 +367,7 @@ class InputPlugin(AbstractInputPlugin):
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
         while current_start < now_time:
+            self.__logger.debug("Pulling dividends from %s to %s", current_start, current_end)
 
             # CCXT doesn't have a standard way to pull income, we must use the underlying API endpoint
             dividends = self.client.sapiGetAssetAssetDividend(params=({_STARTTIME: current_start, _ENDTIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT}))
@@ -404,9 +408,9 @@ class InputPlugin(AbstractInputPlugin):
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
             else:
-                # Binance sends latest record first ([0])
-                # CCXT sorts by timestamp, so latest record is last ([499])
-                current_start = int(dividends[_ROWS][_DIVIDEND_RECORD_LIMIT - 1][_DIVTIME]) + 1  # times are inclusive
+                # Using implicit API so we need to follow Binance order, which sends latest record first ([0])
+                # CCXT standard API sorts by timestamp, so latest record is last ([499])
+                current_start = int(dividends[_ROWS][0][_DIVTIME]) + 1  # times are inclusive
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
         ### Mining Income
@@ -529,6 +533,7 @@ class InputPlugin(AbstractInputPlugin):
                     break
                 # Times are inclusive
                 since = int(market_trades[_TRADE_RECORD_LIMIT - 1][_TIMESTAMP]) + 1
+                sleep(0.05) # Prevents too many requests exception
 
         ### Dust Trades
 

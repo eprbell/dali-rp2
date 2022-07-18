@@ -26,8 +26,6 @@ from dali.plugin.input.rest.binance_com import InputPlugin
 
 
 class TestBinance:
-
-    # pylint: disable=no-self-use
     def test_deposits(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -183,7 +181,6 @@ class TestBinance:
         assert fiat_deposit.fiat_fee is None
         assert fiat_deposit.fiat_ticker == "EUR"
 
-    # pylint: disable=no-self-use
     def test_trades(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -446,7 +443,6 @@ class TestBinance:
         assert sell_fiat_order_in.fiat_fee is None
         assert sell_fiat_order_in.fiat_ticker == "GBP"
 
-    # pylint: disable=no-self-use
     def test_gains(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -545,7 +541,6 @@ class TestBinance:
         assert mining_deposit.fiat_in_with_fee is None
         assert mining_deposit.fiat_fee is None
 
-    # pylint: disable=no-self-use
     def test_withdrawals(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
