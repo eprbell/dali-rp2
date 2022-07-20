@@ -409,6 +409,9 @@ class InputPlugin(AbstractInputPlugin):
                     ),
                 )
 
+    def _is_credit_card_spend(self, transaction: Any) -> bool:
+        return transaction[_TYPE] is None and _TO in transaction and _EMAIL in transaction[_TO] and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
+
     def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
         currency: str = account[_CURRENCY][_CODE]
         account_id: str = account[_ID]
@@ -463,6 +466,8 @@ class InputPlugin(AbstractInputPlugin):
                 self._process_fiat_deposit(transaction, currency, in_transaction_list)
             elif transaction_type in {_FIAT_WITHDRAWAL}:
                 self._process_fiat_withdrawal(transaction, currency, out_transaction_list)
+            elif self._is_credit_card_spend(transaction):
+                self._process_fiat_withdrawal(transaction, currency, out_transaction_list, "Coinbase card spend")
             else:
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
@@ -736,7 +741,9 @@ class InputPlugin(AbstractInputPlugin):
 
     def _process_fiat_deposit(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
-        notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
+        details_title = transaction[_DETAILS][_TITLE]
+        details_subtitle = transaction[_DETAILS][_SUBTITLE]
+        notes = f"{notes + '; ' if notes else ''}{details_title + '; ' if details_title else ''}{details_subtitle if details_subtitle else ''}"
         in_transaction_list.append(
             InTransaction(
                 plugin=self.__COINBASE,
@@ -759,7 +766,9 @@ class InputPlugin(AbstractInputPlugin):
 
     def _process_fiat_withdrawal(self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
-        notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
+        details_title = transaction[_DETAILS][_TITLE]
+        details_subtitle = transaction[_DETAILS][_SUBTITLE]
+        notes = f"{notes + '; ' if notes else ''}{details_title + '; ' if details_title else ''}{details_subtitle if details_subtitle else ''}"
         out_transaction_list.append(
             OutTransaction(
                 plugin=self.__COINBASE,
