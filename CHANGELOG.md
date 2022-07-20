@@ -14,7 +14,7 @@
 
 # RP2 Change Log
 
-## 0.4.11
+## 0.4.12
 * added country plugin infrastructure (US is the default country plugin). Default fiat is no longer hardcoded to USD (it now comes from the country plugin)
 * updated generators and rest of the code to use the native fiat from the country plugin (previously it was hard coded as USD)
 * the dali script has been renamed to dali_us to support the new country plugin architecture
