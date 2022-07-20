@@ -410,7 +410,12 @@ class InputPlugin(AbstractInputPlugin):
                 )
 
     def _is_credit_card_spend(self, transaction: Any) -> bool:
-        return transaction[_TYPE] is None and _TO in transaction and _EMAIL in transaction[_TO] and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
+        return (
+            transaction[_TYPE] is None
+            and _TO in transaction
+            and _EMAIL in transaction[_TO]
+            and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
+        )
 
     def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
         currency: str = account[_CURRENCY][_CODE]
