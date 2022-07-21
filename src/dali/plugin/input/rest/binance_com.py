@@ -529,11 +529,11 @@ class InputPlugin(AbstractInputPlugin):
                     self._process_sell(trade, out_transactions)
                     self._process_buy(trade, in_transactions, out_transactions)
                 if len(market_trades) < _TRADE_RECORD_LIMIT:
-                    sleep(0.11)  # Prevents requestTimeOut from too many requests
+                    sleep(0.15)  # Prevents requestTimeOut from too many requests
                     break
                 # Times are inclusive
                 since = int(market_trades[_TRADE_RECORD_LIMIT - 1][_TIMESTAMP]) + 1
-                sleep(0.11) # Prevents too many requests exception
+                sleep(0.15) # Prevents too many requests exception
 
         ### Dust Trades
 
