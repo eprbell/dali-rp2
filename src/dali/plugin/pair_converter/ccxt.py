@@ -62,18 +62,6 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {"USDT": "USD", "SOLO": "XRP"}
 _MS_IN_SECOND: int = 1000
 
 
-class StableCoin(NamedTuple):
-    symbol: str
-    fiat_code: str
-
-
-class AssetPairAndTimestamp(NamedTuple):
-    timestamp: datetime
-    from_asset: str
-    to_asset: str
-    exchange: str
-
-
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
     to_asset: str
@@ -88,7 +76,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
-        self.__exchange_graphs: Dict[str, Dict[str, List[str]]] = {}
+
+        # TO BE IMPLEMENTED - graph and vertex classes to make this more understandable
+        # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924056308
+        self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
 
     def name(self) -> str:
@@ -106,14 +97,16 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return self.__exchange_markets
 
     @property
-    def exchange_graphs(self) -> Dict[str, Dict[str, List[str]]]:
+    def exchange_graphs(self) -> Dict[str, Dict[str, Dict[str, None]]]:
         return self.__exchange_graphs
 
-    def _bfs_cyclic(self, graph: Dict[str, List[str]], start: str, end: str) -> Optional[List[str]]:
+    def _bfs_cyclic(self, graph: Dict[str, Dict[str, None]], start: str, end: str) -> Optional[List[str]]:
 
         # maintain a queue of paths
+        # TO BE IMPLEMENTED - using on vertex queue and one dict?
+        # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924058754
         queue: List[List[str]] = []
-        visited: List[str] = []
+        visited: Dict[str] = {}
 
         # push the first path into the queue
         queue.append([start])
@@ -130,14 +123,14 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 return path
 
             # enumerate all adjacent nodes, construct a new path and push it into the queue
-            for adjacent in graph.get(node, []):
+            for adjacent in graph.get(node, {}):
 
                 # prevents an infinite loop.
                 if adjacent not in visited:
                     new_path: List[str] = list(path)
                     new_path.append(adjacent)
                     queue.append(new_path)
-                    visited.append(adjacent)
+                    visited[adjacent] = None
 
         # No path found
         return None
@@ -155,19 +148,19 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 current_exchange: Exchange = _EXCHANGE_DICT[exchange]()
                 # key: market, value: exchanges where the market is available in order of priority
                 current_markets: Dict[str, List[str]] = {}
-                current_graph: Dict[str, List[str]] = {}
+                current_graph: Dict[str, Dict[str, None]] = {}
 
                 for market in current_exchange.fetch_markets():
-                    self.__logger.debug("Market: %s", market)
+                    # self.__logger.debug("Market: %s", market)
                     current_markets[market[_ID]] = [exchange]
 
                     # TO BE IMPLEMENTED - lazy build graph only if needed
 
                     # Add the quote asset to the graph if it isn't there already.
                     if current_graph.get(market[_BASE]) and (market[_QUOTE] not in current_graph[market[_BASE]]):
-                        current_graph[market[_BASE]].append(market[_QUOTE])
+                        current_graph[market[_BASE]][market[_QUOTE]] = None
                     else:
-                        current_graph[market[_BASE]] = [market[_QUOTE]]
+                        current_graph[market[_BASE]] = {market[_QUOTE]:None}
 
                 # TO BE IMPLEMENTED - possibly sort the lists to put the main stable coin first.
 
@@ -185,11 +178,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         self.__exchanges[alt_exchange_name] = alt_exchange
 
                     if current_graph.get(base_asset) and (quote_asset not in current_graph[base_asset]):
-                        current_graph[base_asset].append(quote_asset)
+                        current_graph[base_asset][quote_asset] = None
                     else:
-                        current_graph[base_asset] = [quote_asset]
+                        current_graph[base_asset] = {quote_asset: None}
 
-                self._add_fiat_graph_to(current_graph, current_markets)
+                self._add_fiat_edges_to_graph(current_graph, current_markets)
                 self.__logger.debug("Added graph for %s : %s", current_exchange, current_graph)
                 self.__exchanges[exchange] = current_exchange
                 self.__exchange_markets[exchange] = current_markets
@@ -250,7 +243,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 # Replacing an immutable attribute
                 conversion_route[i] = conversion_route[i]._replace(historical_data=hop_bar)
             else:
-                self.__logger.error("Internal Error: Market not found for hop.")
+                self.__logger.debug("""No pricing data found for hop. This could be caused by airdropped 
+                    coins that do not have a market yet. Market - %s%s, Timestamp - %s, Exchange - %s""",
+                    hop_data.from_asset, hop_data.to_asset, timestamp, hop_data.exchange)
 
             if result is not None:
                 # TO BE IMPLEMENTED - override Historical Bar * to multiply two bars?
@@ -286,8 +281,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     # Excessive calls to the API within a certain window might get an IP temporarily banned
                     if _REQUEST_DELAYDICT[exchange] > 0:
                         current_time = time()
-                        self.__logger.debug("Delaying for %s seconds", _REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0)))
-                        sleep(max(0,_REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0))))
+                        second_delay = _REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0))
+                        self.__logger.debug("Delaying for %s seconds", second_delay)
+                        sleep(max(0,second_delay))
                         self.__exchange_last_request[exchange] = time()
 
                     historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
