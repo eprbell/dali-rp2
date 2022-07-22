@@ -222,7 +222,7 @@ class TestCcxtPlugin:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         self.__btcusdt_mock(plugin, mocker)
 
-        mocker.patch.object(plugin, "get_fiat_exchange_rate").return_value = HistoricalBar(
+        mocker.patch.object(plugin, "_get_fiat_exchange_rate").return_value = HistoricalBar(
             duration=timedelta(seconds=86400),
             timestamp=BAR_TIMESTAMP,
             open=RP2Decimal(str(JPY_USD_RATE)),
@@ -358,7 +358,7 @@ class TestCcxtPlugin:
         # Need to be mocked to prevent logger spam
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: ["WHATEVER"]})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
-        mocker.patch.object(plugin, "get_fiat_exchange_rate").return_value = HistoricalBar(
+        mocker.patch.object(plugin, "_get_fiat_exchange_rate").return_value = HistoricalBar(
             duration=timedelta(seconds=86400),
             timestamp=EUR_USD_TIMESTAMP,
             open=RP2Decimal(str(EUR_USD_RATE)),
