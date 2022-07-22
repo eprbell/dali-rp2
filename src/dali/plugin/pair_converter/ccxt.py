@@ -17,8 +17,17 @@ from datetime import datetime, timedelta
 from time import sleep, time
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
-from ccxt import (binance, DDoSProtection, Exchange, ExchangeError, ExchangeNotAvailable, kraken, 
-    liquid, NetworkError, RequestTimeout)
+from ccxt import (
+    DDoSProtection,
+    Exchange,
+    ExchangeError,
+    ExchangeNotAvailable,
+    NetworkError,
+    RequestTimeout,
+    binance,
+    kraken,
+    liquid,
+)
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
@@ -52,7 +61,7 @@ _EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _KRAKEN: kraken, _LIQUID: l
 # It appears Kraken public API is limited to around 12 calls per minute.
 # There also appears to be a limit of how many calls per 2 hour time period.
 # Being authenticated lowers this limit.
-_REQUEST_DELAYDICT: Dict[str, float] = {_BINANCE: 0.0, _KRAKEN:5.1, _LIQUID:0}
+_REQUEST_DELAYDICT: Dict[str, float] = {_BINANCE: 0.0, _KRAKEN: 5.1, _LIQUID: 0}
 
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {"USDTUSD": _KRAKEN, "SOLOXRP": _LIQUID}
@@ -160,7 +169,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     if current_graph.get(market[_BASE]) and (market[_QUOTE] not in current_graph[market[_BASE]]):
                         current_graph[market[_BASE]][market[_QUOTE]] = None
                     else:
-                        current_graph[market[_BASE]] = {market[_QUOTE]:None}
+                        current_graph[market[_BASE]] = {market[_QUOTE]: None}
 
                 # TO BE IMPLEMENTED - possibly sort the lists to put the main stable coin first.
 
@@ -243,9 +252,14 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 # Replacing an immutable attribute
                 conversion_route[i] = conversion_route[i]._replace(historical_data=hop_bar)
             else:
-                self.__logger.debug("""No pricing data found for hop. This could be caused by airdropped 
+                self.__logger.debug(
+                    """No pricing data found for hop. This could be caused by airdropped
                     coins that do not have a market yet. Market - %s%s, Timestamp - %s, Exchange - %s""",
-                    hop_data.from_asset, hop_data.to_asset, timestamp, hop_data.exchange)
+                    hop_data.from_asset,
+                    hop_data.to_asset,
+                    timestamp,
+                    hop_data.exchange,
+                )
 
             if result is not None:
                 # TO BE IMPLEMENTED - override Historical Bar * to multiply two bars?
@@ -283,13 +297,15 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         current_time = time()
                         second_delay = _REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0))
                         self.__logger.debug("Delaying for %s seconds", second_delay)
-                        sleep(max(0,second_delay))
+                        sleep(max(0, second_delay))
                         self.__exchange_last_request[exchange] = time()
 
                     historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
                     break
                 except (DDoSProtection, ExchangeError) as exc:
-                    self.__logger.debug("Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc)
+                    self.__logger.debug(
+                        "Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc
+                    )
                     # logger INFO for retry?
                     sleep(0.1)
                     request_count += 3
@@ -302,7 +318,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
                     self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, na)
                     sleep(10)
-
 
             # If there is no candle the list will be empty
             if historical_data:

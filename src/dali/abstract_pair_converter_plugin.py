@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from datetime import datetime, timedelta
-from json import JSONDecodeError
+from json import JSONDecodeError, loads
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
@@ -33,8 +33,8 @@ _SYMBOLS: str = "symbols"
 _RATES: str = "rates"
 
 # exchangerates.host urls
-_EXCHANGE_BASE: str = "https://api.exchangerate.host/"
-_EXCHANGE_SYMBOLS: str = "https://api.exchangerate.host/symbols"
+_EXCHANGE_BASE_URL: str = "https://api.exchangerate.host/"
+_EXCHANGE_SYMBOLS_URL: str = "https://api.exchangerate.host/symbols"
 
 _DAYS_IN_SECONDS: int = 86400
 _FIAT_EXCHANGE: str = "exchangerate.host"
@@ -55,7 +55,7 @@ class AbstractPairConverterPlugin:
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __TIMEOUT: int = 30
 
-    def __init__(self, historical_price_type: str) -> None:
+    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None) -> None:
         if not isinstance(historical_price_type, str):
             raise RP2TypeError(f"historical_price_type is not a string: {historical_price_type}")
         if historical_price_type not in HISTORICAL_PRICE_KEYWORD_SET:
@@ -67,6 +67,11 @@ class AbstractPairConverterPlugin:
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
         self.__fiat_list: List[str] = []
+        self.__fiat_priority: List[str]
+        if fiat_priority is None:
+            self.__fiat_priority = _FIAT_PRIORITY
+        else:
+            self.__fiat_priority = loads(fiat_priority)
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -120,7 +125,7 @@ class AbstractPairConverterPlugin:
 
     def _build_fiat_list(self) -> None:
         try:
-            response: Response = self.__session.get(_EXCHANGE_SYMBOLS, timeout=self.__TIMEOUT)
+            response: Response = self.__session.get(_EXCHANGE_SYMBOLS_URL, timeout=self.__TIMEOUT)
             # {
             #     'motd':
             #         {
@@ -143,36 +148,39 @@ class AbstractPairConverterPlugin:
                 self.__fiat_list = [fiat_iso for fiat_iso in data[_SYMBOLS] if fiat_iso != "BTC"]
             else:
                 if "message" in data:
-                    LOGGER.error("Error %d: %s: %s", response.status_code, _EXCHANGE_SYMBOLS, data["message"])
+                    LOGGER.error("Error %d: %s: %s", response.status_code, _EXCHANGE_SYMBOLS_URL, data["message"])
                 response.raise_for_status()
 
         except JSONDecodeError as exc:
             LOGGER.debug("Fetching of fiat symbols failed. The server might be down. Please try again later.")
             raise Exception("JSON decode error") from exc
 
-    def _add_fiat_graph_to(self, graph: Dict[str, List[str]], markets: Dict[str, List[str]]) -> None:
+    def _add_fiat_edges_to_graph(self, graph: Dict[str, Dict[str, None]], markets: Dict[str, List[str]]) -> None:
         if not self.__fiat_list:
             self._build_fiat_list()
 
         for fiat in self.__fiat_list:
-            to_fiat_list: List[str] = self.__fiat_list.copy()
-            to_fiat_list.remove(fiat)
+            to_fiat_list: Dict[str] = dict.fromkeys(self.__fiat_list.copy())
+            del to_fiat_list[fiat]
             if graph.get(fiat):
                 for to_be_added_fiat in to_fiat_list:
                     # add a pair if it doesn't exist
                     if to_be_added_fiat not in graph[fiat]:
-                        graph[fiat].append(to_be_added_fiat)
+                        graph[fiat][to_be_added_fiat] = None
             else:
                 graph[fiat] = to_fiat_list
 
             for to_fiat in to_fiat_list:
-                fiat_market = fiat + to_fiat
+                fiat_market = f"{fiat}{to_fiat}"
                 markets[fiat_market] = [_FIAT_EXCHANGE]
 
             # Add prioritized fiat at the beginning
-            for priority_fiat in reversed(_FIAT_PRIORITY):
+            for priority_fiat in reversed(self.__fiat_priority):
                 if priority_fiat in graph[fiat]:
-                    graph[fiat].insert(0, graph[fiat].pop(graph[fiat].index(priority_fiat)))
+                    graph[fiat].pop(priority_fiat)
+                    remainder: Dict[str, None] = graph[fiat]
+                    graph[fiat] = {priority_fiat: None}
+                    graph[fiat].update(remainder)
 
             LOGGER.debug("Added to assets for %s: %s", fiat, graph[fiat])
 
@@ -190,7 +198,7 @@ class AbstractPairConverterPlugin:
         params: Dict[str, Any] = {"base": from_asset, "symbols": to_asset}
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
         try:
-            response: Response = self.__session.get(f"{_EXCHANGE_BASE}{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+            response: Response = self.__session.get(f"{_EXCHANGE_BASE_URL}{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
             # {
             #     'motd':
             #         {
