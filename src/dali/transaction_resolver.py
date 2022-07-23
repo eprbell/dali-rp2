@@ -142,7 +142,7 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
         )
         if conversion.rate is None:
             raise Exception(
-                f"Spot price for {transaction.timestamp_value}:{transaction.asset}->{global_configuration[Keyword.NATIVE_FIAT.value]}"
+                f"Spot price for {transaction.unique_id}:{transaction.timestamp_value}:{transaction.asset}->{global_configuration[Keyword.NATIVE_FIAT.value]}"
                 " not found on any pair converter plugin"
             )
 
