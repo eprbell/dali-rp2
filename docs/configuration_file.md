@@ -18,7 +18,7 @@
 * **[Introduction](#introduction)**
 * **[Data Loader Plugin Sections](#data-loader-plugin-sections)**
   * [Coinbase Section (REST)](#coinbase-section-rest)
-  * [Coinbase Section Pro (REST)](#coinbase-pro-section-rest)
+  * [Coinbase Pro Section (REST)](#coinbase-pro-section-rest)
   * [Ledger Section (CSV)](#ledger-section-csv)
   * [Trezor Section (CSV)](#trezor-section-csv)
   * [Trezor Old Section (CSV)](#trezor-old-section-csv)
