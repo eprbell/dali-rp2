@@ -36,6 +36,7 @@ class InTransaction(AbstractTransaction):
         asset: str,
         exchange: str,
         holder: str,
+        # TODO not sure why we aren't using `Keyword` here?
         transaction_type: str,
         spot_price: str,
         crypto_in: str,

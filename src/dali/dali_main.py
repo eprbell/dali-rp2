@@ -45,6 +45,7 @@ from dali.logger import LOGGER
 from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
 from dali.plugin.pair_converter.historic_crypto import PairConverterPlugin as HistoricCryptoPairConverterPlugin
+from dali.plugin.pair_converter.binance import PairConverterPlugin as BinancePairConverterPlugin
 from dali.transaction_resolver import resolve_transactions
 
 _VERSION: str = "0.4.12"
@@ -163,6 +164,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
 
         if not pair_converter_list:
             pair_converter_list.append(HistoricCryptoPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
+            pair_converter_list.append(BinancePairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
             LOGGER.info("No pair converter plugins found in configuration file: using Historic_Crypto/high as default")
 
         dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
