@@ -577,8 +577,9 @@ class InputPlugin(AbstractInputPlugin):
 
                 for dust in dust_trades:
                     self.__logger.debug("Dust: %s", json.dumps(dust))
-                    # dust trades have a null id
-                    dust[_ID] = dust[_ORDER]
+                    # dust trades have a null id, and if multiple assets are dusted at the same time, all are assigned same ID
+                    trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+                    dust[_ID] = f"{dust[_ORDER]}{trade.base_asset}"
                     self._process_sell(dust, out_transactions)
                     self._process_buy(dust, in_transactions, out_transactions)
 
