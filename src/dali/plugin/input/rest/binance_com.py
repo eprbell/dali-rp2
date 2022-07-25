@@ -53,6 +53,7 @@ _COST: str = "cost"  # CCXT only variable
 _CREATETIME: str = "createTime"
 _CRYPTOCURRENCY: str = "cryptoCurrency"
 _CURRENCY: str = "currency"  # CCXT only variable
+_DAILY: str = "DAILY"
 _DATA: str = "data"
 _DATETIME: str = "datetime"  # CCXT only variable
 _DEPOSIT: str = "deposit"  # CCXT only variable
@@ -65,9 +66,12 @@ _ID: str = "id"  # CCXT only variable
 _INDICATEDAMOUNT: str = "indicatedAmount"
 _INFO: str = "info"
 _INSERTTIME: str = "insertTime"
+_INTEREST_PARAMETER: str = "INTEREST"
+_INTEREST_FIELD: str = "interest"
 _ISDUST: str = "isDust"
 _ISFIATPAYMENT: str = "isFiatPayment"
 _LEGALMONEY: str = "legalMoney"
+_LENDINGTYPE: str = "lendingType"
 _LIMIT: str = "limit"
 _OBTAINAMOUNT: str = "obtainAmount"
 _ORDER: str = "order"  # CCXT only variable
@@ -75,10 +79,13 @@ _ORDERNO: str = "orderNo"
 _PAGEINDEX: str = "pageIndex"
 _PAGESIZE: str = "pageSize"
 _PRICE: str = "price"
+_PRODUCT: str = "product"
 _PROFITAMOUNT: str = "profitAmount"
 _ROWS: str = "rows"
 _SELL: str = "sell"  # CCXT only variable
 _SIDE: str = "side"  # CCXT only variable
+_SIZE: str = "size"
+_STAKING: str = "STAKING"
 _STARTTIME: str = "startTime"
 _STATUS: str = "status"
 _SOURCEAMOUNT: str = "sourceAmount"
@@ -92,6 +99,7 @@ _TOTALFEE: str = "totalFee"
 _TOTALNUM: str = "totalNum"
 _TYPE: str = "type"
 _TXID: str = "txid"  # CCXT doesn't capitalize I
+_TXNTYPE: str = "txnType"
 _UPDATETIME: str = "updateTime"
 _USERNAME: str = "userName"
 _WITHDRAWAL: str = "withdrawal"  # CCXT only variable
@@ -105,6 +113,7 @@ _MS_IN_SECOND: int = 1000
 _DEPOSIT_RECORD_LIMIT: int = 1000
 _DIVIDEND_RECORD_LIMIT: int = 500
 _DUST_TRADE_RECORD_LIMIT: int = 100
+_INTEREST_SIZE_LIMIT: int = 100
 _MINING_PAGE_LIMIT: int = 200
 _TRADE_RECORD_LIMIT: int = 1000
 _WITHDRAWAL_RECORD_LIMIT: int = 1000
@@ -357,11 +366,15 @@ class InputPlugin(AbstractInputPlugin):
 
     def _process_gains(self, in_transactions: List[InTransaction]) -> None:
 
-        ### Regular Dividends from Staking (including Eth staking) and Savings (Lending)
+        ### Regular Dividends from Staking (including Eth staking) and Savings (Lending) after around May 8th, 2021 01:00 UTC.
 
         # We need milliseconds for Binance
         current_start = self.start_time_ms
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
+
+        # The exact moment when Binance switched to unified dividends is unknown/unpublished.
+        # This allows us an educated guess.
+        earliest_record_epoch: int = 0 
 
         # We will pull in 30 day periods. This allows for 16 assets with daily dividends.
         current_end = current_start + _THIRTY_DAYS_IN_MS
@@ -412,6 +425,106 @@ class InputPlugin(AbstractInputPlugin):
                 # CCXT standard API sorts by timestamp, so latest record is last ([499])
                 current_start = int(dividends[_ROWS][0][_DIVTIME]) + 1  # times are inclusive
                 current_end = current_start + _THIRTY_DAYS_IN_MS
+
+            if not earliest_record_epoch and int(dividends[_TOTAL]) > 0:
+            	earliest_record_epoch = int(dividends[_ROWS][0][_DIVTIME]) - 1
+
+        # Old system Locked Savings 
+
+        old_savings: bool = False
+
+        # Reset window
+        current_start = self.start_time_ms
+        current_end = current_start + _THIRTY_DAYS_IN_MS
+
+        # We will step backward in time from the switch over
+        while current_start < earliest_record_epoch:
+
+            self.__logger.debug("Pulling locked staking from older api system from %s to %s", current_start, current_end)
+
+            locked_staking = self.client.sapi_get_staking_stakingrecord(params=({_STARTTIME:current_start, _ENDTIME:current_end,
+                _PRODUCT:_STAKING, _TXNTYPE:_INTEREST_PARAMETER, _SIZE:_INTEREST_SIZE_LIMIT}))
+            # [
+            # 	{
+            # 		'positionId': '7146912', 
+            # 		'time': '1624233772000', 
+            # 		'asset': 'BTC', 
+            # 		'amount': '0.017666', 
+            # 		'status': 'SUCCESS'
+            # 	}, 
+            # 	{
+            # 		'positionId': '7147052', 
+            # 		'time': '1624147893000', 
+            # 		'asset': 'BTC', 
+            # 		'amount': '0.0176665', 
+            # 		'status': 'SUCCESS'
+            # 	}
+            # ]
+            for stake_dividend in locked_staking:
+                self.__logger.debug("Locked Staking: %s", json.dumps(stake_dividend))
+                stake_dividend[_ENINFO] = "Locked Staking/Savings (OLD)"
+                stake_dividend[_ID] = Keyword.UNKNOWN.value
+                stake_dividend[_DIVTIME] = stake_dividend[_TIME]
+                self._process_gain(stake_dividend, Keyword.STAKING, in_transactions)
+                old_savings = True
+
+            # if we returned the limit, we need to roll the window forward to the last time
+            if len(locked_staking) < _INTEREST_SIZE_LIMIT:
+                current_start = current_end + 1
+                current_end = current_start + _THIRTY_DAYS_IN_MS
+            else:
+                current_start = int(locked_staking[0][_TIME]) + 1
+                current_end = current_start + _THIRTY_DAYS_IN_MS
+
+        # Old system Flexible Savings
+
+        # Reset window
+        current_start = self.start_time_ms
+        current_end = current_start + _THIRTY_DAYS_IN_MS
+
+        # We will step backward in time from the switch over
+        while current_start < earliest_record_epoch:
+
+            self.__logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
+
+            flexible_saving = self.client.sapi_get_lending_union_interesthistory(params=({_STARTTIME:current_start, _ENDTIME:current_end,
+                _LENDINGTYPE:_DAILY, _SIZE:_INTEREST_SIZE_LIMIT}))
+            # [
+            #     {
+            #         "asset": "BUSD",
+            #         "interest": "0.00006408",
+            #         "lendingType": "DAILY",
+            #         "productName": "BUSD",
+            #         "time": 1577233578000
+            #     },
+            #     {
+            #         "asset": "USDT",
+            #         "interest": "0.00687654",
+            #         "lendingType": "DAILY",
+            #         "productName": "USDT",
+            #         "time": 1577233562000
+            #     }
+            # ]
+            for saving in flexible_saving:
+                self.__logger.debug("Flexible Saving: %s", json.dumps(stake_dividend))
+                saving[_ENINFO] = "Flexible Savings (OLD)"
+                saving[_ID] = Keyword.UNKNOWN.value
+                saving[_DIVTIME] = saving[_TIME]
+                saving[_AMOUNT] = saving[_INTEREST_FIELD]
+                self._process_gain(saving, Keyword.INTEREST, in_transactions)
+                old_savings = True
+
+            # if we returned the limit, we need to roll the window forward to the last time
+            if len(flexible_saving) < _INTEREST_SIZE_LIMIT:
+                current_start = current_end + 1
+                current_end = current_start + _THIRTY_DAYS_IN_MS
+            else:
+                current_start = int(flexible_saving[0][_TIME]) + 1
+                current_end = current_start + _THIRTY_DAYS_IN_MS
+
+        if old_savings:
+            # Since we are making a guess at the cut off, there might be errors.
+            self.__logger.warning("Pre-May 8th, 2021 savings detected. Please be aware that there may be duplicate or missing savings records around May 8th, 2021.")
 
         ### Mining Income
 
@@ -578,7 +691,7 @@ class InputPlugin(AbstractInputPlugin):
                 for dust in dust_trades:
                     self.__logger.debug("Dust: %s", json.dumps(dust))
                     # dust trades have a null id, and if multiple assets are dusted at the same time, all are assigned same ID
-                    trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+                    trade: _Trade = self._to_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
                     dust[_ID] = f"{dust[_ORDER]}{trade.base_asset}"
                     self._process_sell(dust, out_transactions)
                     self._process_buy(dust, in_transactions, out_transactions)
