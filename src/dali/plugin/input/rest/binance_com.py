@@ -427,7 +427,7 @@ class InputPlugin(AbstractInputPlugin):
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
             if not earliest_record_epoch and int(dividends[_TOTAL]) > 0:
-            	earliest_record_epoch = int(dividends[_ROWS][0][_DIVTIME]) - 1
+            	earliest_record_epoch = int(dividends[_ROWS][-1][_DIVTIME]) - 1
 
         # Old system Locked Savings 
 
@@ -476,6 +476,10 @@ class InputPlugin(AbstractInputPlugin):
                 current_start = int(locked_staking[0][_TIME]) + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
+            if current_end > earliest_record_epoch:
+                current_end = earliest_record_epoch
+
+
         # Old system Flexible Savings
 
         # Reset window
@@ -521,6 +525,9 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 current_start = int(flexible_saving[0][_TIME]) + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
+
+            if current_end > earliest_record_epoch:
+                current_end = earliest_record_epoch
 
         if old_savings:
             # Since we are making a guess at the cut off, there might be errors.
@@ -843,12 +850,14 @@ class InputPlugin(AbstractInputPlugin):
 
             if transaction[_FEE][_CURRENCY] == in_asset:
                 crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
-                crypto_in = crypto_in - crypto_fee
+                crypto_in = crypto_in
             else:
                 crypto_fee = ZERO
 
+                transaction_fee = transaction[_FEE][_COST]
+
                 # Users can use BNB to pay fees on Binance
-                if transaction[_FEE][_CURRENCY] != out_asset:
+                if transaction[_FEE][_CURRENCY] != out_asset and float(transaction_fee) > 0:
                     out_transaction_list.append(
                         OutTransaction(
                             plugin=self.__BINANCE_COM,
@@ -860,9 +869,9 @@ class InputPlugin(AbstractInputPlugin):
                             holder=self.account_holder,
                             transaction_type=Keyword.FEE.value,
                             spot_price=Keyword.UNKNOWN.value,
-                            crypto_out_no_fee=str(transaction[_FEE][_COST]),
-                            crypto_fee="0",
-                            crypto_out_with_fee=str(transaction[_FEE][_COST]),
+                            crypto_out_no_fee="0",
+                            crypto_fee=str(transaction_fee),
+                            crypto_out_with_fee=str(transaction_fee),
                             fiat_out_no_fee=None,
                             fiat_fee=None,
                             notes=(f"{notes + '; ' if notes else ''} Fee for conversion from " f"{conversion_info}"),
