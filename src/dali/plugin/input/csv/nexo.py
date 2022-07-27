@@ -116,6 +116,8 @@ class InputPlugin(AbstractInputPlugin):
                         }))
                     )
                 elif transaction_type in [_LOCKING_TERM_DEPOSIT, _UNLOCKING_TERM_DEPOSIT]:
+                    # These are unique to Nexo thing: they "lock" your crypto in a "fixed term" deposit which earns higher interest.
+                    # i.e. these transactions just indicate that you cannot withdraw these funds while these are locked. So they effect your available balance.
                     # I don't think we need to record locking/unlocking deposits for term interest
                     self.__logger.debug("Skipping lock or unlock deposit: %s", line)
                 elif transaction_type == _DEPOSIT:
