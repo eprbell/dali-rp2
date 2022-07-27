@@ -16,6 +16,7 @@
 # Note: BlockFi doesn't provide hash information, so BlockFi transactions cannot be resolved
 
 import logging
+import re
 from csv import reader
 from typing import Dict, List, Optional
 
@@ -29,24 +30,7 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
-# _ACH_DEPOSIT: str = "Ach Deposit"
-# _ACH_WITHDRAWAL: str = "Ach Withdrawal"
-# _BUY_CURRENCY: str = "Buy Currency"
-# _BUY_QUANTITY: str = "Buy Quantity"
-# _CRYPTO_TRANSFER: str = "Crypto Transfer"
-# _DATE: str = "Date"
-# _INTEREST_PAYMENT: str = "Interest Payment"
-# _REFERRAL_BONUS: str = "Referral Bonus"
-# _SOLD_CURRENCY: str = "Sold Currency"
-# _SOLD_QUANTITY: str = "Sold Quantity"
-# _TRADE: str = "Trade"
-# _TRADE_ID: str = "Trade ID"
-# _TYPE: str = "Type"
-# _WITHDRAWAL: str = "Withdrawal"
-# _WITHDRAWAL_FEE: str = "Withdrawal Fee"
-
-
-# types of transactions
+# transaction types
 _INTEREST = "Interest"
 _LOCKING_TERM_DEPOSIT = "LockingTermDeposit"
 _UNLOCKING_TERM_DEPOSIT = "UnlockingTermDeposit"
@@ -61,6 +45,7 @@ class InputPlugin(AbstractInputPlugin):
     __TRANSACTION_TYPE_INDEX = 1
     __CURRENCY_INDEX: int = 2
     __AMOUNT_INDEX: int = 3
+    __SPOT_PRICE_INDEX: int = 4
 
     __TIMESTAMP_INDEX: int = 7
 
@@ -99,51 +84,59 @@ class InputPlugin(AbstractInputPlugin):
                 amount = line[self.__AMOUNT_INDEX].strip()
                 timestamp_with_timezone = f"{line[self.__TIMESTAMP_INDEX].strip()} -00:00"
 
-                if transaction_type in [_INTEREST, _FIXED_TERM_INTEREST]:
-                    result.append(
-                        InTransaction(
-                            plugin=self.__NEXO,
-                            unique_id=transaction_id,
-                            raw_data=raw_data,
-                            exchange=self.__NEXO,
-                            holder=self.account_holder,
-                            timestamp=timestamp_with_timezone,
-                            asset=currency,
+                common_params = {
+                    'plugin': self.__NEXO,
+                    'unique_id': transaction_id,
+                    'raw_data': raw_data,
+                    # there is no timezone information in the CSV, so we assume UTC
+                    'timestamp': timestamp_with_timezone,
+                    'asset': currency,
+                }
 
-                            transaction_type=Keyword.INTEREST.name,
-                            # nexo does give us the spot price, but it's often 0 if subcent
-                            spot_price=Keyword.UNKNOWN.value,
-                            crypto_in=amount,
-                            fiat_fee="0",
-                        )
+                if transaction_type in [_INTEREST, _FIXED_TERM_INTEREST]:
+                    # nexo does give us the spot price, but it's often 0 if a subcent value
+                    # if it is non-zero, we use it, otherwise we use unknown as the value
+                    # the spot price contains $ char, so we remove it
+                    spot_price = RP2Decimal(re.sub(r'[^\d.]', '', line[self.__SPOT_PRICE_INDEX]))
+
+                    if spot_price.is_zero():
+                        spot_price = Keyword.UNKNOWN.value
+                    else:
+                        spot_price = str(spot_price)
+
+                    result.append(
+                        InTransaction(**(common_params | {
+                            'exchange':self.__NEXO,
+                            'holder':self.account_holder,
+
+                            'transaction_type':Keyword.INTEREST.name,
+                            'spot_price': spot_price,
+                            'crypto_in': amount,
+                            'fiat_fee': "0",
+                        }))
                     )
                 elif transaction_type in [_LOCKING_TERM_DEPOSIT, _UNLOCKING_TERM_DEPOSIT]:
                     # I don't think we need to record locking/unlocking deposits for term interest
                     self.__logger.debug("Skipping lock or unlock deposit: %s", line)
                 elif transaction_type == _DEPOSIT:
                     result.append(
-                        IntraTransaction(
-                            plugin=self.__NEXO,
-                            unique_id=transaction_id,
-                            raw_data=raw_data,
-                            timestamp=timestamp_with_timezone,
-                            asset=currency,
-
-                            crypto_received=amount,
+                        IntraTransaction(**(common_params | {
+                            'crypto_received':amount,
 
                             # most likely, it's you, but we can't say for sure
-                            from_exchange=Keyword.UNKNOWN.value,
-                            from_holder=Keyword.UNKNOWN.value,
+                            'from_exchange':Keyword.UNKNOWN.value,
+                            'from_holder':Keyword.UNKNOWN.value,
 
-                            to_exchange=self.__NEXO,
-                            to_holder=self.account_holder,
+                            'to_exchange':self.__NEXO,
+                            'to_holder':self.account_holder,
 
                             # we do know the spot price, but nexo seems to do some aggressive rounding
-                            spot_price=Keyword.UNKNOWN.value,
-                            crypto_sent=Keyword.UNKNOWN.value,
-                        )
+                            'spot_price':Keyword.UNKNOWN.value,
+                            'crypto_sent':Keyword.UNKNOWN.value,
+                        }))
                     )
                 else:
+                    # TODO in my data, I had no withdrawals, they will need to be implemented in the future
                     self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result
