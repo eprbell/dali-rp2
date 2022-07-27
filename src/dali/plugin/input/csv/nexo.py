@@ -82,13 +82,13 @@ class InputPlugin(AbstractInputPlugin):
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
                 currency: str = line[self.__CURRENCY_INDEX].strip()
                 amount = line[self.__AMOUNT_INDEX].strip()
+                    # there is no timezone information in the CSV, so we assume UTC
                 timestamp_with_timezone = f"{line[self.__TIMESTAMP_INDEX].strip()} -00:00"
 
                 common_params = {
                     'plugin': self.__NEXO,
                     'unique_id': transaction_id,
                     'raw_data': raw_data,
-                    # there is no timezone information in the CSV, so we assume UTC
                     'timestamp': timestamp_with_timezone,
                     'asset': currency,
                 }
