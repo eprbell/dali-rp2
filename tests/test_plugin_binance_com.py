@@ -24,8 +24,14 @@ from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 from dali.plugin.input.rest.binance_com import InputPlugin
 
+# Time Constants
+_MS_IN_DAY: int = 86400000
+_MS_IN_HOUR: int = 3600000
+
 
 class TestBinance:
+
+    # pylint: disable=no-self-use
     def test_deposits(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -34,7 +40,7 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
         mocker.patch.object(plugin.client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
             "message": "success",
@@ -181,6 +187,7 @@ class TestBinance:
         assert fiat_deposit.fiat_fee is None
         assert fiat_deposit.fiat_ticker == "EUR"
 
+    # pylint: disable=no-self-use
     def test_trades(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -189,7 +196,7 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
         mocker.patch.object(plugin.client, "fetch_my_trades").return_value = [
             # Trade using BNB for fee payment
             {
@@ -372,7 +379,7 @@ class TestBinance:
         assert int(parser.parse(buy_conversion_in.timestamp).timestamp()) * 1000 == 1502962947000
         assert buy_conversion_in.transaction_type == Keyword.BUY.value
         assert buy_conversion_in.spot_price == Keyword.UNKNOWN.value
-        assert RP2Decimal(buy_conversion_in.crypto_in) == RP2Decimal("2.9985")
+        assert RP2Decimal(buy_conversion_in.crypto_in) == RP2Decimal("3")
         assert RP2Decimal(str(buy_conversion_in.crypto_fee)) == RP2Decimal("0.0015")
         assert buy_conversion_in.fiat_in_no_fee is None
         assert buy_conversion_in.fiat_in_with_fee is None
@@ -403,7 +410,7 @@ class TestBinance:
         assert buy_fiat_order_out.asset == "GBP"
         assert int(parser.parse(buy_fiat_order_out.timestamp).timestamp()) * 1000 == 1502962949000
         assert buy_fiat_order_out.transaction_type == Keyword.SELL.value
-        assert RP2Decimal(buy_fiat_order_out.spot_price) == RP2Decimal("23000.01")
+        assert RP2Decimal(buy_fiat_order_out.spot_price) == RP2Decimal("1")
         assert RP2Decimal(buy_fiat_order_out.crypto_out_no_fee) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_out.crypto_fee) == RP2Decimal("0")
         assert RP2Decimal(str(buy_fiat_order_out.crypto_out_with_fee)) == RP2Decimal("23000.01")
@@ -415,7 +422,7 @@ class TestBinance:
         assert int(parser.parse(buy_fiat_order_in.timestamp).timestamp()) * 1000 == 1502962949000
         assert buy_fiat_order_in.transaction_type == Keyword.BUY.value
         assert RP2Decimal(buy_fiat_order_in.spot_price) == RP2Decimal("23000.01")
-        assert RP2Decimal(buy_fiat_order_in.crypto_in) == RP2Decimal("0.998")
+        assert RP2Decimal(buy_fiat_order_in.crypto_in) == RP2Decimal("1")
         assert RP2Decimal(str(buy_fiat_order_in.crypto_fee)) == RP2Decimal("0.002")
         assert RP2Decimal(str(buy_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("22954.00998")
         assert RP2Decimal(str(buy_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("23000.01")
@@ -435,14 +442,15 @@ class TestBinance:
         assert sell_fiat_order_in.asset == "GBP"
         assert int(parser.parse(sell_fiat_order_in.timestamp).timestamp()) * 1000 == 1502962950000
         assert sell_fiat_order_in.transaction_type == Keyword.BUY.value
-        assert RP2Decimal(sell_fiat_order_in.spot_price) == RP2Decimal("23000.01")
-        assert RP2Decimal(sell_fiat_order_in.crypto_in) == RP2Decimal("22960.01")
+        assert RP2Decimal(sell_fiat_order_in.spot_price) == RP2Decimal("1")
+        assert RP2Decimal(sell_fiat_order_in.crypto_in) == RP2Decimal("23000.01")
         assert RP2Decimal(str(sell_fiat_order_in.crypto_fee)) == RP2Decimal("40")
-        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("22960.01")
-        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("23000.01")
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("23000.01")
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("22960.01")
         assert sell_fiat_order_in.fiat_fee is None
         assert sell_fiat_order_in.fiat_ticker == "GBP"
 
+    # pylint: disable=no-self-use
     def test_gains(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -451,8 +459,8 @@ class TestBinance:
             username="user",
             native_fiat="USD",
         )
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin.client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
+        mocker.patch.object(plugin.client, "sapiGetMiningPubAlgoList").return_value = {'data':[{'algoName':'sha256'}]}
         mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "sapiGetAssetAssetDividend").return_value = {
             "rows": [
@@ -482,7 +490,7 @@ class TestBinance:
                     {
                         "time": 1607529600000,
                         "coinName": "BTC",
-                        "type": "0",  # String
+                        "type": "0", # String
                         "dayHashRate": 9942053925926,
                         "profitAmount": 0.85426469,
                         "hashTransfer": 200000000000,
@@ -495,6 +503,77 @@ class TestBinance:
             },
         }
 
+        def penalized_locked_staking(params: Dict[str,str]) -> List[Dict[str,str]]:
+            # pylint: disable=unused-argument
+            result: List[Dict[str,str]] = []
+            normal_subscription_time: int = 1619740800000
+            early_redeem_subscription_time: int = 1619740800000 + _MS_IN_DAY
+
+            if params["txnType"] = "SUBSCRIPTION":
+                result = [
+                    {
+                        "time": normal_subscription_time,
+                        "asset": "BTC",
+                        "amount": "1",
+                        "lockPeriod": "10",
+                        "type": "NORMAL",
+                        "status": "SUCCESS",
+                    },
+                    {
+                        "time": early_redeem_subscription_time,
+                        "asset": "BTC",
+                        "amount": "1",
+                        "lockPeriod": "10",
+                        "type": "NORMAL",
+                        "status": "SUCCESS",
+                    }
+
+                ]
+
+            elif params["txnType"] = "REDEMPTION":
+                result = [
+                    {
+                        "positionId": "12345",
+                        "time": (normal_subscription_time + _MS_IN_DAY * 10 + _MS_IN_HOUR * 12), # valid redemption time
+                        "asset": "BTC",
+                        "amount": "1",
+                        "deliverDate": (normal_subscription_time + _MS_IN_DAY * 10 + _MS_IN_HOUR * 13), # Just needs to be later
+                        "status": "PAID",
+                    },
+                    {
+                        "positionId": "12346",
+                        "time": (early_redeem_subscription_time + _MS_IN_DAY * 5 + _MS_IN_HOUR * 12), # invalid redemption time (6 days short)
+                        "asset": "BTC",
+                        "amount": "0.95",
+                        "deliverDate": (early_redeem_subscription_time + _MS_IN_DAY * 5 + _MS_IN_HOUR * 13), # Just needs to be later
+                        "status": "PAID",
+                    }
+                ]
+            elif params["txnType"] = "INTEREST":
+                normal_interest_start: int = normal_subscription_time + _MS_IN_HOUR * 6
+                early_redem_interest_start: int = early_redeem_subscription_time + _MS_IN_HOUR * 6
+                for i in range(1,10):
+                    result.extend({
+                        'positionId': '12345', 
+                        'time': normal_subscription_time + _MS_IN_DAY * i, 
+                        'asset': 'BTC', 
+                        'amount': '0.01', 
+                        'status': 'SUCCESS',
+                        })
+
+                    # Early redemption doesn't get all the interest payments
+                    if i <= 5:
+                        result.extend({
+                            'positionId': '12346', 
+                            'time': early_redeem_subscription_time + _MS_IN_DAY * i, 
+                            'asset': 'BTC', 
+                            'amount': '0.01', 
+                            'status': 'SUCCESS',                           
+                        })
+
+
+        mocker.patch.object(plugin.client, "sapi_get_staking_stakingrecord").side_effect = penalized_locked_staking
+
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         mocker.patch.object(plugin, "_process_trades").return_value = None
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
@@ -503,12 +582,15 @@ class TestBinance:
 
         # One Eth staking transaction +
         # One BUSD savings transaction +
-        # One Mining transaction = 3
-        assert len(result) == 3
+        # 15 Interest transactions +
+        # 1 Early Redemption Penalty +
+        # One Mining transaction = 19
+        assert len(result) == 19
 
         eth_staking: InTransaction = result[0]  # type: ignore
         busd_savings: InTransaction = result[1]  # type: ignore
-        mining_deposit: InTransaction = result[2]  # type: ignore
+        early_redeem_fee: OutTransaction = result[17] # type: ignore
+        mining_deposit: InTransaction = result[18]  # type: ignore
 
         # Make sure it identifies this as staking income
         assert eth_staking.asset == "BETH"
@@ -531,6 +613,16 @@ class TestBinance:
         assert busd_savings.fiat_in_with_fee is None
         assert busd_savings.fiat_fee is None
 
+        assert early_redeem_fee.asset == "BTC"
+        assert int(parser.parse(early_redeem_fee.timestamp).timestamp()) * 1000 == early_redeem_subscription_time + _MS_IN_DAY * 5 + _MS_IN_HOUR * 13
+        assert early_redeem_fee.transaction_type == Keyword.FEE.value
+        assert early_redeem_fee.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(early_redeem_fee.crypto_out_no_fee) == RP2Decimal("0.05")
+        assert RP2Decimal(early_redeem_fee.crypto_out_with_fee) == RP2Decimal("0.05")
+        assert RP2Decimal(early_redeem_fee.crypto_fee) == RP2Decimal("0")
+        assert early_redeem_fee.fiat_in_no_fee is None
+        assert early_redeem_fee.fiat_fee is None      
+
         assert mining_deposit.asset == "BTC"
         assert int(parser.parse(mining_deposit.timestamp).timestamp()) * 1000 == 1607529600000
         assert mining_deposit.transaction_type == Keyword.MINING.value
@@ -541,6 +633,7 @@ class TestBinance:
         assert mining_deposit.fiat_in_with_fee is None
         assert mining_deposit.fiat_fee is None
 
+    # pylint: disable=no-self-use
     def test_withdrawals(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -549,7 +642,7 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{'id':'ETHBTC'}]
         mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(plugin.client, "fetch_withdrawals").return_value = [
             {
