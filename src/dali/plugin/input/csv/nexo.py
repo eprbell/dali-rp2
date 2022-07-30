@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CSV Format: currency, amount, type, timestamp
-# Note: BlockFi doesn't provide hash information, so BlockFi transactions cannot be resolved
+# CSV Format: transaction id, type, currency, amount, usd equivalent, details, outstanding loan, datetime
 
 import logging
 import re
@@ -36,6 +35,7 @@ _LOCKING_TERM_DEPOSIT = "LockingTermDeposit"
 _UNLOCKING_TERM_DEPOSIT = "UnlockingTermDeposit"
 _FIXED_TERM_INTEREST = "FixedTermInterest"
 _DEPOSIT = "Deposit"
+
 
 class InputPlugin(AbstractInputPlugin):
 
@@ -82,64 +82,70 @@ class InputPlugin(AbstractInputPlugin):
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
                 currency: str = line[self.__CURRENCY_INDEX].strip()
                 amount = line[self.__AMOUNT_INDEX].strip()
-                    # there is no timezone information in the CSV, so we assume UTC
+                # there is no timezone information in the CSV, so we assume UTC
                 timestamp_with_timezone = f"{line[self.__TIMESTAMP_INDEX].strip()} -00:00"
 
                 common_params = {
-                    'plugin': self.__NEXO,
-                    'unique_id': transaction_id,
-                    'raw_data': raw_data,
-                    'timestamp': timestamp_with_timezone,
-                    'asset': currency,
+                    "plugin": self.__NEXO,
+                    "unique_id": transaction_id,
+                    "raw_data": raw_data,
+                    "timestamp": timestamp_with_timezone,
+                    "asset": currency,
                 }
 
+                # nexo does give us the spot price, but it's often 0 if a subcent value
+                # if it is non-zero, we use it, otherwise we use unknown as the value
+                # the spot price contains $ char, so we remove it
+                spot_price = RP2Decimal(re.sub(r"[^\d.]", "", line[self.__SPOT_PRICE_INDEX]))
+
+                if spot_price.is_zero():
+                    spot_price = Keyword.UNKNOWN.value
+                else:
+                    spot_price = str(spot_price)
+
                 if transaction_type in [_INTEREST, _FIXED_TERM_INTEREST]:
-                    # nexo does give us the spot price, but it's often 0 if a subcent value
-                    # if it is non-zero, we use it, otherwise we use unknown as the value
-                    # the spot price contains $ char, so we remove it
-                    spot_price = RP2Decimal(re.sub(r'[^\d.]', '', line[self.__SPOT_PRICE_INDEX]))
-
-                    if spot_price.is_zero():
-                        spot_price = Keyword.UNKNOWN.value
-                    else:
-                        spot_price = str(spot_price)
-
                     result.append(
-                        InTransaction(**(common_params | {
-                            'exchange':self.__NEXO,
-                            'holder':self.account_holder,
-
-                            'transaction_type':Keyword.INTEREST.name,
-                            'spot_price': spot_price,
-                            'crypto_in': amount,
-                            'fiat_fee': "0",
-                        }))
+                        InTransaction(
+                            **(
+                                common_params
+                                | {
+                                    "exchange": self.__NEXO,
+                                    "holder": self.account_holder,
+                                    "transaction_type": Keyword.INTEREST.name,
+                                    "spot_price": spot_price,
+                                    "crypto_in": amount,
+                                    "fiat_fee": "0",
+                                }
+                            )
+                        )
                     )
                 elif transaction_type in [_LOCKING_TERM_DEPOSIT, _UNLOCKING_TERM_DEPOSIT]:
                     # These are unique to Nexo thing: they "lock" your crypto in a "fixed term" deposit which earns higher interest.
-                    # i.e. these transactions just indicate that you cannot withdraw these funds while these are locked. So they effect your available balance.
+                    # i.e. these transactions just indicate that you cannot withdraw these funds while these are locked. So they affect your available balance.
                     # I don't think we need to record locking/unlocking deposits for term interest
                     self.__logger.debug("Skipping lock or unlock deposit: %s", line)
                 elif transaction_type == _DEPOSIT:
                     result.append(
-                        IntraTransaction(**(common_params | {
-                            'crypto_received':amount,
-
-                            # most likely, it's you, but we can't say for sure
-                            'from_exchange':Keyword.UNKNOWN.value,
-                            'from_holder':Keyword.UNKNOWN.value,
-
-                            'to_exchange':self.__NEXO,
-                            'to_holder':self.account_holder,
-
-                            # we do know the spot price, but nexo seems to do some aggressive rounding
-                            'spot_price':Keyword.UNKNOWN.value,
-                            'crypto_sent':Keyword.UNKNOWN.value,
-                        }))
+                        IntraTransaction(
+                            **(
+                                common_params
+                                | {
+                                    "crypto_received": amount,
+                                    # most likely, funds are coming from the user/tax payer, but we can't say for sure so we use unknown
+                                    # and let the user manually input the owner of these funds.
+                                    "from_exchange": Keyword.UNKNOWN.value,
+                                    "from_holder": Keyword.UNKNOWN.value,
+                                    "to_exchange": self.__NEXO,
+                                    "to_holder": self.account_holder,
+                                    # we do know the spot price, but nexo seems to do some aggressive rounding
+                                    "spot_price": spot_price,
+                                    "crypto_sent": Keyword.UNKNOWN.value,
+                                }
+                            )
+                        )
                     )
                 else:
                     # TODO in my data, I had no withdrawals, they will need to be implemented in the future
                     self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result
-
