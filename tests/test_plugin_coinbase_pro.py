@@ -20,8 +20,6 @@ from dali.plugin.input.rest.coinbase_pro import InputPlugin
 
 
 class TestSwapFill:
-
-    # pylint: disable=no-self-use
     def test_buy_side(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",

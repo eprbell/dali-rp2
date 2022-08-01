@@ -14,12 +14,16 @@
 
 # RP2 Change Log
 
-## In Progress
-* added country plugin infrastructure (US is the default country plugin)
+## 0.4.12
+* added country plugin infrastructure (US is the default country plugin). Default fiat is no longer hardcoded to USD (it now comes from the country plugin)
 * updated generators and rest of the code to use the native fiat from the country plugin (previously it was hard coded as USD)
 * the dali script has been renamed to dali_us to support the new country plugin architecture
+* added exchange hint to pair converter API
+* added Ledger CSV data loader
+* added credit card spend transactions to Coinbase plugin
 * renamed cache folder from .cache to .dali_cache
 * updated documentation to reflect latest changes
+* small additions and fixes to documentation and code
 
 ## 0.4.9
 * added new pair conversion plugin infrastructure

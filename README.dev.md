@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.4.10 Developer Guide
+# DaLI for RP2 v0.4.12 Developer Guide
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -33,6 +33,7 @@
   * [Design Guidelines](#design-guidelines)
   * [Development Workflow](#development-workflow)
   * [Unit Tests](#unit-tests)
+* **[Creating a Release](#creating-a-release)**
 * **[Internal Design](#internal-design)**
   * [The Transaction Resolver](#the-transaction-resolver)
   * [Plugin Development](#plugin-development)
@@ -175,6 +176,23 @@ LOG_LEVEL=DEBUG bin/dali_us -s -o output/ config/test_config.ini
 ### Unit Tests
 Unit tests are in the [tests](tests) directory. Please add unit tests for any new code.
 
+## Creating a Release
+This section is for project maintainers.
+
+To create a new release:
+* add a section named as the new version in CHANGELOG.md
+* use the output of `git log` to collect significant changes since last version and add them to CHANGELOG.md as a list of brief bullet points
+* `git add CHANGELOG.md`
+* `git commit -m "Updated with latest changes" CHANGELOG.md`
+* `bumpversion patch` (or `bumpversion minor` or `bumpversion major`)
+* `git push`
+* wait for all tests to pass successfully on Github
+* add a tag in Github (named the same as the version but with a `v` in front, e.g. `v1.0.4`):  click on "Releases" and then "Draft a new release"
+
+To create a Pypi distribution:
+* `make distribution`
+* `make upload_distribution`
+
 ## Internal Design
 DaLI's control flow is as follows (see [dali_main.py](src/dali/dali_main.py)):
 * parse the INI configuration file which includes plugin initialization parameters and global configuration sections;
@@ -224,7 +242,8 @@ For an example of pair converter look at the [Historic-Crypto](src/dali/plugin/p
 Country plugins are reused from RP2. To add support for a new country in DaLI:
 * [add a country plugin to RP2](https://github.com/eprbell/rp2/blob/main/README.dev.md#adding-support-for-a-new-country);
 * add a new Python file to the `src/dali/plugin/country` directory and name it after the [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) 2-letter code for the country;
-* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file.
+* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file;
+* add a console script to setup.cfg pointing the new country dali_entry (see the US example in the console_scripts section of setup.cfg).
 
 ### Plugin Laundry List
 When submitting a new plugin open a [PR](https://github.com/eprbell/dali-rp2/pulls) and make sure all the following bullet points apply to your code:
