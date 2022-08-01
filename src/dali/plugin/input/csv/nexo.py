@@ -120,7 +120,7 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
                 elif transaction_type in [_LOCKING_TERM_DEPOSIT, _UNLOCKING_TERM_DEPOSIT]:
-                    # These are unique to Nexo thing: they "lock" your crypto in a "fixed term" deposit which earns higher interest.
+                    # These are unique to Nexo: they "lock" your crypto in a "fixed term" deposit which earns higher interest.
                     # i.e. these transactions just indicate that you cannot withdraw these funds while these are locked. So they affect your available balance.
                     # I don't think we need to record locking/unlocking deposits for term interest
                     self.__logger.debug("Skipping lock or unlock deposit: %s", line)
@@ -132,7 +132,7 @@ class InputPlugin(AbstractInputPlugin):
                                 | {
                                     "crypto_received": amount,
                                     # most likely, funds are coming from the user/tax payer, but we can't say for sure so we use unknown
-                                    # and let the user manually input the owner of these funds.
+                                    # and let the DaLI transaction resolver fill in the missing details.
                                     "from_exchange": Keyword.UNKNOWN.value,
                                     "from_holder": Keyword.UNKNOWN.value,
                                     "to_exchange": self.__NEXO,
