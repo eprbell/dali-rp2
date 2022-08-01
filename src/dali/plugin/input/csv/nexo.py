@@ -111,7 +111,7 @@ class InputPlugin(AbstractInputPlugin):
                                 | {
                                     "exchange": self.__NEXO,
                                     "holder": self.account_holder,
-                                    "transaction_type": Keyword.INTEREST.name,
+                                    "transaction_type": Keyword.INTEREST.value,
                                     "spot_price": spot_price,
                                     "crypto_in": amount,
                                     "fiat_fee": "0",
