@@ -43,7 +43,7 @@ _OTHERS = "Others"
 
 class InputPlugin(AbstractInputPlugin):
 
-    __BINANCE: str = "Binance"
+    __BINANCE: str = "Binance.us"
 
     __TIMESTAMP_INDEX = 1
     __TRANSACTION_CATEGORY_INDEX = 2
@@ -149,7 +149,7 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
                 elif transaction_type == _CRYPTO_WITHDRAWAL:
-                    # TODO withdrawals can have fees in binance, but it doesn't look like IntraTransaction supports recording fees
+                    # TODO withdrawals can have fees in binance, but it doesn't look like IntraTransaction supports recording fees, not sure what to do here
                     result.append(
                         IntraTransaction(
                             **(
