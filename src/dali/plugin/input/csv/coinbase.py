@@ -85,6 +85,7 @@ class InputPlugin(AbstractInputPlugin):
                 transaction_id: str = line[self.__TRANSACTION_ID_INDEX].strip()
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
 
+                # TODO unsure how to handle conversions, I think this is only for ETH2
                 if transaction_type == _CONVERT:
                     continue
 
