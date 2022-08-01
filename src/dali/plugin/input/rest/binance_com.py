@@ -28,7 +28,7 @@ from datetime import datetime, timezone
 from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
-from ccxt import binance
+from ccxt import DDoSProtection, InvalidNonce, binance
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -56,6 +56,7 @@ _CURRENCY: str = "currency"  # CCXT only variable
 _DAILY: str = "DAILY"
 _DATA: str = "data"
 _DATETIME: str = "datetime"  # CCXT only variable
+_DELIVERDATE: str = "deliverDate"
 _DEPOSIT: str = "deposit"  # CCXT only variable
 _DIVTIME: str = "divTime"
 _ENDTIME: str = "endTime"
@@ -73,14 +74,17 @@ _ISFIATPAYMENT: str = "isFiatPayment"
 _LEGALMONEY: str = "legalMoney"
 _LENDINGTYPE: str = "lendingType"
 _LIMIT: str = "limit"
+_LOCKPERIOD: str = "lockPeriod"
 _OBTAINAMOUNT: str = "obtainAmount"
 _ORDER: str = "order"  # CCXT only variable
 _ORDERNO: str = "orderNo"
 _PAGEINDEX: str = "pageIndex"
 _PAGESIZE: str = "pageSize"
+_POSITIONID: str = "positionId"
 _PRICE: str = "price"
 _PRODUCT: str = "product"
 _PROFITAMOUNT: str = "profitAmount"
+_REDEMPTION: str = "REDEMPTION"
 _ROWS: str = "rows"
 _SELL: str = "sell"  # CCXT only variable
 _SIDE: str = "side"  # CCXT only variable
@@ -89,6 +93,7 @@ _STAKING: str = "STAKING"
 _STARTTIME: str = "startTime"
 _STATUS: str = "status"
 _SOURCEAMOUNT: str = "sourceAmount"
+_SUBSCRIPTION: str = "SUBSCRIPTION"
 _SYMBOL: str = "symbol"
 _TIME: str = "time"
 _TIMESTAMP: str = "timestamp"  # CCXT only variable
@@ -107,6 +112,7 @@ _WITHDRAWAL: str = "withdrawal"  # CCXT only variable
 # Time period constants
 _NINETY_DAYS_IN_MS: int = 7776000000
 _THIRTY_DAYS_IN_MS: int = 2592000000
+_ONE_DAY_IN_MS: int = 86400000
 _MS_IN_SECOND: int = 1000
 
 # Record limits
@@ -198,9 +204,6 @@ class InputPlugin(AbstractInputPlugin):
             quote_info=f"{quote_amount} {assets[1]}",
         )
 
-    def cache_key(self) -> Optional[str]:
-        return self.__cache_key
-
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
         in_transactions: List[InTransaction] = []
@@ -219,7 +222,7 @@ class InputPlugin(AbstractInputPlugin):
                 self.algos.append(algo[_ALGONAME])
 
         self._process_deposits(in_transactions, out_transactions, intra_transactions)
-        self._process_gains(in_transactions)
+        self._process_gains(in_transactions, out_transactions)
         self._process_trades(in_transactions, out_transactions)
         self._process_withdrawals(out_transactions, intra_transactions)
 
@@ -364,7 +367,7 @@ class InputPlugin(AbstractInputPlugin):
                 if deposit[_STATUS] == "Completed":
                     self._process_deposit(deposit, in_transactions)
 
-    def _process_gains(self, in_transactions: List[InTransaction]) -> None:
+    def _process_gains(self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction]) -> None:
 
         ### Regular Dividends from Staking (including Eth staking) and Savings (Lending) after around May 8th, 2021 01:00 UTC.
 
@@ -374,13 +377,13 @@ class InputPlugin(AbstractInputPlugin):
 
         # The exact moment when Binance switched to unified dividends is unknown/unpublished.
         # This allows us an educated guess.
-        earliest_record_epoch: int = 0 
+        earliest_record_epoch: int = 0
 
         # We will pull in 30 day periods. This allows for 16 assets with daily dividends.
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
         while current_start < now_time:
-            self.__logger.debug("Pulling dividends from %s to %s", current_start, current_end)
+            self.__logger.debug("Pulling dividends/subscriptions/redemptions from %s to %s", current_start, current_end)
 
             # CCXT doesn't have a standard way to pull income, we must use the underlying API endpoint
             dividends = self.client.sapiGetAssetAssetDividend(params=({_STARTTIME: current_start, _ENDTIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT}))
@@ -427,9 +430,12 @@ class InputPlugin(AbstractInputPlugin):
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
             if not earliest_record_epoch and int(dividends[_TOTAL]) > 0:
-            	earliest_record_epoch = int(dividends[_ROWS][-1][_DIVTIME]) - 1
+                earliest_record_epoch = int(dividends[_ROWS][-1][_DIVTIME]) - 1
 
-        # Old system Locked Savings 
+            # We need to track subscription and redemption amounts since Binance will take a fee equal to the amount of interest
+            # earned during the lock period if the user prematurely redems their funds.
+
+        # Old system Locked Savings
 
         old_savings: bool = False
 
@@ -437,48 +443,180 @@ class InputPlugin(AbstractInputPlugin):
         current_start = self.start_time_ms
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
+        # The cummulative interest from a positionID
+        total_current_interest: Dict[int, RP2Decimal] = {}
+
+        # The cummulative interest payments made to each positionID
+        total_current_payments: Dict[int, int] = {}
+
+        # Subscriptions organized [asset][amount] = timestamp in milliseconds
+        current_subscriptions: Dict[str, Dict[str, Dict[str, str]]] = {}
+
         # We will step backward in time from the switch over
-        while current_start < earliest_record_epoch:
+        while current_start < now_time:
 
             self.__logger.debug("Pulling locked staking from older api system from %s to %s", current_start, current_end)
 
-            locked_staking = self.client.sapi_get_staking_stakingrecord(params=({_STARTTIME:current_start, _ENDTIME:current_end,
-                _PRODUCT:_STAKING, _TXNTYPE:_INTEREST_PARAMETER, _SIZE:_INTEREST_SIZE_LIMIT}))
+            locked_staking = self.client.sapi_get_staking_stakingrecord(
+                params=({_STARTTIME: current_start, _ENDTIME: current_end, _PRODUCT: _STAKING, _TXNTYPE: _INTEREST_PARAMETER, _SIZE: _INTEREST_SIZE_LIMIT})
+            )
             # [
             # 	{
-            # 		'positionId': '7146912', 
-            # 		'time': '1624233772000', 
-            # 		'asset': 'BTC', 
-            # 		'amount': '0.017666', 
+            # 		'positionId': '7146912',
+            # 		'time': '1624233772000',
+            # 		'asset': 'BTC',
+            # 		'amount': '0.017666',
             # 		'status': 'SUCCESS'
-            # 	}, 
+            # 	},
             # 	{
-            # 		'positionId': '7147052', 
-            # 		'time': '1624147893000', 
-            # 		'asset': 'BTC', 
-            # 		'amount': '0.0176665', 
+            # 		'positionId': '7147052',
+            # 		'time': '1624147893000',
+            # 		'asset': 'BTC',
+            # 		'amount': '0.0176665',
             # 		'status': 'SUCCESS'
             # 	}
             # ]
+            # NOTE: All values are str
             for stake_dividend in locked_staking:
-                self.__logger.debug("Locked Staking: %s", json.dumps(stake_dividend))
-                stake_dividend[_ENINFO] = "Locked Staking/Savings (OLD)"
-                stake_dividend[_ID] = Keyword.UNKNOWN.value
-                stake_dividend[_DIVTIME] = stake_dividend[_TIME]
-                self._process_gain(stake_dividend, Keyword.STAKING, in_transactions)
-                old_savings = True
+                if int(stake_dividend[_TIME]) < earliest_record_epoch:
+                    self.__logger.debug("Locked Staking (OLD): %s", json.dumps(stake_dividend))
+                    stake_dividend[_ENINFO] = "Locked Staking/Savings (OLD)"
+                    stake_dividend[_ID] = Keyword.UNKNOWN.value
+                    stake_dividend[_DIVTIME] = stake_dividend[_TIME]
+                    self._process_gain(stake_dividend, Keyword.STAKING, in_transactions)
+                    old_savings = True
+
+                # Early redemption penalty tracking. Needs to be recorded even for new system.
+                position_id: int = stake_dividend[_POSITIONID]
+                total_current_interest[position_id] = total_current_interest.get(position_id, ZERO) + RP2Decimal(str(stake_dividend[_AMOUNT]))
+                total_current_payments[position_id] = total_current_payments.get(position_id, 0) + 1
+
+            locked_subscriptions = self.client.sapi_get_staking_stakingrecord(
+                params=({_STARTTIME: current_start, _ENDTIME: current_end, _PRODUCT: _STAKING, _TXNTYPE: _SUBSCRIPTION, _SIZE: _INTEREST_SIZE_LIMIT})
+            )
+            # [
+            #     {
+            #         "time": "1624147893000",
+            #         "asset": "BTC",
+            #         "amount": "1",
+            #         "lockPeriod": "10",
+            #         "type": "NORMAL",
+            #         "status": "SUCCESS",
+            #     },
+            #     {
+            #         "time": "1624147893000",
+            #         "asset": "BTC",
+            #         "amount": "1",
+            #         "lockPeriod": "10",
+            #         "type": "NORMAL",
+            #         "status": "SUCCESS",
+            #     }
+            # ]
+            # NOTE: all values are str
+
+            for subscription in locked_subscriptions:
+
+                # If the dict already exists add another key, if not add new dict
+                if current_subscriptions.get(subscription[_ASSET]):
+                    current_subscriptions[subscription[_ASSET]][f"{RP2Decimal(subscription[_AMOUNT]):.13f}"] = subscription
+                else:
+                    current_subscriptions[subscription[_ASSET]] = {f"{RP2Decimal(subscription[_AMOUNT]):.13f}": subscription}
+
+            locked_redemptions = self.client.sapi_get_staking_stakingrecord(
+                params=({_STARTTIME: current_start, _ENDTIME: current_end, _PRODUCT: _STAKING, _TXNTYPE: _REDEMPTION, _SIZE: _INTEREST_SIZE_LIMIT})
+            )
+            # [
+            #         {
+            #             "positionId": "12345",
+            #             "time": "1624147893000"
+            #             "asset": "BTC",
+            #             "amount": "1",
+            #             "deliverDate": "1624147895000"
+            #             "status": "PAID",
+            #         },
+            #         {
+            #             "positionId": "12346",
+            #             "time": "1624147993000"
+            #             "asset": "BTC",
+            #             "amount": "0.95",
+            #             "deliverDate": "1624148093000"
+            #             "status": "PAID",
+            #         }
+            # ]
+            # NOTE: all values are str
+
+            for redemption in locked_redemptions:
+
+                redemption_amount: str = f"{RP2Decimal(redemption[_AMOUNT]):.13f}"
+
+                # Check if there is a subscription with this asset and if the redemption amount is equal to the subscription amount
+                if redemption[_ASSET] in current_subscriptions and redemption_amount not in current_subscriptions[redemption[_ASSET]]:
+
+                    # If they do not equal we need to calculate what the amended principal should be based on total interest paid to that productId
+                    total_interest_earned: RP2Decimal = total_current_interest[redemption[_POSITIONID]]
+                    original_principal: str = f"{(RP2Decimal(redemption[_AMOUNT]) + RP2Decimal(str(total_interest_earned))):.13f}"
+                    earliest_redemption_timestamp: int = 0
+
+                    if str(original_principal) in current_subscriptions[redemption[_ASSET]]:
+
+                        subscription_time: int = int(current_subscriptions[redemption[_ASSET]][str(original_principal)][_TIME])
+                        lockperiod_in_ms: int = int(current_subscriptions[redemption[_ASSET]][str(original_principal)][_LOCKPERIOD]) * _ONE_DAY_IN_MS
+                        earliest_redemption_timestamp = subscription_time + lockperiod_in_ms
+
+                    else:
+                        self.__logger.error(
+                            "Internal Error: Principal (%s) minus paid interest (%s) does not equal returned principal"
+                            " (%s) on locked savings position ID - %s.",
+                            original_principal,
+                            RP2Decimal(str(total_interest_earned)),
+                            RP2Decimal(redemption[_AMOUNT]),
+                            redemption[_POSITIONID],
+                        )
+
+                    # There is some lag time between application for the subscription and when the subscription actually starts ~ 2 days
+                    if (int(redemption[_TIME]) - int(earliest_redemption_timestamp)) < 2 * _ONE_DAY_IN_MS:
+                        out_transactions.append(
+                            OutTransaction(
+                                plugin=self.__BINANCE_COM,
+                                unique_id=Keyword.UNKNOWN.value,
+                                raw_data=json.dumps(redemption),
+                                timestamp=self._rp2timestamp_from_ms_epoch(redemption[_DELIVERDATE]),
+                                asset=redemption[_ASSET],
+                                exchange=self.__BINANCE_COM,
+                                holder=self.account_holder,
+                                transaction_type=Keyword.FEE.value,
+                                spot_price=Keyword.UNKNOWN.value,
+                                crypto_out_no_fee="0",
+                                crypto_fee=str(total_interest_earned),
+                                crypto_out_with_fee=str(total_interest_earned),
+                                fiat_out_no_fee=None,
+                                fiat_fee=None,
+                                notes=(f"Penalty Fee for {redemption[_POSITIONID]}"),
+                            )
+                        )
+
+                    else:
+                        self.__logger.error(
+                            "The redemption time (%s) is not in the redemption window (%s + 2 days).",
+                            self._rp2timestamp_from_ms_epoch(redemption[_TIME]),
+                            self._rp2timestamp_from_ms_epoch(str(earliest_redemption_timestamp)),
+                        )
+
+                elif redemption[_ASSET] in current_subscriptions and redemption_amount in current_subscriptions[redemption[_ASSET]]:
+
+                    self.__logger.debug("Locked Savings positionId %s redeemed successfully.", redemption[_POSITIONID])
+
+                else:
+
+                    self.__logger.error("Internal Error: Orphaned Redemption. Please open an issue at %s.", self.ISSUES_URL)
 
             # if we returned the limit, we need to roll the window forward to the last time
-            if len(locked_staking) < _INTEREST_SIZE_LIMIT:
+            if len(locked_redemptions) < _INTEREST_SIZE_LIMIT:
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
             else:
-                current_start = int(locked_staking[0][_TIME]) + 1
-                current_end = current_start + _THIRTY_DAYS_IN_MS
-
-            if current_end > earliest_record_epoch:
-                current_end = earliest_record_epoch
-
+                current_start = now_time - 1  # int(locked_redemptions[0][_TIME]) + 1
+                current_end = now_time  # current_start + _THIRTY_DAYS_IN_MS
 
         # Old system Flexible Savings
 
@@ -491,8 +629,9 @@ class InputPlugin(AbstractInputPlugin):
 
             self.__logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
 
-            flexible_saving = self.client.sapi_get_lending_union_interesthistory(params=({_STARTTIME:current_start, _ENDTIME:current_end,
-                _LENDINGTYPE:_DAILY, _SIZE:_INTEREST_SIZE_LIMIT}))
+            flexible_saving = self.client.sapi_get_lending_union_interesthistory(
+                params=({_STARTTIME: current_start, _ENDTIME: current_end, _LENDINGTYPE: _DAILY, _SIZE: _INTEREST_SIZE_LIMIT})
+            )
             # [
             #     {
             #         "asset": "BUSD",
@@ -510,7 +649,7 @@ class InputPlugin(AbstractInputPlugin):
             #     }
             # ]
             for saving in flexible_saving:
-                self.__logger.debug("Flexible Saving: %s", json.dumps(stake_dividend))
+                self.__logger.debug("Flexible Saving: %s", json.dumps(saving))
                 saving[_ENINFO] = "Flexible Savings (OLD)"
                 saving[_ID] = Keyword.UNKNOWN.value
                 saving[_DIVTIME] = saving[_TIME]
@@ -526,12 +665,13 @@ class InputPlugin(AbstractInputPlugin):
                 current_start = int(flexible_saving[0][_TIME]) + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
 
-            if current_end > earliest_record_epoch:
-                current_end = earliest_record_epoch
+            current_end = min(current_end, earliest_record_epoch)
 
         if old_savings:
             # Since we are making a guess at the cut off, there might be errors.
-            self.__logger.warning("Pre-May 8th, 2021 savings detected. Please be aware that there may be duplicate or missing savings records around May 8th, 2021.")
+            self.__logger.warning(
+                "Pre-May 8th, 2021 savings detected. Please be aware that there may be duplicate or " "missing savings records around May 8th, 2021."
+            )
 
         ### Mining Income
 
@@ -618,42 +758,46 @@ class InputPlugin(AbstractInputPlugin):
         for market in self.markets:
             since: int = self.start_time_ms
             while True:
-                market_trades = self.client.fetch_my_trades(symbol=market, since=since, limit=_TRADE_RECORD_LIMIT)
-                #   {
-                #       'info':         { ... },                    // the original decoded JSON as is
-                #       'id':           '12345-67890:09876/54321',  // string trade id
-                #       'timestamp':    1502962946216,              // Unix timestamp in milliseconds
-                #       'datetime':     '2017-08-17 12:42:48.000',  // ISO8601 datetime with milliseconds
-                #       'symbol':       'ETH/BTC',                  // symbol
-                #       'order':        '12345-67890:09876/54321',  // string order id or undefined/None/null
-                #       'type':         'limit',                    // order type, 'market', 'limit' or undefined/None/null
-                #       'side':         'buy',                      // direction of the trade, 'buy' or 'sell'
-                #       'takerOrMaker': 'taker',                    // string, 'taker' or 'maker'
-                #       'price':        0.06917684,                 // float price in quote currency
-                #       'amount':       1.5,                        // amount of base currency
-                #       'cost':         0.10376526,                 // total cost, `price * amount`,
-                #       'fee':          {                           // provided by exchange or calculated by ccxt
-                #           'cost':  0.0015,                        // float
-                #           'currency': 'ETH',                      // usually base currency for buys, quote currency for sells
-                #           'rate': 0.002,                          // the fee rate (if available)
-                #       },
-                #   }
+                try:
+                    market_trades = self.client.fetch_my_trades(symbol=market, since=since, limit=_TRADE_RECORD_LIMIT)
+                    #   {
+                    #       'info':         { ... },                    // the original decoded JSON as is
+                    #       'id':           '12345-67890:09876/54321',  // string trade id
+                    #       'timestamp':    1502962946216,              // Unix timestamp in milliseconds
+                    #       'datetime':     '2017-08-17 12:42:48.000',  // ISO8601 datetime with milliseconds
+                    #       'symbol':       'ETH/BTC',                  // symbol
+                    #       'order':        '12345-67890:09876/54321',  // string order id or undefined/None/null
+                    #       'type':         'limit',                    // order type, 'market', 'limit' or undefined/None/null
+                    #       'side':         'buy',                      // direction of the trade, 'buy' or 'sell'
+                    #       'takerOrMaker': 'taker',                    // string, 'taker' or 'maker'
+                    #       'price':        0.06917684,                 // float price in quote currency
+                    #       'amount':       1.5,                        // amount of base currency
+                    #       'cost':         0.10376526,                 // total cost, `price * amount`,
+                    #       'fee':          {                           // provided by exchange or calculated by ccxt
+                    #           'cost':  0.0015,                        // float
+                    #           'currency': 'ETH',                      // usually base currency for buys, quote currency for sells
+                    #           'rate': 0.002,                          // the fee rate (if available)
+                    #       },
+                    #   }
 
-                # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
-                # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
-                # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas ``amount`` is the *base* volume).
-                # * The cost field itself is there mostly for convenience and can be deduced from other fields.
-                # * The ``cost`` of the trade is a *"gross"* value. That is the value pre-fee, and the fee has to be applied afterwards.
-                for trade in market_trades:
-                    self.__logger.debug("Trade: %s", json.dumps(trade))
-                    self._process_sell(trade, out_transactions)
-                    self._process_buy(trade, in_transactions, out_transactions)
-                if len(market_trades) < _TRADE_RECORD_LIMIT:
-                    sleep(0.15)  # Prevents requestTimeOut from too many requests
-                    break
-                # Times are inclusive
-                since = int(market_trades[_TRADE_RECORD_LIMIT - 1][_TIMESTAMP]) + 1
-                sleep(0.15) # Prevents too many requests exception
+                    # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
+                    # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
+                    # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas `amount` is the *base* volume).
+                    # * The cost field itself is there mostly for convenience and can be deduced from other fields.
+                    # * The ``cost`` of the trade is a *"gross"* value. That is the value pre-fee, and the fee has to be applied afterwards.
+                    for trade in market_trades:
+                        self.__logger.debug("Trade: %s", json.dumps(trade))
+                        self._process_sell(trade, out_transactions)
+                        self._process_buy(trade, in_transactions, out_transactions)
+                    if len(market_trades) < _TRADE_RECORD_LIMIT:
+                        break
+                    # Times are inclusive
+                    since = int(market_trades[_TRADE_RECORD_LIMIT - 1][_TIMESTAMP]) + 1
+                except (DDoSProtection, InvalidNonce):
+                    # DDosProtection - too many requests in time window
+                    # InvalidNonce - server is taking too long to process a request
+                    sleep(0.2)
+                    self.__logger.debug("Too many requests or server overloaded. Waiting 0.2 seconds")
 
         ### Dust Trades
 
@@ -698,8 +842,8 @@ class InputPlugin(AbstractInputPlugin):
                 for dust in dust_trades:
                     self.__logger.debug("Dust: %s", json.dumps(dust))
                     # dust trades have a null id, and if multiple assets are dusted at the same time, all are assigned same ID
-                    trade: _Trade = self._to_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
-                    dust[_ID] = f"{dust[_ORDER]}{trade.base_asset}"
+                    dust_trade: _Trade = self._to_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
+                    dust[_ID] = f"{dust[_ORDER]}{dust_trade.base_asset}"
                     self._process_sell(dust, out_transactions)
                     self._process_buy(dust, in_transactions, out_transactions)
 
@@ -850,7 +994,6 @@ class InputPlugin(AbstractInputPlugin):
 
             if transaction[_FEE][_CURRENCY] == in_asset:
                 crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
-                crypto_in = crypto_in
             else:
                 crypto_fee = ZERO
 
