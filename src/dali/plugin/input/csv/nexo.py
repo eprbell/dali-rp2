@@ -17,7 +17,7 @@
 import logging
 import re
 from csv import reader
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
@@ -27,7 +27,6 @@ from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
-from dali.out_transaction import OutTransaction
 
 # transaction types
 _INTEREST = "Interest"
@@ -65,7 +64,6 @@ class InputPlugin(AbstractInputPlugin):
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
-        last_withdrawal_fee: Optional[RP2Decimal] = None
         with open(self.__transaction_csv_file, encoding="utf-8") as transaction_csv_file:
             # read CSV with header and skip first row
             lines = reader(transaction_csv_file)
