@@ -143,7 +143,7 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
                 else:
-                    # TODO in my data, I had no withdrawals, they will need to be implemented in the future
+                    # TODO in my data, I had no withdrawals, they will need to be implemented in the future # pylint: disable=fixme
                     self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result
