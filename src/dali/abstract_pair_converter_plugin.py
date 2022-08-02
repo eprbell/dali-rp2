@@ -52,13 +52,14 @@ class AbstractPairConverterPlugin:
     def historical_price_type(self) -> str:
         return self.__historical_price_type
 
-    def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+    # The exchange parameter is a hint on which exchange to use for price lookups. The plugin is free to use it or ignore it.
+    def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def save_historical_price_cache(self) -> None:
         save_to_cache(self.cache_key(), self.__cache)
 
-    def get_conversion_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[RP2Decimal]:
+    def get_conversion_rate(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[RP2Decimal]:
         result: Optional[RP2Decimal] = None
         historical_bar: Optional[HistoricalBar] = None
         key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset)
@@ -67,7 +68,7 @@ class AbstractPairConverterPlugin:
             historical_bar = self.__cache[key]
             log_message_qualifier = "cache of "
         else:
-            historical_bar = self.get_historic_bar_from_native_source(timestamp, from_asset, to_asset)
+            historical_bar = self.get_historic_bar_from_native_source(timestamp, from_asset, to_asset, exchange)
             if historical_bar:
                 self.__cache[key] = historical_bar
 

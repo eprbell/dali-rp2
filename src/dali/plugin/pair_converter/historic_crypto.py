@@ -16,23 +16,20 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from Historic_Crypto import HistoricalData
-
 from rp2.rp2_decimal import RP2Decimal
 
-from dali.historical_bar import HistoricalBar
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
+from dali.historical_bar import HistoricalBar
 
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
-
-    # pylint: disable=no-self-use
     def name(self) -> str:
         return "Historic-Crypto"
 
     def cache_key(self) -> str:
         return self.name()
 
-    def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+    def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         result: Optional[HistoricalBar] = None
         time_granularity: List[int] = [60, 300, 900, 3600, 21600, 86400]
         # Coinbase API expects UTC timestamps only, see the forum discussion here:
