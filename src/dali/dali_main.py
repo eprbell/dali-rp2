@@ -44,7 +44,12 @@ from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
 from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
-from dali.plugin.pair_converter.historic_crypto import PairConverterPlugin as HistoricCryptoPairConverterPlugin
+from dali.plugin.pair_converter.ccxt import (
+    PairConverterPlugin as CcxtPairConverterPlugin,
+)
+from dali.plugin.pair_converter.historic_crypto import (
+    PairConverterPlugin as HistoricCryptoPairConverterPlugin,
+)
 from dali.transaction_resolver import resolve_transactions
 
 _VERSION: str = "0.4.10"
@@ -163,7 +168,8 @@ def _dali_main_internal(country: AbstractCountry) -> None:
 
         if not pair_converter_list:
             pair_converter_list.append(HistoricCryptoPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
-            LOGGER.info("No pair converter plugins found in configuration file: using Historic_Crypto/high as default")
+            pair_converter_list.append(CcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
+            LOGGER.info("No pair converter plugins found in configuration file: using default pair converters.")
 
         dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
 

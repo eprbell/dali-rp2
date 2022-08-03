@@ -32,6 +32,7 @@ from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
+from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 
 # Native format keywords
@@ -54,6 +55,7 @@ _BINANCE: str = "Binance.com"
 _KRAKEN: str = "Kraken"
 _LIQUID: str = "Liquid"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
+_DEFAULT_EXCHANGE: str = "Binance.com"
 _EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _KRAKEN: kraken, _LIQUID: liquid}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
@@ -70,6 +72,10 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {"USDT": "USD", "SOLO": "XRP"}
 # Time constants
 _MS_IN_SECOND: int = 1000
 
+# Progress Bar
+_CACHE_INTERVAL: int = 50
+_LINE_CLEAR = "\x1b[2K"
+
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
@@ -79,8 +85,8 @@ class AssetPairAndHistoricalPrice(NamedTuple):
 
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
-    def __init__(self, historical_price_type: str) -> None:
-        super().__init__(historical_price_type=historical_price_type)
+    def __init__(self, historical_price_type: str, default_exchange: Optional[str] = _DEFAULT_EXCHANGE, fiat_priority: Optional[str] = None) -> None:
+        super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
         self.__exchanges: Dict[str, Exchange] = {}
@@ -90,6 +96,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924056308
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
+        self.__transactions_processed: int = 0
 
     def name(self) -> str:
         return "CCXT-converter"
@@ -115,7 +122,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # TO BE IMPLEMENTED - using on vertex queue and one dict?
         # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924058754
         queue: List[List[str]] = []
-        visited: Dict[str] = {}
+        visited: Dict[str, None] = {}
 
         # push the first path into the queue
         queue.append([start])
@@ -150,6 +157,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # If both assets are fiat, skip further processing
         if self._is_fiat_pair(from_asset, to_asset):
             return self._get_fiat_exchange_rate(timestamp, from_asset, to_asset)
+
+        if exchange == Keyword.UNKNOWN.value:
+            exchange = _DEFAULT_EXCHANGE
 
         # Caching of exchanges
         if exchange not in self.__exchanges:
@@ -275,6 +285,12 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             else:
                 result = hop_bar
 
+        if self.__transactions_processed % _CACHE_INTERVAL == 0:
+            self.save_historical_price_cache()
+            self.__logger.debug("Resolved %s transactions. Saving to cache.", self.__transactions_processed)
+
+        self.__transactions_processed += 1
+
         return result
 
     def find_historical_bar(self, from_asset: str, to_asset: str, timestamp: datetime, exchange: str) -> Optional[HistoricalBar]:
@@ -295,9 +311,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     # Excessive calls to the API within a certain window might get an IP temporarily banned
                     if _REQUEST_DELAYDICT[exchange] > 0:
                         current_time = time()
-                        second_delay = _REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0))
+                        second_delay = max(0, _REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0)))
                         self.__logger.debug("Delaying for %s seconds", second_delay)
-                        sleep(max(0, second_delay))
+                        sleep(second_delay)
                         self.__exchange_last_request[exchange] = time()
 
                     historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
@@ -309,14 +325,14 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     # logger INFO for retry?
                     sleep(0.1)
                     request_count += 3
-                except (ExchangeNotAvailable, NetworkError, RequestTimeout) as na:
+                except (ExchangeNotAvailable, NetworkError, RequestTimeout) as exc_na:
                     request_count += 1
                     if request_count > 9:
                         self.__logger.info("Maximum number of retries reached. Saving to cache and exiting.")
                         self.save_historical_price_cache()
-                        raise Exception("Server error") from na
+                        raise Exception("Server error") from exc_na
 
-                    self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, na)
+                    self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
                     sleep(10)
 
             # If there is no candle the list will be empty

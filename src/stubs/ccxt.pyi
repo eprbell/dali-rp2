@@ -32,16 +32,16 @@ class Exchange:
         self, symbol: Optional[str] = ..., since: Optional[int] = ..., limit: Optional[int] = ..., params: Optional[Dict[str, Union[int, str, None]]] = ...
     ) -> Any: ...
 
-## Individual Exchanges
-
 class binance(Exchange):
     def __init__(self, config: Dict[str, str]) -> None: ...
     options: Dict[str, str]
     def sapiGetAssetAssetDividend(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapiGetFiatOrders(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapiGetFiatPayments(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapi_get_lending_union_interesthistory(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapiGetMiningPaymentList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapiGetMiningPubAlgoList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapi_get_staking_stakingrecord(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
 
 class coinbase(Exchange):
     def __init__(self, config: Dict[str, str]) -> None: ...
