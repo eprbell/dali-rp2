@@ -55,7 +55,7 @@ _BINANCE: str = "Binance.com"
 _KRAKEN: str = "Kraken"
 _LIQUID: str = "Liquid"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
-_DEFAULT_EXCHANGE: str = "Binance.com"
+# _DEFAULT_MAIN_EXCHANGE: str = "Binance.com" - TODO
 _EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _KRAKEN: kraken, _LIQUID: liquid}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
@@ -85,7 +85,8 @@ class AssetPairAndHistoricalPrice(NamedTuple):
 
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
-    def __init__(self, historical_price_type: str, default_exchange: Optional[str] = _DEFAULT_EXCHANGE, fiat_priority: Optional[str] = None) -> None:
+    # TODO - main_exchange that refers to the main exchange to be used, ignoring the exchange listed in the transaction 
+    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None) -> None:
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
