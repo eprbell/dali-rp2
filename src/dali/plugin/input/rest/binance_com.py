@@ -670,7 +670,7 @@ class InputPlugin(AbstractInputPlugin):
         if old_savings:
             # Since we are making a guess at the cut off, there might be errors.
             self.__logger.warning(
-                "Pre-May 8th, 2021 savings detected. Please be aware that there may be duplicate or " "missing savings records around May 8th, 2021."
+                "Pre-May 8th, 2021 savings detected. Please be aware that there may be duplicate or missing savings records around May 8th, 2021."
             )
 
         ### Mining Income
