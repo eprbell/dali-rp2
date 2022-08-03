@@ -26,7 +26,7 @@ from dali.plugin.input.csv.binance_com import InputPlugin
 
 
 class TestBinanceCsv:
-	def test_autoinvest(self) -> None:
+    def test_autoinvest(self) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             autoinvest_csv_file="input/test_binance_autoinvest.csv",
