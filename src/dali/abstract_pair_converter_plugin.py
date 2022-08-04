@@ -160,7 +160,7 @@ class AbstractPairConverterPlugin:
             self._build_fiat_list()
 
         for fiat in self.__fiat_list:
-            to_fiat_list: Dict[str] = dict.fromkeys(self.__fiat_list.copy())
+            to_fiat_list: Dict[str, None] = dict.fromkeys(self.__fiat_list.copy())
             del to_fiat_list[fiat]
             if graph.get(fiat):
                 for to_be_added_fiat in to_fiat_list:
