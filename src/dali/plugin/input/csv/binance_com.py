@@ -98,7 +98,7 @@ class InputPlugin(AbstractInputPlugin):
                         transaction_type=Keyword.BUY.value,
                         spot_price=Keyword.UNKNOWN.value,
                         crypto_in=(line[self.__AUTO_BASE_AMOUNT_SYMBOL]).split()[0],
-                        notes=f"Funding from {line[self.__FUND_SOURCE]}",
+                        notes=f"Autoinvest buy with funding from {line[self.__FUND_SOURCE]}",
                     )
                 )
 
@@ -120,7 +120,7 @@ class InputPlugin(AbstractInputPlugin):
                         crypto_out_no_fee=quote_asset_amount,
                         crypto_out_with_fee=str(crypto_out_with_fee),
                         crypto_fee=crypto_fee,
-                        notes=f"Funding from {line[self.__FUND_SOURCE]}",
+                        notes=f"Autoinvest withdrawal for the purchase of {line[self.__AUTO_BASE_AMOUNT_SYMBOL]}",
                     )
                 )
 
