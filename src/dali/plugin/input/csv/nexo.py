@@ -29,6 +29,7 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 
 # transaction types
+# locking & unlocking deposits are transfers within Nexo. They cannot lock funds from other wallets/accounts.
 _INTEREST = "Interest"
 _LOCKING_TERM_DEPOSIT = "LockingTermDeposit"
 _UNLOCKING_TERM_DEPOSIT = "UnlockingTermDeposit"
@@ -37,10 +38,8 @@ _DEPOSIT = "Deposit"
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __NEXO: str = "Nexo"
 
-    __TRANSACTION_ID_INDEX = 0
     __TRANSACTION_TYPE_INDEX = 1
     __CURRENCY_INDEX: int = 2
     __AMOUNT_INDEX: int = 3
@@ -76,7 +75,6 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = self.__DELIMITER.join(line)
                 self.__logger.debug("Transaction: %s", raw_data)
 
-                transaction_id: str = line[self.__TRANSACTION_ID_INDEX].strip()
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
                 currency: str = line[self.__CURRENCY_INDEX].strip()
                 amount = line[self.__AMOUNT_INDEX].strip()
@@ -84,8 +82,10 @@ class InputPlugin(AbstractInputPlugin):
                 timestamp_with_timezone = f"{line[self.__TIMESTAMP_INDEX].strip()} -00:00"
 
                 common_params = {
+                    # although there is a transaction id in the CSV, it is not a transaction hash shared across exchanges, so it is uselsss
+                    # https://github.com/eprbell/dali-rp2/pull/60#issuecomment-1201481064
+                    "unique_id": Keyword.UNKNOWN.value,
                     "plugin": self.__NEXO,
-                    "unique_id": transaction_id,
                     "raw_data": raw_data,
                     "timestamp": timestamp_with_timezone,
                     "asset": currency,
@@ -94,18 +94,18 @@ class InputPlugin(AbstractInputPlugin):
                 # nexo does give us the spot price, but it's often 0 if a subcent value
                 # if it is non-zero, we use it, otherwise we use unknown as the value
                 # the spot price contains $ char, so we remove it
-                spot_price = RP2Decimal(re.sub(r"[^\d.]", "", line[self.__SPOT_PRICE_INDEX]))
+                raw_spot_price = RP2Decimal(re.sub(r"[^\d.]", "", line[self.__SPOT_PRICE_INDEX]))
 
-                if spot_price.is_zero():
+                if raw_spot_price.is_zero():
                     spot_price = Keyword.UNKNOWN.value
                 else:
-                    spot_price = str(spot_price)
+                    spot_price = str(raw_spot_price)
 
                 if transaction_type in [_INTEREST, _FIXED_TERM_INTEREST]:
                     result.append(
                         InTransaction(
                             **(
-                                common_params
+                                common_params  # type: ignore
                                 | {
                                     "exchange": self.__NEXO,
                                     "holder": self.account_holder,
@@ -119,14 +119,14 @@ class InputPlugin(AbstractInputPlugin):
                     )
                 elif transaction_type in [_LOCKING_TERM_DEPOSIT, _UNLOCKING_TERM_DEPOSIT]:
                     # These are unique to Nexo: they "lock" your crypto in a "fixed term" deposit which earns higher interest.
-                    # i.e. these transactions just indicate that you cannot withdraw these funds while these are locked. So they affect your available balance.
+                    # i.e. these transactions just indicate that you cannot withdraw these funds while these are locked. So they effect your available balance.
                     # I don't think we need to record locking/unlocking deposits for term interest
                     self.__logger.debug("Skipping lock or unlock deposit: %s", line)
                 elif transaction_type == _DEPOSIT:
                     result.append(
                         IntraTransaction(
                             **(
-                                common_params
+                                common_params  # type: ignore
                                 | {
                                     "crypto_received": amount,
                                     # most likely, funds are coming from the user/tax payer, but we can't say for sure so we use unknown

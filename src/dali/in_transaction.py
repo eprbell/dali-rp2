@@ -36,6 +36,9 @@ class InTransaction(AbstractTransaction):
         asset: str,
         exchange: str,
         holder: str,
+        # validated to be a `configuration.Keyword` enum value at runtime
+        # string is used instead of a `Keyword` type to allow for more flexible input
+        # More info: https://github.com/eprbell/dali-rp2/pull/60#discussion_r928178970)
         transaction_type: str,
         spot_price: str,
         crypto_in: str,
