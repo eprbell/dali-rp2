@@ -161,7 +161,7 @@ class InputPlugin(AbstractInputPlugin):
                             notes="ACH withdrawal",
                         )
                     )
-                elif transaction_type in [_WITHDRAWAL, _BIA_WITHDRAWAL]:
+                elif transaction_type == _WITHDRAWAL:
                     amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
                     amount = -amount  # type: ignore
                     if last_withdrawal_fee is not None:
@@ -204,6 +204,10 @@ class InputPlugin(AbstractInputPlugin):
                 elif transaction_type == _TRADE:
                     # Trades will be handled by parsing trade_report_all.csv
                     # export
+                    continue
+                elif transaction_type == _BIA_WITHDRAWAL:
+                    # these withdrawals are internal transfers within blockfi which is why they are skipped
+                    # https://github.com/eprbell/dali-rp2/pull/64
                     continue
                 elif transaction_type == _WITHDRAWAL_FEE:
                     last_withdrawal_fee = RP2Decimal(line[self.__AMOUNT_INDEX])
