@@ -96,10 +96,7 @@ class InputPlugin(AbstractInputPlugin):
                 # the spot price contains $ char, so we remove it
                 raw_spot_price = RP2Decimal(re.sub(r"[^\d.]", "", line[self.__SPOT_PRICE_INDEX]))
 
-                if raw_spot_price.is_zero():
-                    spot_price = Keyword.UNKNOWN.value
-                else:
-                    spot_price = str(raw_spot_price)
+                spot_price = str(raw_spot_price) if not raw_spot_price.is_zero() else Keyword.UNKNOWN.value
 
                 if transaction_type in [_INTEREST, _FIXED_TERM_INTEREST]:
                     result.append(
