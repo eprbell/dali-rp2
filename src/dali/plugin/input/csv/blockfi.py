@@ -37,12 +37,14 @@ _CRYPTO_TRANSFER: str = "Crypto Transfer"
 _DATE: str = "Date"
 _INTEREST_PAYMENT: str = "Interest Payment"
 _REFERRAL_BONUS: str = "Referral Bonus"
+_BONUS_PAYMENT = "Bonus Payment"
 _SOLD_CURRENCY: str = "Sold Currency"
 _SOLD_QUANTITY: str = "Sold Quantity"
 _TRADE: str = "Trade"
 _TRADE_ID: str = "Trade ID"
 _TYPE: str = "Type"
 _WITHDRAWAL: str = "Withdrawal"
+_BIA_WITHDRAWAL: str = "BIA Withdraw"
 _WITHDRAWAL_FEE: str = "Withdrawal Fee"
 
 
@@ -99,13 +101,13 @@ class InputPlugin(AbstractInputPlugin):
                             asset=line[self.__CURRENCY_INDEX],
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
-                            transaction_type="Interest",
+                            transaction_type=Keyword.INTEREST.value,
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_in=line[self.__AMOUNT_INDEX],
                             fiat_fee="0",
                         )
                     )
-                elif transaction_type == _REFERRAL_BONUS:
+                elif transaction_type in [_REFERRAL_BONUS, _BONUS_PAYMENT]:
                     last_withdrawal_fee = None
                     result.append(
                         InTransaction(
@@ -116,7 +118,7 @@ class InputPlugin(AbstractInputPlugin):
                             asset=line[self.__CURRENCY_INDEX],
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
-                            transaction_type="Income",
+                            transaction_type=Keyword.INCOME.value,
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_in=line[self.__AMOUNT_INDEX],
                             fiat_fee="0",
@@ -152,7 +154,7 @@ class InputPlugin(AbstractInputPlugin):
                             asset=line[self.__CURRENCY_INDEX],
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
-                            transaction_type="Sell",
+                            transaction_type=Keyword.SELL.value,
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_out_no_fee=str(-RP2Decimal(line[self.__AMOUNT_INDEX])),
                             crypto_fee="0",
@@ -192,7 +194,7 @@ class InputPlugin(AbstractInputPlugin):
                             asset=line[self.__CURRENCY_INDEX],
                             exchange=self.__BLOCKFI,
                             holder=self.account_holder,
-                            transaction_type="Buy",
+                            transaction_type=Keyword.BUY.value,
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_in=line[self.__AMOUNT_INDEX],
                             fiat_fee="0",
@@ -202,6 +204,11 @@ class InputPlugin(AbstractInputPlugin):
                 elif transaction_type == _TRADE:
                     # Trades will be handled by parsing trade_report_all.csv
                     # export
+                    continue
+                elif transaction_type == _BIA_WITHDRAWAL:
+                    # these withdrawals are internal transfers within blockfi which is why they are skipped
+                    # https://github.com/eprbell/dali-rp2/pull/64
+                    self.__logger.debug("BIA Withdraw: %s", raw_data)
                     continue
                 elif transaction_type == _WITHDRAWAL_FEE:
                     last_withdrawal_fee = RP2Decimal(line[self.__AMOUNT_INDEX])
