@@ -123,10 +123,8 @@ account_holder = <account_holder>
 account_nickname = <account_nickname>
 transaction_csv_file = <csv_file>
 ```
-
 Notes:
 
-* There is a transaction ID in the Nexo file, but it's an internal transaction ID so it ignored
 * Locking or unlocking transactions are skipped. They are internal to Nexo.
 
 ### Trezor Section (CSV)
