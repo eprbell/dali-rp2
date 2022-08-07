@@ -18,6 +18,7 @@ import logging
 import re
 from csv import reader
 from typing import Dict, List, Optional
+from decimal import Decimal
 
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
@@ -48,11 +49,14 @@ class InputPlugin(AbstractInputPlugin):
     __TIMESTAMP_INDEX = 1
     __TRANSACTION_CATEGORY_INDEX = 2
     __TRANSACTION_TYPE_INDEX = 3
-    __TRANSACTION_ID_INDEX = 5
     __CURRENCY_INDEX = 6
     __BASE_ASSET_INDEX = 9
     __BASE_ASSET_AMOUNT_INDEX = 10
     __BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX = 11
+
+    __FEE_ASSET_INDEX = 15
+    __FEE_ASSET_AMOUNT_INDEX = 16
+    __FEE_ASSET_AMOUNT_SPOT_PRICE_INDEX = 17
 
     # amounts in binance tax CSVs are not comma separated and are nicely formatting floating point values
     __PRIMARY_ASSET_AMOUNT = 7
@@ -86,7 +90,6 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = self.__DELIMITER.join(line)
                 self.__logger.debug("Transaction: %s", raw_data)
 
-                transaction_id: str = line[self.__TRANSACTION_ID_INDEX].strip()
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
                 category = line[self.__TRANSACTION_CATEGORY_INDEX].strip()
                 currency: str = line[self.__CURRENCY_INDEX].strip()
@@ -96,14 +99,15 @@ class InputPlugin(AbstractInputPlugin):
 
                 common_params = {
                     "plugin": self.__BINANCE,
-                    "unique_id": transaction_id,
+                    "unique_id": Keyword.UNKNOWN.name,
                     "raw_data": raw_data,
                     "timestamp": timestamp_with_timezone,
                     "notes": f"{category} - {transaction_type}",
                 }
 
-                # in binance, you can pay fees with lots of different currencies. Since dali does not allow us to specify a fee currency, we use the normalized USD fee amount
-                # this impacts buy & sell transactions
+                # in binance, you can pay fees with lots of different currencies
+                # because of this, we represent fees on transactions as a separate fee transaction since it could be a different currency
+                # that what is being purchased or sold. More info: https://github.com/eprbell/rp2/blob/main/docs/user_faq.md#how-to-represent-fiat-vs-crypto-transaction-fees
 
                 # staking rewards & commission do not have any fees and only have a primary asset
                 if transaction_type in [_REFERRAL_COMMISSION, _STAKING_REWARDS]:
@@ -149,17 +153,19 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
                 elif transaction_type == _CRYPTO_WITHDRAWAL:
-                    # TODO withdrawals can have fees in binance, but it doesn't look like IntraTransaction supports recording fees, not sure what to do here
+                    crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT].strip()
+                    crypto_amount_realized = Decimal(crypto_amount) / Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE].strip())
+
                     result.append(
                         IntraTransaction(
                             **(
                                 common_params
                                 | {
                                     "crypto_received": "0",
-                                    # withdrawals seem to happen in the primary asset field
+                                    # withdrawals happen in the primary asset field
                                     "asset": currency,
-                                    "crypto_sent": line[self.__PRIMARY_ASSET_AMOUNT].strip(),
-                                    "spot_price": line[self.__PRIMARY_ASSET_SPOT_PRICE].strip(),
+                                    "crypto_sent": crypto_amount,
+                                    "spot_price": str(crypto_amount_realized),
                                     "from_exchange": self.__BINANCE,
                                     "from_holder": self.account_holder,
                                     # most likely, funds are coming from the user/tax payer, but we can't say for sure so we use unknown
@@ -170,7 +176,22 @@ class InputPlugin(AbstractInputPlugin):
                             )
                         )
                     )
+
+                    result.append(
+                        OutTransaction(
+                            **(
+                                common_params
+                                | {
+                                    "notes": f"Fee for {category} - {transaction_type}",
+                                }
+                                | self.generate_fee_parameters(line)
+                            )
+                        )
+                    )
                 elif transaction_type in [_BUY, _SELL]:
+                    crypto_amount = line[self.__BASE_ASSET_AMOUNT_INDEX].strip()
+                    calculated_spot_price = Decimal(crypto_amount) / Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip())
+
                     result.append(
                         InTransaction(
                             **(
@@ -180,16 +201,28 @@ class InputPlugin(AbstractInputPlugin):
                                     "holder": self.account_holder,
                                     "transaction_type": Keyword.BUY.value,
                                     "asset": line[self.__BASE_ASSET_INDEX].strip(),
-                                    "crypto_in": line[self.__BASE_ASSET_AMOUNT_INDEX].strip(),
-                                    "spot_price": line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip(),
-                                    # TODO it's unclear if `crypto_fee` is the USD amount of the crypto-paid fee
-                                    # we'll use the USD value for now and see what comes up in PR review
-                                    "crypto_fee": line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip(),
+                                    "crypto_in": crypto_amount,
+                                    "spot_price": str(calculated_spot_price),
                                 }
                             )
                         )
                     )
+
+                    result.append(
+                        OutTransaction(
+                            **(
+                                common_params
+                                | {
+                                    "notes": f"Fee for {category} - {transaction_type}",
+                                }
+                                | self.generate_fee_parameters(line)
+                            )
+                        )
+                    )
                 elif transaction_type == _SELL:
+                    crypto_amount = line[self.__BASE_ASSET_AMOUNT_INDEX].strip()
+                    calculated_spot_price = Decimal(crypto_amount) / Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip())
+
                     result.append(
                         OutTransaction(
                             **(
@@ -198,13 +231,22 @@ class InputPlugin(AbstractInputPlugin):
                                     "exchange": self.__BINANCE,
                                     "holder": self.account_holder,
                                     "transaction_type": Keyword.SELL.value,
-                                    "assets": line[self.__BASE_ASSET_INDEX].strip(),
-                                    "crypto_out_no_fee": line[self.__BASE_ASSET_AMOUNT_INDEX].strip(),
-                                    "spot_price": line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip(),
-                                    # TODO it's unclear if `crypto_fee` is the USD amount of the crypto-paid fee
-                                    # we'll use the USD value for now and see what comes up in PR review
-                                    "crypto_fee": line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip(),
+                                    "asset": line[self.__BASE_ASSET_INDEX].strip(),
+                                    "crypto_out_no_fee": crypto_amount,
+                                    "spot_price": str(calculated_spot_price),
                                 }
+                            )
+                        )
+                    )
+
+                    result.append(
+                        OutTransaction(
+                            **(
+                                common_params
+                                | {
+                                    "notes": f"Fee for {category} - {transaction_type}",
+                                }
+                                | self.generate_fee_parameters(line)
                             )
                         )
                     )
@@ -217,3 +259,16 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result
+
+    def generate_fee_parameters(self, line):
+        fee_amount = line[self.__FEE_ASSET_AMOUNT_INDEX].strip()
+        fee_realized_usd = Decimal(fee_amount) / Decimal(line[self.__FEE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip())
+
+        return {
+            "asset": line[self.__FEE_ASSET_INDEX].strip(),
+            "crypto_out_no_fee": fee_amount,
+            "spot_price": str(fee_realized_usd),
+            "exchange": self.__BINANCE,
+            "holder": self.account_holder,
+            "transaction_type": Keyword.FEE.value,
+        }
