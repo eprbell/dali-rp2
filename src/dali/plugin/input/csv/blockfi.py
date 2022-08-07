@@ -208,6 +208,7 @@ class InputPlugin(AbstractInputPlugin):
                 elif transaction_type == _BIA_WITHDRAWAL:
                     # these withdrawals are internal transfers within blockfi which is why they are skipped
                     # https://github.com/eprbell/dali-rp2/pull/64
+                    self.__logger.debug("BIA Withdraw: %s", raw_data)
                     continue
                 elif transaction_type == _WITHDRAWAL_FEE:
                     last_withdrawal_fee = RP2Decimal(line[self.__AMOUNT_INDEX])
