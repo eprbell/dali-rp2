@@ -21,6 +21,7 @@
   * [What is the Best Way to Get Started on DaLI Development?](#what-is-the-best-way-to-get-started-on-dali-development)
   * [How to Develop a DaLI Data Loader Plugin?](#how-to-develop-a-dali-data-loader-plugin)
   * [How to Fill the Unique Id Field?](#how-to-fill-the-unique-id-field)
+  * [Should I Implement a CSV or a REST Data Loader Plugin?](#should-i-implement-a-csv-or-a-rest-data-loader-plugin)
   * [How to Develop a DaLI Pair Converter Plugin?](#how-to-develop-a-dali-pair-converter-plugin)
   * [How to Develop a DaLI Country Plugin?](#how-to-develop-a-dali-country-plugin)
   * [How Does DaLI Merge Transactions Between Different Exchanges/Wallets?](#how-does-dali-merge-transactions-between-different-exchangeswallets)
