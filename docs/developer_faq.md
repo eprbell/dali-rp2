@@ -59,6 +59,13 @@ Check the following for more details:
 *  [transaction resolver dev docs](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#the-transaction-resolver)
 * [manual plugin docs](https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md#partial-transactions-and-transaction-resolution), which contain an example of how users would use the `unique_id` field in manual plugin CSV files to finish incomplete transactions for unsupported exchanges.
 
+## Should I Implement a CSV or a REST Data Loader Plugin?
+REST endpoints typically provide more complete data compared to CSV files, so they are preferred if available. Often CSV files have incorrect or missing [unique_id](#how-to-fill-the-unique-id-field), spot_price, etc. Here is how to decide whether to write a CSV or a REST plugin for a given service (wallet or exchange):
+* given the choice, a REST plugin is always preferrable to a CSV one, if the endpoint is available;
+* if a REST plugin for the service is already implemented and the CSV files for this service are incomplete, then there is no need for a CSV plugin;
+* if a REST plugin for the service is already implemented and the CSV files for this service are complete (no missing / incorrect information), then it's OK to have a CSV plugin as an alternative option;
+* if a REST plugin for the service is NOT yet implemented and CSV files for this service are available, then a CSV plugin is good to have regardless of whether CSV files are complete or not (it's better than nothing). This CSV plugin may be decommissioned in the future, if a REST plugin is implemented.
+
 ## How to Develop a DaLI Pair Converter Plugin?
 Read the [Internal Design](../README.dev.md#internal-design) section of the Developer Documentation (and in particular the Plugin subsections).
 
