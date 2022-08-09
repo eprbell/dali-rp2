@@ -142,8 +142,8 @@ DaLI code adheres to these principles:
 * immutability:
   * global variables have upper case names, are initialized where declared and are never modified afterwards;
   * generally data structures are read-only (the only exceptions are for data structures that would incur a major complexity increase without write permission: e.g. AVL tree node):
-  * class fields are private (prepended with double-underscore). Fields that need public access have a read-only property. Write-properties are not used;
-  * @dataclass classes have `frozen=True`;
+    * class fields are private (prepended with double-underscore). Fields that need public access have a read-only property. Write-properties are not used;
+    * @dataclass classes have `frozen=True`;
 * runtime checks: parameters of public functions are type-checked at runtime;
 * type hints: all variables and functions have Python type hints (with the exception of local variables, for which type hints are optional);
 * no id-based hashing: classes that are added to dictionaries and sets redefine `__eq__()`, `__neq__()` and `__hash__()`;
