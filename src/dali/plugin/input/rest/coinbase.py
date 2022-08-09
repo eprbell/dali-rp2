@@ -583,7 +583,7 @@ class InputPlugin(AbstractInputPlugin):
                             crypto_out_with_fee=str(-amount),
                             fiat_out_no_fee=str(-native_amount),
                             fiat_fee="0",
-                            notes=f"Coinbase EARN reversal",
+                            notes="Coinbase EARN reversal",
                         )
                     )
                 else:
