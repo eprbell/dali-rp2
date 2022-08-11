@@ -52,7 +52,7 @@ class AssetPairAndTimestamp(NamedTuple):
 
 
 class AbstractPairConverterPlugin:
-    ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
+    __ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __TIMEOUT: int = 30
 
     def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None) -> None:
@@ -68,10 +68,7 @@ class AbstractPairConverterPlugin:
         self.__session: Session = requests.Session()
         self.__fiat_list: List[str] = []
         self.__fiat_priority: List[str]
-        if fiat_priority is None:
-            self.__fiat_priority = _FIAT_PRIORITY
-        else:
-            self.__fiat_priority = loads(fiat_priority)
+        self.__fiat_priority = loads(fiat_priority) if fiat_priority is not None else _FIAT_PRIORITY
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -86,6 +83,10 @@ class AbstractPairConverterPlugin:
     @property
     def fiat_list(self) -> List[str]:
         return self.__fiat_list
+
+    @property
+    def issues_url(self) -> str:
+        return self.__ISSUES_URL
 
     # The exchange parameter is a hint on which exchange to use for price lookups. The plugin is free to use it or ignore it.
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:

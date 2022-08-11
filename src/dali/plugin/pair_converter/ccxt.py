@@ -72,10 +72,6 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {"USDT": "USD", "SOLO": "XRP"}
 # Time constants
 _MS_IN_SECOND: int = 1000
 
-# Progress Bar
-_CACHE_INTERVAL: int = 50
-_LINE_CLEAR = "\x1b[2K"
-
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
@@ -209,7 +205,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__exchange_graphs[exchange] = current_graph
 
             else:
-                self.__logger.error("WARNING: Unrecognized Exchange: %s. Please open an issue at %s", exchange, self.ISSUES_URL)
+                self.__logger.error("WARNING: Unrecognized Exchange: %s. Please open an issue at %s", exchange, self.issues_url)
                 return None
         else:
             current_exchange = self.__exchanges[exchange]
@@ -228,7 +224,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         pricing_path: Optional[List[str]] = self._bfs_cyclic(current_graph, from_asset, to_asset)
         if pricing_path is None:
-            self.__logger.debug("No path found for %s to %s. Please open an issue at %s.", from_asset, to_asset, self.ISSUES_URL)
+            self.__logger.debug("No path found for %s to %s. Please open an issue at %s.", from_asset, to_asset, self.issues_url)
             return None
 
         self.__logger.debug("Found path - %s", pricing_path)
