@@ -409,6 +409,14 @@ class InputPlugin(AbstractInputPlugin):
                     ),
                 )
 
+    def _is_credit_card_spend(self, transaction: Any) -> bool:
+        return (
+            transaction[_TYPE] is None
+            and _TO in transaction
+            and _EMAIL in transaction[_TO]
+            and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
+        )
+
     def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
         currency: str = account[_CURRENCY][_CODE]
         account_id: str = account[_ID]
@@ -463,6 +471,8 @@ class InputPlugin(AbstractInputPlugin):
                 self._process_fiat_deposit(transaction, currency, in_transaction_list)
             elif transaction_type in {_FIAT_WITHDRAWAL}:
                 self._process_fiat_withdrawal(transaction, currency, out_transaction_list)
+            elif self._is_credit_card_spend(transaction):
+                self._process_fiat_withdrawal(transaction, currency, out_transaction_list, "Coinbase card spend")
             else:
                 self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
@@ -529,7 +539,8 @@ class InputPlugin(AbstractInputPlugin):
             crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else Keyword.UNKNOWN.value
             if amount < ZERO:
                 if (
-                    transaction[_TO][_RESOURCE] == _USER
+                    _TO in transaction
+                    and transaction[_TO][_RESOURCE] == _USER
                     and transaction_network[_STATUS] == _OFF_BLOCKCHAIN
                     and _SUBTITLE in transaction[_DETAILS]
                     and _EMAIL in transaction[_TO]
@@ -554,6 +565,27 @@ class InputPlugin(AbstractInputPlugin):
                             notes=f"To: {transaction[_TO][_EMAIL]}",
                         )
                     )
+                elif _FROM in transaction and transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
+                    # Coinbase Earn reversal transactions (due to credit card refunds typically): this is conservatively treated as a sale.
+                    out_transaction_list.append(
+                        OutTransaction(
+                            plugin=self.__COINBASE,
+                            unique_id=transaction[_ID],
+                            raw_data=raw_data,
+                            timestamp=transaction[_CREATED_AT],
+                            asset=currency,
+                            exchange=self.__COINBASE,
+                            holder=self.account_holder,
+                            transaction_type="Sell",
+                            spot_price=str(native_amount / amount),
+                            crypto_out_no_fee=str(-amount),
+                            crypto_fee="0",
+                            crypto_out_with_fee=str(-amount),
+                            fiat_out_no_fee=str(-native_amount),
+                            fiat_fee="0",
+                            notes="Coinbase EARN reversal",
+                        )
+                    )
                 else:
                     intra_transaction_list.append(
                         IntraTransaction(
@@ -572,7 +604,12 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
             else:
-                if transaction[_FROM][_RESOURCE] == _USER and transaction_network[_STATUS] == _OFF_BLOCKCHAIN and _SUBTITLE in transaction[_DETAILS]:
+                if (
+                    _FROM in transaction
+                    and transaction[_FROM][_RESOURCE] == _USER
+                    and transaction_network[_STATUS] == _OFF_BLOCKCHAIN
+                    and _SUBTITLE in transaction[_DETAILS]
+                ):
                     if _EMAIL in transaction[_FROM]:
                         # Incoming money from another Coinbase user. Marking it as income conservatively, but it could be
                         # a gift or other type: if so the user needs to explicitly recast it with a transaction hint
@@ -736,7 +773,9 @@ class InputPlugin(AbstractInputPlugin):
 
     def _process_fiat_deposit(self, transaction: Any, currency: str, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
-        notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
+        details_title = transaction[_DETAILS][_TITLE]
+        details_subtitle = transaction[_DETAILS][_SUBTITLE]
+        notes = f"{notes + '; ' if notes else ''}{details_title + '; ' if details_title else ''}{details_subtitle if details_subtitle else ''}"
         in_transaction_list.append(
             InTransaction(
                 plugin=self.__COINBASE,
@@ -759,7 +798,9 @@ class InputPlugin(AbstractInputPlugin):
 
     def _process_fiat_withdrawal(self, transaction: Any, currency: str, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
-        notes = f"{notes + '; ' if notes else ''}{transaction[_DETAILS][_TITLE]}; {transaction[_DETAILS][_SUBTITLE]}"
+        details_title = transaction[_DETAILS][_TITLE]
+        details_subtitle = transaction[_DETAILS][_SUBTITLE]
+        notes = f"{notes + '; ' if notes else ''}{details_title + '; ' if details_title else ''}{details_subtitle if details_subtitle else ''}"
         out_transaction_list.append(
             OutTransaction(
                 plugin=self.__COINBASE,

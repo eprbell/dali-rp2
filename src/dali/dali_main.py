@@ -52,7 +52,7 @@ from dali.plugin.pair_converter.historic_crypto import (
 )
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.4.10"
+_VERSION: str = "0.4.12"
 
 
 def dali_main(country: AbstractCountry) -> None:
