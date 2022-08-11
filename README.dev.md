@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.4.10 Developer Guide
+# DaLI for RP2 v0.4.12 Developer Guide
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -137,6 +137,7 @@ Read the [Contributing](CONTRIBUTING.md) document on pull requests guidelines.
 
 ### Design Guidelines
 DaLI code adheres to these principles:
+* user privacy is of paramount importance: user data never leaves the user's machine. The only networking logic allowed is read-only REST API calls in data loader plugins to collect transaction data;
 * all identifiers have [descriptive names](https://realpython.com/python-pep8/#how-to-choose-names);
 * immutability:
   * global variables have upper case names, are initialized where declared and are never modified afterwards;
@@ -202,7 +203,7 @@ DaLI's control flow is as follows (see [dali_main.py](src/dali/dali_main.py)):
 * pass the resolved data to the RP2 [ODS input file generator](src/dali/ods_generator.py) and the RP2 [config file generator](src/dali/config_generator.py), which create the input files for RP2.
 
 ### The Transaction Resolver
-The [transaction resolver](src/dali/transaction_resolver.py) is a critical component of DaLI and has the purpose of merging and normalizing transaction data from data loader plugins. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the `to_exchange`, `to_holder` and `crypto_received` fields of the IntraTransaction (so it fills them with `Keyword.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the `from_exchange`, `from_holder` and `crypto_sent` fields of the IntraTransaction. So how does DaLI merge these two incomplete transaction parts into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction to pair them: typically this is the transaction hash, but in certain cases it could also be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for pairs of incomplete ones with the same `unique_id` and merges them into a single one.
+The [transaction resolver](src/dali/transaction_resolver.py) is a critical component of DaLI and has the purpose of merging and normalizing transaction data from data loader plugins. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the `to_exchange`, `to_holder` and `crypto_received` fields of the IntraTransaction (so it fills them with `Keyword.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the `from_exchange`, `from_holder` and `crypto_sent` fields of the IntraTransaction. So how does DaLI merge these two incomplete transaction parts into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction to pair them: typically this is the transaction hash, but in certain cases it could also be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for pairs of incomplete ones with the same `unique_id` and merges them into a single one (see also the FAQ on [unique_id population](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field)).
 
 For this reason it's essential that all data loader plugins populate the `unique_id` field as best they can: without it the transaction resolver cannot merge incomplete data. Sometimes hash information is missing (especially in CSV files) and so it's impossible to populate the `unique_id` field: in such cases it's still possible to write a plugin, but the user will have to manually modify the generated result and perform transaction resolution manually, which is not ideal.
 
@@ -224,7 +225,7 @@ Data loader plugins live in one of the following directories, depending on their
 * `src/dali/plugin/input/csv/`;
 * `src/dali/plugin/input/rest/`.
 
-If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`.
+If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`. The `unique_id` requires special attention, because the transaction resolver uses it to match and join incomplete transactions: the plugin must ensure to [populate it with the correct value](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field).
 
 For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
 
@@ -242,7 +243,8 @@ For an example of pair converter look at the [Historic-Crypto](src/dali/plugin/p
 Country plugins are reused from RP2. To add support for a new country in DaLI:
 * [add a country plugin to RP2](https://github.com/eprbell/rp2/blob/main/README.dev.md#adding-support-for-a-new-country);
 * add a new Python file to the `src/dali/plugin/country` directory and name it after the [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) 2-letter code for the country;
-* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file.
+* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file;
+* add a console script to setup.cfg pointing the new country dali_entry (see the US example in the console_scripts section of setup.cfg).
 
 ### Plugin Laundry List
 When submitting a new plugin open a [PR](https://github.com/eprbell/dali-rp2/pulls) and make sure all the following bullet points apply to your code:
