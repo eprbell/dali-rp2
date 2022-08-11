@@ -43,6 +43,9 @@ class binance(Exchange):
     def sapiGetMiningPubAlgoList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapi_get_staking_stakingrecord(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
 
+class cex(Exchange):
+    def __init__(self, config: Dict[str, str]) -> None: ...
+
 class coinbase(Exchange):
     def __init__(self, config: Dict[str, str]) -> None: ...
 

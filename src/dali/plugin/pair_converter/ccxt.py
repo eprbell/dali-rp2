@@ -74,6 +74,9 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {"GUSD": "USD", "SOLO": "XRP", "USDT":
 # Time constants
 _MS_IN_SECOND: int = 1000
 
+# Cache
+_CACHE_INTERVAL: int = 50
+
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
