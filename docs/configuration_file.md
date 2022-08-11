@@ -339,6 +339,7 @@ Then, it will route the price through a fiat conversion to get the final price:
 Be aware that: 
 * Exchange rates for fiat transactions are based on the daily rate and not minute or hourly rates.
 * If a market for the conversion exists on the exchange where the asset was purchased, no routing takes place. The plugin retrieves the price for the time period.
+* The router uses the exchange listed in the transaction data to build the graph to calculate the route. If no exchange is listed, the current default is Binance.com.
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset. 
 
 
