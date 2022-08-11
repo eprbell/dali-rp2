@@ -137,6 +137,7 @@ Read the [Contributing](CONTRIBUTING.md) document on pull requests guidelines.
 
 ### Design Guidelines
 DaLI code adheres to these principles:
+* user privacy is of paramount importance: user data never leaves the user's machine. The only networking logic allowed is read-only REST API calls in data loader plugins to collect transaction data;
 * all identifiers have [descriptive names](https://realpython.com/python-pep8/#how-to-choose-names);
 * immutability:
   * global variables have upper case names, are initialized where declared and are never modified afterwards;
