@@ -164,8 +164,8 @@ class InputPlugin(AbstractInputPlugin):
 
                 if not header_found:
                     # let user know there is not enough columns
-                    if len(line) - 1 < self.__IN_NOTES_INDEX:
-                        raise ValueError(f"Not enough columns: the CSV must contain {self.__IN_NOTES_INDEX} columns.")
+                    if len(line) - 1 < self.__OUT_NOTES_INDEX:
+                        raise ValueError(f"Not enough columns: the {self.__out_csv_file} CSV must contain {self.__OUT_NOTES_INDEX} columns.")
 
                     # Skip header line
                     header_found = True
