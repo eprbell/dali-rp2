@@ -65,7 +65,7 @@ _EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _CEX: cex, _KRAKEN: kraken,
 # It appears Kraken public API is limited to around 12 calls per minute.
 # There also appears to be a limit of how many calls per 2 hour time period.
 # Being authenticated lowers this limit.
-_REQUEST_DELAYDICT: Dict[str, float] = {_BINANCE: 0.0, _KRAKEN: 5.1, _LIQUID: 0}
+_REQUEST_DELAYDICT: Dict[str, float] = {_KRAKEN: 5.1}
 
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {"GUSDUSD": _CEX, "SOLOXRP": _LIQUID, "USDTUSD": _KRAKEN}
@@ -160,13 +160,16 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         if self._is_fiat_pair(from_asset, to_asset):
             return self._get_fiat_exchange_rate(timestamp, from_asset, to_asset)
 
-        if exchange == Keyword.UNKNOWN.value:
+        if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT:
+            self.__logger.debug(f"Using default exchange {_DEFAULT_EXCHANGE} type for {exchange}")
             exchange = _DEFAULT_EXCHANGE
 
         # Caching of exchanges
         if exchange not in self.__exchanges:
             if exchange in _EXCHANGE_DICT:
-                current_exchange: Exchange = _EXCHANGE_DICT[exchange]()
+                # initializes the cctx exchange instance which is used to get the historical data
+                # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
+                current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
                 # key: market, value: exchanges where the market is available in order of priority
                 current_markets: Dict[str, List[str]] = {}
                 current_graph: Dict[str, Dict[str, None]] = {}
@@ -311,13 +314,14 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             while request_count < 9:
                 try:
                     # Excessive calls to the API within a certain window might get an IP temporarily banned
-                    if _REQUEST_DELAYDICT[exchange] > 0:
+                    if _REQUEST_DELAYDICT.get(exchange, 0) > 0:
                         current_time = time()
                         second_delay = max(0, _REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0)))
                         self.__logger.debug("Delaying for %s seconds", second_delay)
                         sleep(second_delay)
                         self.__exchange_last_request[exchange] = time()
 
+                    # this is where we pull the historical prices from the underlying exchange
                     historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
                     break
                 except (DDoSProtection, ExchangeError) as exc:
