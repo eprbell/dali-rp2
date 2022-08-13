@@ -65,7 +65,9 @@ class OutTransaction(AbstractTransaction):
         self.__crypto_out_no_fee: str = self._validate_numeric_field(
             Keyword.CRYPTO_OUT_NO_FEE.value, crypto_out_no_fee, raw_data, disallow_empty=True, disallow_unknown=True
         )
-        self.__crypto_fee: str = self._validate_numeric_field(Keyword.CRYPTO_FEE.value, crypto_fee, raw_data, disallow_empty=True, disallow_unknown=True)
+        self.__crypto_fee: Optional[str] = self._validate_optional_numeric_field(
+            Keyword.CRYPTO_FEE.value, crypto_fee, raw_data, disallow_empty=False, disallow_unknown=True
+        )
         self.__crypto_out_with_fee: Optional[str] = self._validate_optional_numeric_field(
             Keyword.CRYPTO_OUT_WITH_FEE.value, crypto_out_with_fee, raw_data, disallow_empty=False, disallow_unknown=True
         )
