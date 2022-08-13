@@ -155,7 +155,7 @@ class TestTrade:
         assert out_transaction.transaction_type == "Sell"
         assert RP2Decimal(out_transaction.spot_price) == RP2Decimal("3E+3")
         assert RP2Decimal(out_transaction.crypto_out_no_fee) == RP2Decimal("0.10000000")
-        assert RP2Decimal(out_transaction.crypto_fee) == RP2Decimal("0.000")
+        assert in_transaction.crypto_fee is None
         assert RP2Decimal(out_transaction.crypto_out_with_fee) == RP2Decimal("0.10000000")  # type: ignore
         assert RP2Decimal(out_transaction.fiat_out_no_fee) == RP2Decimal("300.00")  # type: ignore
         assert RP2Decimal(out_transaction.fiat_fee) == RP2Decimal("0")  # type: ignore

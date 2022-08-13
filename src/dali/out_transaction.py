@@ -39,7 +39,7 @@ class OutTransaction(AbstractTransaction):
         transaction_type: str,
         spot_price: str,
         crypto_out_no_fee: str,
-        crypto_fee: str,
+        crypto_fee: Optional[str] = None,
         crypto_out_with_fee: Optional[str] = None,
         fiat_out_no_fee: Optional[str] = None,
         fiat_fee: Optional[str] = None,
@@ -123,7 +123,7 @@ class OutTransaction(AbstractTransaction):
         return self.__crypto_out_no_fee
 
     @property
-    def crypto_fee(self) -> str:
+    def crypto_fee(self) -> Optional[str]:
         return self.__crypto_fee
 
     @property

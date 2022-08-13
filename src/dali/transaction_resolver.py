@@ -417,11 +417,6 @@ def _apply_transaction_hint(
                 notes=notes,
             )
         elif isinstance(transaction, OutTransaction):
-            if is_unknown(transaction.crypto_out_no_fee) or is_unknown(transaction.crypto_fee):
-                raise RP2ValueError(
-                    f"Invalid conversion {Keyword.INTRA.value}->{Keyword.OUT.value}: "
-                    f"{Keyword.CRYPTO_OUT_NO_FEE.value}/{Keyword.CRYPTO_FEE.value} cannot be unknown: {transaction}"
-                )
             result = IntraTransaction(
                 plugin=transaction.plugin,
                 unique_id=transaction.unique_id,
