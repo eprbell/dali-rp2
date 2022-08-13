@@ -46,21 +46,27 @@ class InputPlugin(AbstractInputPlugin):
 
     __BINANCE: str = "Binance.us"
 
+    # amounts in binance tax CSVs are not comma separated and are nicely formatting floating point values
+
     __TIMESTAMP_INDEX = 1
     __TRANSACTION_CATEGORY_INDEX = 2
     __TRANSACTION_TYPE_INDEX = 3
-    __CURRENCY_INDEX = 6
+
+    __PRIMARY_ASSET_INDEX = 6
+    __PRIMARY_ASSET_AMOUNT_INDEX = 7
+    __PRIMARY_ASSET_SPOT_PRICE_INDEX = 8
+
     __BASE_ASSET_INDEX = 9
     __BASE_ASSET_AMOUNT_INDEX = 10
     __BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX = 11
 
+    __QUOTE_ASSET_INDEX = 12
+    __QUOTE_ASSET_AMOUNT_INDEX = 13
+    __QUOTE_ASSET_AMOUNT_SPOT_PRICE_INDEX = 14
+
     __FEE_ASSET_INDEX = 15
     __FEE_ASSET_AMOUNT_INDEX = 16
     __FEE_ASSET_AMOUNT_SPOT_PRICE_INDEX = 17
-
-    # amounts in binance tax CSVs are not comma separated and are nicely formatting floating point values
-    __PRIMARY_ASSET_AMOUNT = 7
-    __PRIMARY_ASSET_SPOT_PRICE = 8
 
     __DELIMITER = ","
 
@@ -92,14 +98,13 @@ class InputPlugin(AbstractInputPlugin):
 
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
                 category = line[self.__TRANSACTION_CATEGORY_INDEX].strip()
-                currency: str = line[self.__CURRENCY_INDEX].strip()
 
                 # there is no timezone information in the CSV, so we assume UTC
                 timestamp_with_timezone = f"{line[self.__TIMESTAMP_INDEX].strip()} -00:00"
 
                 common_params = {
                     "plugin": self.__BINANCE,
-                    "unique_id": Keyword.UNKNOWN.name,
+                    "unique_id": Keyword.UNKNOWN.value,
                     "raw_data": raw_data,
                     "timestamp": timestamp_with_timezone,
                     "notes": f"{category} - {transaction_type}",
@@ -110,9 +115,13 @@ class InputPlugin(AbstractInputPlugin):
                 # that what is being purchased or sold. More info: https://github.com/eprbell/rp2/blob/main/docs/user_faq.md#how-to-represent-fiat-vs-crypto-transaction-fees
 
                 # staking rewards & commission do not have any fees and only have a primary asset
-                if transaction_type in [_REFERRAL_COMMISSION, _STAKING_REWARDS]:
+                # it is unclear what 'Distribution > Other' represents, but it looks like some type of income
+                if transaction_type in [_REFERRAL_COMMISSION, _STAKING_REWARDS] or (category == "Distribution" and transaction_type == _OTHERS):
                     granular_transaction_type = Keyword.INCOME if transaction_type == _REFERRAL_COMMISSION else Keyword.INTEREST
-                    currency: str = line[self.__CURRENCY_INDEX].strip()
+                    currency: str = line[self.__PRIMARY_ASSET_INDEX].strip()
+
+                    crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT_INDEX].strip()
+                    calculated_spot_price = Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         InTransaction(
@@ -123,15 +132,17 @@ class InputPlugin(AbstractInputPlugin):
                                     "exchange": self.__BINANCE,
                                     "holder": self.account_holder,
                                     "transaction_type": granular_transaction_type.value,
-                                    "spot_price": line[self.__PRIMARY_ASSET_SPOT_PRICE].strip(),
-                                    "crypto_in": line[self.__PRIMARY_ASSET_AMOUNT].strip(),
+                                    "crypto_in": crypto_amount,
+                                    "spot_price": str(calculated_spot_price),
                                     "fiat_fee": "0",
                                 }
                             )
                         )
                     )
                 elif transaction_type == _CRYPTO_DEPOSIT:
-                    currency: str = line[self.__CURRENCY_INDEX].strip()
+                    currency: str = line[self.__PRIMARY_ASSET_INDEX].strip()
+                    crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT_INDEX].strip()
+                    calculated_spot_price = Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         IntraTransaction(
@@ -140,8 +151,8 @@ class InputPlugin(AbstractInputPlugin):
                                 | {
                                     "asset": currency,
                                     "crypto_sent": "0",
-                                    "crypto_received": line[self.__PRIMARY_ASSET_AMOUNT].strip(),
-                                    "spot_price": line[self.__PRIMARY_ASSET_SPOT_PRICE].strip(),
+                                    "crypto_received": crypto_amount,
+                                    "spot_price": str(calculated_spot_price),
                                     # most likely, funds are coming from the user/tax payer, but we can't say for sure so we use unknown
                                     # and let the user manually input the owner of these funds.
                                     "from_exchange": Keyword.UNKNOWN.value,
@@ -153,8 +164,9 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
                 elif transaction_type == _CRYPTO_WITHDRAWAL:
-                    crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT].strip()
-                    crypto_amount_realized = Decimal(crypto_amount) / Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE].strip())
+                    currency: str = line[self.__PRIMARY_ASSET_INDEX].strip()
+                    crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT_INDEX].strip()
+                    calculated_spot_price = Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         IntraTransaction(
@@ -165,7 +177,7 @@ class InputPlugin(AbstractInputPlugin):
                                     # withdrawals happen in the primary asset field
                                     "asset": currency,
                                     "crypto_sent": crypto_amount,
-                                    "spot_price": str(crypto_amount_realized),
+                                    "spot_price": str(calculated_spot_price),
                                     "from_exchange": self.__BINANCE,
                                     "from_holder": self.account_holder,
                                     # most likely, funds are coming from the user/tax payer, but we can't say for sure so we use unknown
@@ -188,9 +200,19 @@ class InputPlugin(AbstractInputPlugin):
                             )
                         )
                     )
-                elif transaction_type in [_BUY, _SELL]:
-                    crypto_amount = line[self.__BASE_ASSET_AMOUNT_INDEX].strip()
-                    calculated_spot_price = Decimal(crypto_amount) / Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip())
+                elif transaction_type == _BUY:
+                    # in the case of a "Quick Buy" the fields seem to be swapped: the base asset is the quote asset (the currency being used to purchase)
+                    # and the quote asset is the asset being purchased. For instance, buying BUSD with USD is represented as:
+                    # 52358478,2021-08-04 16:15:55.614,Quick Buy,Buy,{32 char txn id},{9 char id},,,,USD,30.00000000,30.00000000,BUSD,29.84000000,29.84542100,USD,0.15000000,0.15000000,ACH,,
+
+                    if category == "Quick Buy":
+                        purchased_asset: str = line[self.__QUOTE_ASSET_INDEX].strip()
+                        crypto_amount = line[self.__QUOTE_ASSET_AMOUNT_INDEX].strip()
+                        calculated_spot_price = Decimal(line[self.__QUOTE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
+                    else:
+                        purchased_asset: str = line[self.__BASE_ASSET_INDEX].strip()
+                        crypto_amount = line[self.__BASE_ASSET_AMOUNT_INDEX].strip()
+                        calculated_spot_price = Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         InTransaction(
@@ -200,7 +222,7 @@ class InputPlugin(AbstractInputPlugin):
                                     "exchange": self.__BINANCE,
                                     "holder": self.account_holder,
                                     "transaction_type": Keyword.BUY.value,
-                                    "asset": line[self.__BASE_ASSET_INDEX].strip(),
+                                    "asset": purchased_asset,
                                     "crypto_in": crypto_amount,
                                     "spot_price": str(calculated_spot_price),
                                 }
@@ -208,20 +230,48 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
 
+                    if category == "Quick Buy":
+                        quote_asset: str = line[self.__BASE_ASSET_INDEX].strip()
+                        quote_crypto_amount = line[self.__BASE_ASSET_AMOUNT_INDEX].strip()
+                        calculated_quote_spot_price = Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
+                    else:
+                        quote_asset = line[self.__QUOTE_ASSET_INDEX].strip()
+                        quote_crypto_amount = line[self.__QUOTE_ASSET_AMOUNT_INDEX].strip()
+                        calculated_quote_spot_price = Decimal(line[self.__QUOTE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(quote_crypto_amount)
+
                     result.append(
                         OutTransaction(
                             **(
                                 common_params
                                 | {
-                                    "notes": f"Fee for {category} - {transaction_type}",
+                                    "exchange": self.__BINANCE,
+                                    "holder": self.account_holder,
+                                    "transaction_type": Keyword.SELL.value,
+                                    "asset": quote_asset,
+                                    "crypto_out_no_fee": quote_crypto_amount,
+                                    "crypto_fee": "0",
+                                    "spot_price": str(calculated_quote_spot_price),
                                 }
-                                | self.generate_fee_parameters(line)
                             )
                         )
                     )
+
+                    fee_params = self.generate_fee_parameters(line)
+                    if fee_params:
+                        result.append(
+                            OutTransaction(
+                                **(
+                                    common_params
+                                    | {
+                                        "notes": f"Fee for {category} - {transaction_type}",
+                                    }
+                                    | fee_params
+                                )
+                            )
+                        )
                 elif transaction_type == _SELL:
                     crypto_amount = line[self.__BASE_ASSET_AMOUNT_INDEX].strip()
-                    calculated_spot_price = Decimal(crypto_amount) / Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip())
+                    calculated_spot_price = Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         OutTransaction(
@@ -233,41 +283,69 @@ class InputPlugin(AbstractInputPlugin):
                                     "transaction_type": Keyword.SELL.value,
                                     "asset": line[self.__BASE_ASSET_INDEX].strip(),
                                     "crypto_out_no_fee": crypto_amount,
+                                    "crypto_fee": "0",
                                     "spot_price": str(calculated_spot_price),
                                 }
                             )
                         )
                     )
 
+                    quote_crypto_amount = line[self.__QUOTE_ASSET_AMOUNT_INDEX].strip()
+                    calculated_quote_spot_price = Decimal(line[self.__QUOTE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(quote_crypto_amount)
+
                     result.append(
-                        OutTransaction(
+                        InTransaction(
                             **(
                                 common_params
                                 | {
-                                    "notes": f"Fee for {category} - {transaction_type}",
+                                    "exchange": self.__BINANCE,
+                                    "holder": self.account_holder,
+                                    "transaction_type": Keyword.BUY.value,
+                                    "asset": line[self.__QUOTE_ASSET_INDEX].strip(),
+                                    "crypto_in": quote_crypto_amount,
+                                    "spot_price": str(calculated_quote_spot_price),
                                 }
-                                | self.generate_fee_parameters(line)
                             )
                         )
                     )
+
+                    fee_params = self.generate_fee_parameters(line)
+                    if fee_params:
+                        result.append(
+                            OutTransaction(
+                                **(
+                                    common_params
+                                    | {
+                                        "notes": f"Fee for {category} - {transaction_type}",
+                                    }
+                                    | fee_params
+                                )
+                            )
+                        )
                 elif transaction_type == _USD_DEPOSIT:
                     # we only care when USD is used to buy something, so we can skip the deposit entries
                     self.__logger.debug("Skipping USD deposit %s", raw_data)
                 else:
-                    # TODO I've seen some "Distrubition > Others" but there is no indication about what they respresent
                     # TODO in my data, I had no withdrawals, they will need to be implemented in the future
                     self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result
 
     def generate_fee_parameters(self, line):
-        fee_amount = line[self.__FEE_ASSET_AMOUNT_INDEX].strip()
-        fee_realized_usd = Decimal(fee_amount) / Decimal(line[self.__FEE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip())
+        fee_amount = Decimal(line[self.__FEE_ASSET_AMOUNT_INDEX].strip())
+
+        if fee_amount.is_zero():
+            return {}
+
+        fee_realized_usd = Decimal(line[self.__FEE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip())
+        calculated_spot_price = fee_realized_usd / fee_amount
 
         return {
             "asset": line[self.__FEE_ASSET_INDEX].strip(),
-            "crypto_out_no_fee": fee_amount,
-            "spot_price": str(fee_realized_usd),
+            # `fee` transaction_types must have a zero specified for crypto_out_no_fee
+            "crypto_out_no_fee": "0",
+            "crypto_fee": str(fee_amount),
+            "spot_price": str(calculated_spot_price),
             "exchange": self.__BINANCE,
             "holder": self.account_holder,
             "transaction_type": Keyword.FEE.value,
