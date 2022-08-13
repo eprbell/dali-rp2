@@ -121,10 +121,12 @@ class InputPlugin(AbstractInputPlugin):
                     # I don't think we need to record locking/unlocking deposits for term interest
                     self.__logger.debug("Skipping lock or unlock deposit: %s", line)
                 elif transaction_type == _DEPOSIT:
+                    unique_id = common_params["unique_id"]
+
                     # nexo includes a network transaction hash in the case of deposits: it's embedded in the details field
                     # let's extract it using a regex
-                    transaction_hash_match = re.search(r"([A-Fa-f0-9]{64})$", line[self.__DETAILS_INDEX])
-                    unique_id = transaction_hash_match.groups()[0] if transaction_hash_match else common_params["unique_id"]
+                    if transaction_hash_match := re.search(r"([A-Fa-f0-9]{64})$", line[self.__DETAILS_INDEX]):
+                        unique_id = transaction_hash_match[0]
 
                     result.append(
                         IntraTransaction(
