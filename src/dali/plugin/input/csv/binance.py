@@ -12,17 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CSV Format: User_Id,Time,Category,Operation,Order_Id,Transaction_Id,Primary_Asset,Realized_Amount_For_Primary_Asset,Realized_Amount_For_Primary_Asset_In_USD_Value,Base_Asset,Realized_Amount_For_Base_Asset,Realized_Amount_For_Base_Asset_In_USD_Value,Quote_Asset,Realized_Amount_For_Quote_Asset,Realized_Amount_For_Quote_Asset_In_USD_Value,Fee_Asset,Realized_Amount_For_Fee_Asset,Realized_Amount_For_Fee_Asset_In_USD_Value,Payment_Method,Withdrawal_Method,Additional_Note
+# CSV Format:
+# User_Id,Time,Category,Operation,Order_Id,Transaction_Id,Primary_Asset,Realized_Amount_For_Primary_Asset,Realized_Amount_For_Primary_Asset_In_USD_Value,Base_Asset,Realized_Amount_For_Base_Asset,Realized_Amount_For_Base_Asset_In_USD_Value,Quote_Asset,Realized_Amount_For_Quote_Asset,Realized_Amount_For_Quote_Asset_In_USD_Value,Fee_Asset,Realized_Amount_For_Fee_Asset,Realized_Amount_For_Fee_Asset_In_USD_Value,Payment_Method,Withdrawal_Method,Additional_Note # pylint: disable=line-too-long
 
 import logging
-import re
 from csv import reader
-from typing import Dict, List, Optional
 from decimal import Decimal
+from typing import List, Optional
 
 from rp2.logger import create_logger
-from rp2.rp2_decimal import RP2Decimal
-from dali import transaction_resolver
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -112,7 +110,8 @@ class InputPlugin(AbstractInputPlugin):
 
                 # in binance, you can pay fees with lots of different currencies
                 # because of this, we represent fees on transactions as a separate fee transaction since it could be a different currency
-                # that what is being purchased or sold. More info: https://github.com/eprbell/rp2/blob/main/docs/user_faq.md#how-to-represent-fiat-vs-crypto-transaction-fees
+                # that what is being purchased or sold.
+                # More info: https://github.com/eprbell/rp2/blob/main/docs/user_faq.md#how-to-represent-fiat-vs-crypto-transaction-fees
 
                 # staking rewards & commission do not have any fees and only have a primary asset
                 # it is unclear what 'Distribution > Other' represents, but it looks like some type of income
@@ -203,7 +202,7 @@ class InputPlugin(AbstractInputPlugin):
                 elif transaction_type == _BUY:
                     # in the case of a "Quick Buy" the fields seem to be swapped: the base asset is the quote asset (the currency being used to purchase)
                     # and the quote asset is the asset being purchased. For instance, buying BUSD with USD is represented as:
-                    # 52358478,2021-08-04 16:15:55.614,Quick Buy,Buy,{32 char txn id},{9 char id},,,,USD,30.00000000,30.00000000,BUSD,29.84000000,29.84542100,USD,0.15000000,0.15000000,ACH,,
+                    # 52358478,2021-08-04 16:15:55.614,Quick Buy,Buy,{32 char txn id},{9 char id},,,,USD,30.00000000,30.00000000,BUSD,29.84000000,29.84542100,USD,0.15000000,0.15000000,ACH,, # pylint: disable=line-too-long
 
                     if category == "Quick Buy":
                         purchased_asset: str = line[self.__QUOTE_ASSET_INDEX].strip()
@@ -326,7 +325,7 @@ class InputPlugin(AbstractInputPlugin):
                     # we only care when USD is used to buy something, so we can skip the deposit entries
                     self.__logger.debug("Skipping USD deposit %s", raw_data)
                 else:
-                    # TODO in my data, I had no withdrawals, they will need to be implemented in the future
+                    # TODO in my data, I had no withdrawals, they will need to be implemented in the future # pylint: disable=fixme
                     self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 
         return result
