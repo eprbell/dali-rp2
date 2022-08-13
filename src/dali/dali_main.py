@@ -44,7 +44,9 @@ from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
 from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
-from dali.plugin.pair_converter.historic_crypto import PairConverterPlugin as HistoricCryptoPairConverterPlugin
+from dali.plugin.pair_converter.historic_crypto import (
+    PairConverterPlugin as HistoricCryptoPairConverterPlugin,
+)
 from dali.transaction_resolver import resolve_transactions
 
 _VERSION: str = "0.4.12"
