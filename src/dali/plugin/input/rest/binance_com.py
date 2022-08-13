@@ -24,6 +24,7 @@
 
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Union
@@ -132,10 +133,11 @@ _LAUNCH_POOL = "Launchpool"
 _LOCKED_SAVINGS = "Locked Savings"
 _LOCKED_STAKING = "Locked Staking"
 _SOLO_AIRDROP = "SOLO airdrop"
+_GENERAL_STAKING = "STAKING"
 
 _AIRDROP_LIST = [_SOLO_AIRDROP]
 _INTEREST_LIST = [_FLEXIBLE_SAVINGS, _LOCKED_SAVINGS]
-_STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL]
+_STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING]
 
 
 class _ProcessAccountResult(NamedTuple):
@@ -410,11 +412,11 @@ class InputPlugin(AbstractInputPlugin):
             # }
             for dividend in dividends[_ROWS]:
                 self.__logger.debug("Dividend: %s", json.dumps(dividend))
-                if dividend[_EN_INFO] in _STAKING_LIST:
+                if dividend[_EN_INFO] in _STAKING_LIST or re.search("[dD]istribution", dividend[_EN_INFO]) or re.search("staking", dividend[_EN_INFO]):
                     self._process_gain(dividend, Keyword.STAKING, in_transactions)
                 elif dividend[_EN_INFO] in _INTEREST_LIST:
                     self._process_gain(dividend, Keyword.INTEREST, in_transactions)
-                elif dividend[_EN_INFO] in _AIRDROP_LIST:
+                elif dividend[_EN_INFO] in _AIRDROP_LIST or re.search("[aA]irdrop", dividend[_EN_INFO]):
                     self._process_gain(dividend, Keyword.AIRDROP, in_transactions)
                 else:
                     self.__logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_EN_INFO], self.ISSUES_URL)
@@ -1228,6 +1230,9 @@ class InputPlugin(AbstractInputPlugin):
             )
 
     def _process_transfer(self, transaction: Any, intra_transaction_list: List[IntraTransaction]) -> None:
+        if transaction[_STATUS] == "failed":
+            self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
+            return None
 
         # This is a CCXT list must convert to string from float
         amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
