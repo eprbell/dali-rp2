@@ -152,7 +152,7 @@ class TestTrade:
         # coinbase doesn't charge fees for eth2 stake
         assert out_transaction.asset == "ETH"
         assert out_transaction.timestamp == "2020-12-11 00:20:59+0000"
-        assert out_transaction.transaction_type == "Sell"
+        assert out_transaction.transaction_type == "SELL"
         assert RP2Decimal(out_transaction.spot_price) == RP2Decimal("3E+3")
         assert RP2Decimal(out_transaction.crypto_out_no_fee) == RP2Decimal("0.10000000")
         assert RP2Decimal(out_transaction.crypto_fee) == RP2Decimal("0.000")
@@ -162,7 +162,7 @@ class TestTrade:
 
         assert in_transaction.asset == "ETH2"
         assert in_transaction.timestamp == "2020-12-11 00:20:59+0000"
-        assert in_transaction.transaction_type == "Buy"
+        assert in_transaction.transaction_type == "BUY"
         assert RP2Decimal(in_transaction.spot_price) == RP2Decimal("3E+3")
         assert RP2Decimal(in_transaction.crypto_in) == RP2Decimal("0.10000000")
         assert in_transaction.crypto_fee is None
