@@ -70,7 +70,7 @@ _INSERT_TIME: str = "insertTime"
 _INTEREST_PARAMETER: str = "INTEREST"
 _INTEREST_FIELD: str = "interest"
 _IS_DUST: str = "isDust"
-_IS_FIATPAYMENT: str = "isFiatPayment"
+_IS_FIAT_PAYMENT: str = "isFiatPayment"
 _LEGAL_MONEY: str = "legalMoney"
 _LENDING_TYPE: str = "lendingType"
 _LIMIT: str = "limit"
@@ -187,12 +187,12 @@ class InputPlugin(AbstractInputPlugin):
         return self.__cache_key
 
     @staticmethod
-    def _rp2timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
+    def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
         rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
 
         # RP2 Timestamp has a space between the UTC offset and seconds
         # Standard Python format does not
-        return rp2_time.strftime("%Y-%m-%d %H:%M:%S %z")
+        return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
     @staticmethod
     def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> _Trade:
@@ -277,7 +277,7 @@ class InputPlugin(AbstractInputPlugin):
             for payment in fiat_payments[_DATA]:
                 self.__logger.debug("Payments: %s", json.dumps(payment))
                 if payment[_STATUS] == "Completed":
-                    payment[_IS_FIATPAYMENT] = True
+                    payment[_IS_FIAT_PAYMENT] = True
                     self._process_buy(payment, in_transactions, out_transactions)
 
         # Process crypto deposits (limited to 90 day windows), fetches 1000 transactions
@@ -564,13 +564,9 @@ class InputPlugin(AbstractInputPlugin):
                         earliest_redemption_timestamp = subscription_time + lockperiod_in_ms
 
                     else:
-                        self.__logger.error(
-                            "Internal Error: Principal (%s) minus paid interest (%s) does not equal returned principal"
-                            " (%s) on locked savings position ID - %s.",
-                            original_principal,
-                            RP2Decimal(str(total_interest_earned)),
-                            RP2Decimal(redemption[_AMOUNT]),
-                            redemption[_POSITION_ID],
+                        raise Exception(
+                            f"Internal Error: Principal ({original_principal}) minus paid interest ({RP2Decimal(str(total_interest_earned))}) does not equal"
+                            f" returned principal ({RP2Decimal(redemption[_AMOUNT])}) on locked savings position ID - {redemption[_POSITION_ID]}."
                         )
 
                     # There is some lag time between application for the subscription and when the subscription actually starts ~ 2 days
@@ -580,7 +576,7 @@ class InputPlugin(AbstractInputPlugin):
                                 plugin=self.__BINANCE_COM,
                                 unique_id=Keyword.UNKNOWN.value,
                                 raw_data=json.dumps(redemption),
-                                timestamp=self._rp2timestamp_from_ms_epoch(redemption[_DELIVER_DATE]),
+                                timestamp=self._rp2_timestamp_from_ms_epoch(redemption[_DELIVER_DATE]),
                                 asset=redemption[_ASSET],
                                 exchange=self.__BINANCE_COM,
                                 holder=self.account_holder,
@@ -596,10 +592,9 @@ class InputPlugin(AbstractInputPlugin):
                         )
 
                     else:
-                        self.__logger.error(
-                            "The redemption time (%s) is not in the redemption window (%s + 2 days).",
-                            self._rp2timestamp_from_ms_epoch(redemption[_TIME]),
-                            self._rp2timestamp_from_ms_epoch(str(earliest_redemption_timestamp)),
+                        raise Exception(
+                            f"Internal Error: The redemption time ({self._rp2_timestamp_from_ms_epoch(redemption[_TIME])}) is not in the redemption window "
+                            f"({self._rp2_timestamp_from_ms_epoch(str(earliest_redemption_timestamp))} + 2 days)."
                         )
 
                 elif redemption[_ASSET] in current_subscriptions and redemption_amount in current_subscriptions[redemption[_ASSET]]:
@@ -607,8 +602,7 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.debug("Locked Savings positionId %s redeemed successfully.", redemption[_POSITION_ID])
 
                 else:
-
-                    self.__logger.error("Internal Error: Orphaned Redemption. Please open an issue at %s.", self.ISSUES_URL)
+                    raise Exception(f"Internal Error: Orphaned Redemption. Please open an issue at {self.ISSUES_URL}.")
 
             # if we returned the limit, we need to roll the window forward to the last time
             if len(locked_redemptions) < _INTEREST_SIZE_LIMIT:
@@ -835,7 +829,7 @@ class InputPlugin(AbstractInputPlugin):
                         break
                     else:
                         raise Exception(
-                            f"Internal error: too many assets dusted at the same time: " f"{self._rp2timestamp_from_ms_epoch(str(current_dribblet_time))}"
+                            f"Internal error: too many assets dusted at the same time: " f"{self._rp2_timestamp_from_ms_epoch(str(current_dribblet_time))}"
                         )
             else:
 
@@ -955,13 +949,13 @@ class InputPlugin(AbstractInputPlugin):
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
 
-        if _IS_FIATPAYMENT in transaction:
+        if _IS_FIAT_PAYMENT in transaction:
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.__BINANCE_COM,
                     unique_id=transaction[_ORDER_NO],
                     raw_data=json.dumps(transaction),
-                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
                     asset=transaction[_CRYPTOCURRENCY],
                     exchange=self.__BINANCE_COM,
                     holder=self.account_holder,
@@ -1006,7 +1000,7 @@ class InputPlugin(AbstractInputPlugin):
                             plugin=self.__BINANCE_COM,
                             unique_id=transaction[_ID],
                             raw_data=json.dumps(transaction),
-                            timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                            timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                             asset=transaction[_FEE][_CURRENCY],
                             exchange=self.__BINANCE_COM,
                             holder=self.account_holder,
@@ -1022,7 +1016,7 @@ class InputPlugin(AbstractInputPlugin):
                     )
 
             # Is this a plain buy or a conversion?
-            if trade.quote_asset in self.client.options[_LEGAL_MONEY]:  # Binance specific param
+            if trade.quote_asset in self.client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat ever traded on Binance.com)
                 fiat_in_with_fee = RP2Decimal(str(transaction[_COST]))
                 fiat_fee = RP2Decimal(crypto_fee)
                 spot_price = RP2Decimal(str(transaction[_PRICE]))
@@ -1038,7 +1032,7 @@ class InputPlugin(AbstractInputPlugin):
                         plugin=self.__BINANCE_COM,
                         unique_id=transaction[_ID],
                         raw_data=json.dumps(transaction),
-                        timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                         asset=in_asset,
                         exchange=self.__BINANCE_COM,
                         holder=self.account_holder,
@@ -1062,7 +1056,7 @@ class InputPlugin(AbstractInputPlugin):
                         plugin=self.__BINANCE_COM,
                         unique_id=transaction[_ID],
                         raw_data=json.dumps(transaction),
-                        timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                         asset=in_asset,
                         exchange=self.__BINANCE_COM,
                         holder=self.account_holder,
@@ -1087,7 +1081,7 @@ class InputPlugin(AbstractInputPlugin):
                 plugin=self.__BINANCE_COM,
                 unique_id=transaction[_ORDER_NO],
                 raw_data=json.dumps(transaction),
-                timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
                 asset=transaction[_FIAT_CURRENCY],
                 exchange=self.__BINANCE_COM,
                 holder=self.account_holder,
@@ -1113,7 +1107,7 @@ class InputPlugin(AbstractInputPlugin):
                     plugin=self.__BINANCE_COM,
                     unique_id=Keyword.UNKNOWN.value,
                     raw_data=json.dumps(transaction),
-                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIME]),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIME]),
                     asset=transaction[_COIN_NAME],
                     exchange=self.__BINANCE_COM,
                     holder=self.account_holder,
@@ -1136,7 +1130,7 @@ class InputPlugin(AbstractInputPlugin):
                     plugin=self.__BINANCE_COM,
                     unique_id=str(transaction[_ID]),  # Binance sometimes has two ids for one tranid
                     raw_data=json.dumps(transaction),
-                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_DIV_TIME]),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_DIV_TIME]),
                     asset=transaction[_ASSET],
                     exchange=self.__BINANCE_COM,
                     holder=self.account_holder,
@@ -1175,7 +1169,7 @@ class InputPlugin(AbstractInputPlugin):
         crypto_out_with_fee: RP2Decimal = crypto_out_no_fee + crypto_fee
 
         # Is this a plain buy or a conversion?
-        if trade.quote_asset in self.client.options[_LEGAL_MONEY]:  # Binance specific param
+        if trade.quote_asset in self.client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat ever traded on Binance.com)
             fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
             fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
             spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
@@ -1185,7 +1179,7 @@ class InputPlugin(AbstractInputPlugin):
                     plugin=self.__BINANCE_COM,
                     unique_id=transaction[_ID],
                     raw_data=json.dumps(transaction),
-                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                     asset=out_asset,
                     exchange=self.__BINANCE_COM,
                     holder=self.account_holder,
@@ -1208,7 +1202,7 @@ class InputPlugin(AbstractInputPlugin):
                     plugin=self.__BINANCE_COM,
                     unique_id=transaction[_ID],
                     raw_data=json.dumps(transaction),
-                    timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                     asset=out_asset,
                     exchange=self.__BINANCE_COM,
                     holder=self.account_holder,
@@ -1279,7 +1273,7 @@ class InputPlugin(AbstractInputPlugin):
                 plugin=self.__BINANCE_COM,
                 unique_id=transaction[_ORDER_NO],
                 raw_data=json.dumps(transaction),
-                timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
                 asset=transaction[_FIAT_CURRENCY],
                 exchange=self.__BINANCE_COM,
                 holder=self.account_holder,
