@@ -16,8 +16,8 @@
 from datetime import datetime, timedelta
 from typing import NamedTuple, cast
 
-from rp2.rp2_error import RP2ValueError
 from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_error import RP2ValueError
 
 from dali.configuration import Keyword
 
