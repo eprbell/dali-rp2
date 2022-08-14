@@ -18,9 +18,9 @@ import logging
 import re
 from csv import reader
 from typing import List, Optional
+from decimal import Decimal
 
 from rp2.logger import create_logger
-from rp2.rp2_decimal import RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -44,6 +44,7 @@ class InputPlugin(AbstractInputPlugin):
     __CURRENCY_INDEX: int = 2
     __AMOUNT_INDEX: int = 3
     __SPOT_PRICE_INDEX: int = 4
+    __DETAILS_INDEX = 5
 
     __TIMESTAMP_INDEX: int = 7
 
@@ -91,12 +92,12 @@ class InputPlugin(AbstractInputPlugin):
                     "asset": currency,
                 }
 
-                # nexo does give us the spot price, but it's often 0 if a subcent value
-                # if it is non-zero, we use it, otherwise we use unknown as the value
-                # the spot price contains $ char, so we remove it
-                raw_spot_price = RP2Decimal(re.sub(r"[^\d.]", "", line[self.__SPOT_PRICE_INDEX]))
-
-                spot_price = str(raw_spot_price) if not raw_spot_price.is_zero() else Keyword.UNKNOWN.value
+                # nexo gives us the realized usd, but it's often 0 if a subcent value
+                # if it is non-zero, we use it to calculate the spot price, otherwise we use unknown as the value
+                # the spot price contains $ char, so we remove it. Sometimes the price is specified with scientific notation,
+                # so we are not using a more general regex like `[^\d.]`
+                realized_usd = Decimal(re.sub(r"[$]", "", line[self.__SPOT_PRICE_INDEX]))
+                spot_price = str(realized_usd / Decimal(amount)) if not realized_usd.is_zero() else Keyword.UNKNOWN.value
 
                 if transaction_type in [_INTEREST, _FIXED_TERM_INTEREST]:
                     result.append(
@@ -120,11 +121,19 @@ class InputPlugin(AbstractInputPlugin):
                     # I don't think we need to record locking/unlocking deposits for term interest
                     self.__logger.debug("Skipping lock or unlock deposit: %s", line)
                 elif transaction_type == _DEPOSIT:
+                    unique_id = common_params["unique_id"]
+
+                    # nexo includes a network transaction hash in the case of deposits: it's embedded in the details field
+                    # let's extract it using a regex
+                    if transaction_hash_match := re.search(r"([A-Fa-f0-9]{64})$", line[self.__DETAILS_INDEX]):
+                        unique_id = transaction_hash_match[0]
+
                     result.append(
                         IntraTransaction(
                             **(
                                 common_params  # type: ignore
                                 | {
+                                    "unique_id": unique_id,
                                     "crypto_received": amount,
                                     # most likely, funds are coming from the user/tax payer, but we can't say for sure so we use unknown
                                     # and let the DaLI transaction resolver fill in the missing details.

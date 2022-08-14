@@ -17,7 +17,7 @@ from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from rp2.rp2_decimal import RP2Decimal, ZERO
+from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2ValueError
 
 from dali.configuration import Keyword
