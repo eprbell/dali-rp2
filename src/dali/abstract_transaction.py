@@ -74,8 +74,8 @@ class AbstractTransaction:
         if result.tzinfo is None:
             raise Exception(f"Internal error: {name} has no timezone info: {value}\n{raw_data}")
         if result.microsecond == 0:
-            return StringAndDatetime(result.strftime("%Y-%m-%d %H:%M:%S %z"), result)
-        return StringAndDatetime(result.strftime("%Y-%m-%d %H:%M:%S.%f %z"), result)
+            return StringAndDatetime(result.strftime("%Y-%m-%d %H:%M:%S%z"), result)
+        return StringAndDatetime(result.strftime("%Y-%m-%d %H:%M:%S.%f%z"), result)
 
     @classmethod
     def _validate_optional_string_field(cls, name: str, value: Optional[str], raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> Optional[str]:

@@ -539,7 +539,8 @@ class InputPlugin(AbstractInputPlugin):
             crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else Keyword.UNKNOWN.value
             if amount < ZERO:
                 if (
-                    transaction[_TO][_RESOURCE] == _USER
+                    _TO in transaction
+                    and transaction[_TO][_RESOURCE] == _USER
                     and transaction_network[_STATUS] == _OFF_BLOCKCHAIN
                     and _SUBTITLE in transaction[_DETAILS]
                     and _EMAIL in transaction[_TO]
@@ -564,6 +565,27 @@ class InputPlugin(AbstractInputPlugin):
                             notes=f"To: {transaction[_TO][_EMAIL]}",
                         )
                     )
+                elif _FROM in transaction and transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
+                    # Coinbase Earn reversal transactions (due to credit card refunds typically): this is conservatively treated as a sale.
+                    out_transaction_list.append(
+                        OutTransaction(
+                            plugin=self.__COINBASE,
+                            unique_id=transaction[_ID],
+                            raw_data=raw_data,
+                            timestamp=transaction[_CREATED_AT],
+                            asset=currency,
+                            exchange=self.__COINBASE,
+                            holder=self.account_holder,
+                            transaction_type="Sell",
+                            spot_price=str(native_amount / amount),
+                            crypto_out_no_fee=str(-amount),
+                            crypto_fee="0",
+                            crypto_out_with_fee=str(-amount),
+                            fiat_out_no_fee=str(-native_amount),
+                            fiat_fee="0",
+                            notes="Coinbase EARN reversal",
+                        )
+                    )
                 else:
                     intra_transaction_list.append(
                         IntraTransaction(
@@ -582,7 +604,12 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
             else:
-                if transaction[_FROM][_RESOURCE] == _USER and transaction_network[_STATUS] == _OFF_BLOCKCHAIN and _SUBTITLE in transaction[_DETAILS]:
+                if (
+                    _FROM in transaction
+                    and transaction[_FROM][_RESOURCE] == _USER
+                    and transaction_network[_STATUS] == _OFF_BLOCKCHAIN
+                    and _SUBTITLE in transaction[_DETAILS]
+                ):
                     if _EMAIL in transaction[_FROM]:
                         # Incoming money from another Coinbase user. Marking it as income conservatively, but it could be
                         # a gift or other type: if so the user needs to explicitly recast it with a transaction hint
