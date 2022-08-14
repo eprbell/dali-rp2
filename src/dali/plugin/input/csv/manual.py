@@ -114,6 +114,10 @@ class InputPlugin(AbstractInputPlugin):
             for line in lines:
                 raw_data: str = ",".join(line).strip()
                 if not header_found:
+                    # let user know there is not enough columns
+                    if len(line) - 1 < self.__IN_NOTES_INDEX:
+                        raise ValueError(f"Not enough columns: the {self.__in_csv_file} CSV must contain {self.__IN_NOTES_INDEX} columns.")
+
                     # Skip header line
                     header_found = True
                     self.__logger.debug("Header: %s", ";".join(line))
@@ -157,7 +161,12 @@ class InputPlugin(AbstractInputPlugin):
             header_found: bool = False
             for line in lines:
                 raw_data: str = ",".join(line).strip()
+
                 if not header_found:
+                    # let user know there is not enough columns
+                    if len(line) - 1 < self.__OUT_NOTES_INDEX:
+                        raise ValueError(f"Not enough columns: the {self.__out_csv_file} CSV must contain {self.__OUT_NOTES_INDEX} columns.")
+
                     # Skip header line
                     header_found = True
                     self.__logger.debug("Header: %s", ";".join(line))
@@ -202,6 +211,10 @@ class InputPlugin(AbstractInputPlugin):
             for line in lines:
                 raw_data: str = ",".join(line).strip()
                 if not header_found:
+                    # let user know there is not enough columns
+                    if len(line) - 1 < self.__INTRA_NOTES_INDEX:
+                        raise ValueError(f"Not enough columns: the {self.__intra_csv_file} CSV must contain {self.__INTRA_NOTES_INDEX} columns.")
+
                     # Skip header line
                     header_found = True
                     self.__logger.debug("Header: %s", ";".join(line))
