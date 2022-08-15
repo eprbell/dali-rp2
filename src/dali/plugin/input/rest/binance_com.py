@@ -1224,47 +1224,46 @@ class InputPlugin(AbstractInputPlugin):
     def _process_transfer(self, transaction: Any, intra_transaction_list: List[IntraTransaction]) -> None:
         if transaction[_STATUS] == "failed":
             self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
-            return None
-
-        # This is a CCXT list must convert to string from float
-        amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
-
-        if transaction[_TYPE] == _DEPOSIT:
-            intra_transaction_list.append(
-                IntraTransaction(
-                    plugin=self.__BINANCE_COM,
-                    unique_id=transaction[_TX_ID],
-                    raw_data=json.dumps(transaction),
-                    timestamp=transaction[_DATE_TIME],
-                    asset=transaction[_CURRENCY],
-                    from_exchange=Keyword.UNKNOWN.value,
-                    from_holder=Keyword.UNKNOWN.value,
-                    to_exchange=self.__BINANCE_COM,
-                    to_holder=self.account_holder,
-                    spot_price=Keyword.UNKNOWN.value,
-                    crypto_sent=Keyword.UNKNOWN.value,
-                    crypto_received=str(amount),
-                )
-            )
-        elif transaction[_TYPE] == _WITHDRAWAL:
-            intra_transaction_list.append(
-                IntraTransaction(
-                    plugin=self.__BINANCE_COM,
-                    unique_id=transaction[_TX_ID],
-                    raw_data=json.dumps(transaction),
-                    timestamp=transaction[_DATE_TIME],
-                    asset=transaction[_CURRENCY],
-                    from_exchange=self.__BINANCE_COM,
-                    from_holder=self.account_holder,
-                    to_exchange=Keyword.UNKNOWN.value,
-                    to_holder=Keyword.UNKNOWN.value,
-                    spot_price=Keyword.UNKNOWN.value,
-                    crypto_sent=str(amount),
-                    crypto_received=Keyword.UNKNOWN.value,
-                )
-            )
         else:
-            self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
+            # This is a CCXT list must convert to string from float
+            amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
+
+            if transaction[_TYPE] == _DEPOSIT:
+                intra_transaction_list.append(
+                    IntraTransaction(
+                        plugin=self.__BINANCE_COM,
+                        unique_id=transaction[_TX_ID],
+                        raw_data=json.dumps(transaction),
+                        timestamp=transaction[_DATE_TIME],
+                        asset=transaction[_CURRENCY],
+                        from_exchange=Keyword.UNKNOWN.value,
+                        from_holder=Keyword.UNKNOWN.value,
+                        to_exchange=self.__BINANCE_COM,
+                        to_holder=self.account_holder,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_sent=Keyword.UNKNOWN.value,
+                        crypto_received=str(amount),
+                    )
+                )
+            elif transaction[_TYPE] == _WITHDRAWAL:
+                intra_transaction_list.append(
+                    IntraTransaction(
+                        plugin=self.__BINANCE_COM,
+                        unique_id=transaction[_TX_ID],
+                        raw_data=json.dumps(transaction),
+                        timestamp=transaction[_DATE_TIME],
+                        asset=transaction[_CURRENCY],
+                        from_exchange=self.__BINANCE_COM,
+                        from_holder=self.account_holder,
+                        to_exchange=Keyword.UNKNOWN.value,
+                        to_holder=Keyword.UNKNOWN.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_sent=str(amount),
+                        crypto_received=Keyword.UNKNOWN.value,
+                    )
+                )
+            else:
+                self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
 
     def _process_withdrawal(self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
 
