@@ -192,8 +192,6 @@ class InputPlugin(AbstractInputPlugin):
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
         rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
 
-        # RP2 Timestamp has a space between the UTC offset and seconds
-        # Standard Python format does not
         return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
     @staticmethod
