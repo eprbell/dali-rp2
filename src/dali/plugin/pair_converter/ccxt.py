@@ -172,8 +172,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 current_graph: Dict[str, Dict[str, None]] = {}
 
                 for market in current_exchange.fetch_markets():
-                    # self.__logger.debug("Market: %s", market)
-                    current_markets[market[_ID]] = [exchange]
+                    self.__logger.debug("Market: %s", market)
+                    current_markets[f"{market[_BASE]}{market[_QUOTE]}"] = [exchange]
 
                     # TO BE IMPLEMENTED - lazy build graph only if needed
 
