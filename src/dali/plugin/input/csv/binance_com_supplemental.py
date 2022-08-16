@@ -58,7 +58,7 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__autoinvest_csv_file: Optional[str] = autoinvest_csv_file
         self.__betheth_csv_file: Optional[str] = betheth_csv_file
-        self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM_CSV}/{self.account_holder}")
+        self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM_SUPPLEMENTAL_CSV}/{self.account_holder}")
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
@@ -85,7 +85,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 result.append(
                     InTransaction(
-                        plugin=self.__BINANCE_COM_CSV,
+                        plugin=self.__BINANCE_COM_SUPPLEMENTAL_CSV,
                         unique_id=Keyword.UNKNOWN.value,
                         raw_data=raw_data,
                         timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
@@ -105,7 +105,7 @@ class InputPlugin(AbstractInputPlugin):
                 crypto_out_with_fee: RP2Decimal = RP2Decimal(quote_asset_amount) + RP2Decimal(crypto_fee)
                 result.append(
                     OutTransaction(
-                        plugin=self.__BINANCE_COM_CSV,
+                        plugin=self.__BINANCE_COM_SUPPLEMENTAL_CSV,
                         unique_id=Keyword.UNKNOWN.value,
                         raw_data=raw_data,
                         timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
@@ -137,7 +137,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 result.append(
                     InTransaction(
-                        plugin=self.__BINANCE_COM_CSV,
+                        plugin=self.__BINANCE_COM_SUPPLEMENTAL_CSV,
                         unique_id=Keyword.UNKNOWN.value,
                         raw_data=raw_data,
                         timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",
@@ -153,7 +153,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 result.append(
                     OutTransaction(
-                        plugin=self.__BINANCE_COM_CSV,
+                        plugin=self.__BINANCE_COM_SUPPLEMENTAL_CSV,
                         unique_id=Keyword.UNKNOWN.value,
                         raw_data=raw_data,
                         timestamp=f"{line[self.__TIMESTAMP_INDEX]} -00:00",

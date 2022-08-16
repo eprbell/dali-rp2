@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
-
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
-from dali.plugin.input.csv.binance_com import InputPlugin
+from dali.plugin.input.csv.binance_com_supplemental import InputPlugin
 
 
 class TestBinanceCsv:
