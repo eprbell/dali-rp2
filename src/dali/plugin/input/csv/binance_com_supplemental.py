@@ -35,7 +35,7 @@ from dali.out_transaction import OutTransaction
 class InputPlugin(AbstractInputPlugin):
 
     __BINANCE_COM: str = "Binance.com"
-    __BINANCE_COM_CSV: str = "Binance.com CSV"
+    __BINANCE_COM_SUPPLEMENTAL_CSV: str = "Binance.com_Supplemental_CSV"
 
     __TIMESTAMP_INDEX: int = 0
     __AUTO_BASE_SYMBOL: int = 1
@@ -64,13 +64,10 @@ class InputPlugin(AbstractInputPlugin):
         result: List[AbstractTransaction] = []
 
         if self.__autoinvest_csv_file:
-            result = self.parse_autoinvest_file(self.__autoinvest_csv_file)
+            result += self.parse_autoinvest_file(self.__autoinvest_csv_file)
 
         if self.__betheth_csv_file:
-            if result:
-                result += self.parse_betheth_file(self.__betheth_csv_file)
-            else:
-                result = self.parse_betheth_file(self.__betheth_csv_file)
+            result += self.parse_betheth_file(self.__betheth_csv_file)
 
         return result
 
@@ -150,7 +147,7 @@ class InputPlugin(AbstractInputPlugin):
                         transaction_type=Keyword.BUY.value,
                         spot_price=Keyword.UNKNOWN.value,
                         crypto_in=line[self.__BETHETH_AMOUNT],
-                        notes="Conversion from BETH -> ETH",
+                        notes="Conversion from ETH -> BETH",
                     )
                 )
 
@@ -168,7 +165,7 @@ class InputPlugin(AbstractInputPlugin):
                         crypto_out_no_fee=line[self.__BETHETH_AMOUNT],
                         crypto_out_with_fee=line[self.__BETHETH_AMOUNT],
                         crypto_fee="0",
-                        notes="Conversion from BETH -> ETH",
+                        notes="Conversion from ETH -> BETH",
                     )
                 )
 
