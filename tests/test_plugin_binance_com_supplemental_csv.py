@@ -59,7 +59,7 @@ class TestBinanceCsv:
         assert eth_transaction_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(eth_transaction_out.crypto_out_no_fee) == RP2Decimal("10.00")
         assert RP2Decimal(eth_transaction_out.crypto_fee) == RP2Decimal("0.0025")
-        assert RP2Decimal(eth_transaction_out.crypto_out_with_fee) == RP2Decimal("10.0025")
+        assert RP2Decimal(str(eth_transaction_out.crypto_out_with_fee)) == RP2Decimal("10.0025")
         assert eth_transaction_out.fiat_out_no_fee is None
         assert eth_transaction_out.fiat_fee is None
 
@@ -80,7 +80,7 @@ class TestBinanceCsv:
         assert btc_transaction_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(btc_transaction_out.crypto_out_no_fee) == RP2Decimal("20.00")
         assert RP2Decimal(btc_transaction_out.crypto_fee) == RP2Decimal("0.005")
-        assert RP2Decimal(btc_transaction_out.crypto_out_with_fee) == RP2Decimal("20.005")
+        assert RP2Decimal(str(btc_transaction_out.crypto_out_with_fee)) == RP2Decimal("20.005")
         assert btc_transaction_out.fiat_out_no_fee is None
         assert btc_transaction_out.fiat_fee is None
 
@@ -117,6 +117,6 @@ class TestBinanceCsv:
         assert betheth_transaction_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(betheth_transaction_out.crypto_out_no_fee) == RP2Decimal("0.1")
         assert RP2Decimal(betheth_transaction_out.crypto_fee) == ZERO
-        assert RP2Decimal(betheth_transaction_out.crypto_out_with_fee) == RP2Decimal("0.1")
+        assert RP2Decimal(str(betheth_transaction_out.crypto_out_with_fee)) == RP2Decimal("0.1")
         assert betheth_transaction_out.fiat_out_no_fee is None
         assert betheth_transaction_out.fiat_fee is None
