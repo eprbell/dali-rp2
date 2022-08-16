@@ -41,6 +41,7 @@ _FIAT_EXCHANGE: str = "exchangerate.host"
 
 # First on the list has the most priority
 # This is hard-coded for now based on volume of each of these markets for BTC on Coinmarketcap.com
+# Any change to this priority should be documented in "docs/configuration_file.md"
 _FIAT_PRIORITY: List[str] = ["USD", "JPY", "KRW", "EUR", "GBP", "AUD"]
 
 
