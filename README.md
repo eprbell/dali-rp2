@@ -114,7 +114,7 @@ An example of a configuration file can be found in [test_config.ini](https://git
 
 After processing the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and a RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
 
-The DaLI executable is country-dependent: `dali_<country_code>`, where country code is a [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes), 2-letter identifier (e.g. `dali_us`, `dali_jp`, etc).
+The DaLI executable is country-dependent: `dali_<country_code>`, where country code is a [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2), 2-letter identifier (e.g. `dali_us`, `dali_jp`, etc).
 
 Provided [DaLI is installed](#installation), to generate RP2 input files from the example configuration, open a terminal window (or PowerShell if on Windows).
 
