@@ -48,7 +48,7 @@ It performs the following operations:
 * it analyzes, processes and merges this data;
 * it uses the processed data to generate an ODS input file for RP2 and its respective JSON configuration file.
 
-DaLI has a [programmable plugin architecture](https://github.com/eprbell/dali-rp2/tree/main/README.dev.md#dali-internals) for data loaders (both CSV and REST-based). While some exchanges and wallets are already supported out-of-the-box, more are needed: help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](https://github.com/eprbell/dali-rp2/tree/main/CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets! Check [data-loader-plugin open issues](https://github.com/eprbell/dali-rp2/issues).
+DaLI has a programmable plugin architecture for [data loaders](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#data-loader-plugin-development) (both CSV and REST-based), [pair converters](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#pair-converter-plugin-development) and [countries](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#country-plugin-development). While some exchanges and wallets are already supported out-of-the-box, more are needed: help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](https://github.com/eprbell/dali-rp2/tree/main/CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets! Check [open issues](https://github.com/eprbell/dali-rp2/issues) or open a new one.
 
 DaLI has [unit test](https://github.com/eprbell/dali-rp2/tree/main/tests/) coverage to reduce the risk of regression.
 
@@ -56,6 +56,7 @@ Note that DaLI has RP2 as a dependency, so installing DaLI causes RP2 to be inst
 
 **IMPORTANT DISCLAIMER**:
 * DaLI offers no guarantee of correctness (read the [license](https://github.com/eprbell/dali-rp2/tree/main/LICENSE)): always verify results with the help of a tax professional.
+* The author of DaLI and RP2 is not a tax professional, but has used RP2 personally for a few years.
 
 ## License
 DaLI is released under the terms of Apache License Version 2.0. For more information see [LICENSE](https://github.com/eprbell/dali-rp2/tree/main/LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>.
@@ -113,6 +114,8 @@ An example of a configuration file can be found in [test_config.ini](https://git
 
 After processing the configuration file, DaLI reads crypto data from native sources and generates a RP2 input ODS file and a RP2 configuration file in the `output` directory or where specified with the `-o` CLI option.
 
+The DaLI executable is country-dependent: `dali_<country_code>`, where country code is a [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639-1_codes), 2-letter identifier (e.g. `dali_us`, `dali_jp`, etc).
+
 Provided [DaLI is installed](#installation), to generate RP2 input files from the example configuration, open a terminal window (or PowerShell if on Windows).
 
 Create the directory structure and download the example input files using wget or manually.
@@ -143,12 +146,12 @@ And move the csv files to the input directory:
 mv *.csv input
 ```
 
-Then generate the output files for rp2:
+Then generate the US output files for rp2:
 ```console
 dali_us -s -o output -p test_ test_config.ini
  ```
 
-* `-s` option allows DaLI to retrieve spot price information from the Internet, when it's not available from the CSV files or REST services.
+* `-s` option allows DaLI to retrieve spot price information from the Internet, when it's not available from the CSV files or REST endpoints.
 * `-o` option specifies the directory where the ODS output file is generated.
 * `-p` is the prefix of the output file.
 * `test_config.ini` is the configuration that ties the inputs together.
