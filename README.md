@@ -22,23 +22,23 @@
 [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=Check%20RP2,%20the%20privacy-focused,%20free,%20open%20source%20US%20crypto%20tax%20calculator&url=https://github.com/eprbell/rp2/?anything)
 
 ## Table of Contents
-* **[Introduction](https://github.com/eprbell/dali-rp2/tree/main/README.md#introduction)**
-* **[License](https://github.com/eprbell/dali-rp2/tree/main/README.md#license)**
-* **[Download](https://github.com/eprbell/dali-rp2/tree/main/README.md#download)**
-* **[Installation](https://github.com/eprbell/dali-rp2/tree/main/README.md#installation)**
-  * [Ubuntu Linux](https://github.com/eprbell/dali-rp2/tree/main/README.md#installation-on-ubuntu-linux)
-  * [macOS](https://github.com/eprbell/dali-rp2/tree/main/README.md#installation-on-macos)
-  * [Windows 10](https://github.com/eprbell/dali-rp2/tree/main/README.md#installation-on-windows-10)
-  * [Other Unix-like Systems](https://github.com/eprbell/dali-rp2/tree/main/README.md#installation-on-other-unix-like-systems)
-* **[Running](https://github.com/eprbell/dali-rp2/tree/main/README.md#running)**
-  * [Linux, macOS, Windows 10 and Other Unix-like Systems](https://github.com/eprbell/dali-rp2/tree/main/README.md#running-on-linux-macos-windows-10-and-other-unix-like-systems)
-  * [Windows 10](https://github.com/eprbell/dali-rp2/tree/main/README.md#running-on-windows-10)
-* **[Configuration File](https://github.com/eprbell/dali-rp2/tree/main/README.md#configuration-file)**
-* **[Reporting Bugs](https://github.com/eprbell/dali-rp2/tree/main/README.md#reporting-bugs)**
-* **[Contributing](https://github.com/eprbell/dali-rp2/tree/main/README.md#contributing)**
-* **[Developer Documentation](https://github.com/eprbell/dali-rp2/tree/main/README.md#developer-documentation)**
-* **[Frequently Asked Questions](https://github.com/eprbell/dali-rp2/tree/main/README.md#frequently-asked-questions)**
-* **[Change Log](https://github.com/eprbell/dali-rp2/tree/main/README.md#change-log)**
+* **[Introduction](#introduction)**
+* **[License](#license)**
+* **[Download](#download)**
+* **[Installation](#installation)**
+  * [Ubuntu Linux](#installation-on-ubuntu-linux)
+  * [macOS](#installation-on-macos)
+  * [Windows 10](#installation-on-windows-10)
+  * [Other Unix-like Systems](#installation-on-other-unix-like-systems)
+* **[Running](#running)**
+  * [Linux, macOS, Windows 10 and Other Unix-like Systems](#running-on-linux-macos-windows-10-and-other-unix-like-systems)
+  * [Windows 10](#running-on-windows-10)
+* **[Configuration File](#configuration-file)**
+* **[Reporting Bugs](#reporting-bugs)**
+* **[Contributing](#contributing)**
+* **[Developer Documentation](#developer-documentation)**
+* **[Frequently Asked Questions](#frequently-asked-questions)**
+* **[Change Log](#change-log)**
 
 ## Introduction
 [DaLI](https://github.com/eprbell/dali-rp2) (Data Loader Interface) is a data loader and input generator for [RP2](https://github.com/eprbell/rp2), the privacy-focused, free, non-commercial, open-source cryptocurrency tax calculator: DaLI removes the need to manually prepare RP2 input files. Just like RP2, DaLI is also free, non-commercial, open-source and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
