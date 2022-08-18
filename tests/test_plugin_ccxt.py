@@ -160,10 +160,10 @@ class TestCcxtPlugin:
         assert plugin.exchange_markets is not None
         assert plugin.exchange_graphs is not None
 
-    def test_invalid_exchange(self) -> None:
+    def test_unknown_exchange(self) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "Bogus Exchange")
-        assert data is None
+        assert data
 
     def test_historical_prices(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)

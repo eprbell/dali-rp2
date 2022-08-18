@@ -87,7 +87,7 @@ class AssetPairAndHistoricalPrice(NamedTuple):
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
     # TO BE IMPLEMENTED - main_exchange that refers to the main exchange to be used, ignoring the exchange listed in the transaction
-    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None) -> None:
+    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None, default_exchange: str = _DEFAULT_EXCHANGE) -> None:
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
@@ -99,6 +99,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         self.__transactions_processed: int = 0
+        self.__default_exchange: str = default_exchange
 
     def name(self) -> str:
         return "CCXT-converter"
@@ -161,8 +162,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             return self._get_fiat_exchange_rate(timestamp, from_asset, to_asset)
 
         if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT:
-            self.__logger.debug(f"Using default exchange {_DEFAULT_EXCHANGE} type for {exchange}")
-            exchange = _DEFAULT_EXCHANGE
+            self.__logger.debug(f"Using default exchange {self.__default_exchange} type for {exchange}")
+            exchange = self.__default_exchange
 
         # Caching of exchanges
         if exchange not in self.__exchanges:
