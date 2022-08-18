@@ -87,7 +87,9 @@ native_fiat = <em>&lt;native_fiat&gt;</em>
 
 Notes: 
 * The `username` parameter is optional and denotes the username used when connecting to the Binance.com mining pool. Only basic mining deposits (type 2) are currently supported.
-* Due to a bug in the Binance.com system, there may be duplicate locked savings/staked and flexible savings dividends around May 8th, 2021. Please review your payments around this time before processing your transactions with RP2.
+* On May 8th, 2021, Binance.com implemented a new unified dividend endpoint. This endpoint returns the time when interest affected a user's wallet. However, the endpoint used to retrieve interest payments previously returns the time when the interest was delivered (but hadn't yet affected the user's wallet). [See this post for more details](https://dev.binance.vision/t/time-difference-between-sapi-v1-asset-assetdividend-and-sapi-v1-staking-stakingrecord/12346/2).
+* Due to this discrepency, there may be duplicate locked savings/staked and flexible savings dividends around May 8th, 2021. Please review your payments around this time before processing your transactions with RP2.
+* [Currently only dust 'dribblets' of 100 or less crypto assets can be retrieved at once](https://dev.binance.vision/t/pagination-for-dustlog-asset-dividend-record-swap-history-bswap/4963). If you dust more than 100 crypto assets at one time the REST API will not be able to process the transactions successfully. 
 * Due to the information not being available via REST, autoinvest trades and ETH to BETH conversions can not be processed with this plugin. Please download the CSV for these transactions and use the Binance.com Supplemental CSV plugin. Note that some files are only available as .xlsx will need to be converted to the CSV format to be processed.
 
 ### Coinbase Section (REST)
