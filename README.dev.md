@@ -35,8 +35,11 @@
   * [Unit Tests](#unit-tests)
 * **[Creating a Release](#creating-a-release)**
 * **[Internal Design](#internal-design)**
-  * [The Transaction Resolver](#the-transaction-resolver)
-  * [Plugin Development](#plugin-development)
+* **[The Transaction Resolver](#the-transaction-resolver)**
+* **[Plugin Development](#plugin-development)**
+  * [Data Loader Plugin Development](#data-loader-plugin-development)
+  * [Pair Converter Plugin Development](#pair-converter-plugin-development)
+  * [Country Plugin Development](#country-plugin-development)
   * [Plugin Laundry List](#plugin-laundry-list)
 * **[Frequently Asked Developer Questions](#frequently-asked-developer-questions)**
 
@@ -109,6 +112,7 @@ The RP2 source tree is organized as follows:
 * `CONTRIBUTING.md`: contribution guidelines;
 * `docs/`: additional documentation, referenced from the README files;
 * `.editorconfig`;
+* `.gitattributes`;
 * `.github/workflows/`: configuration of Github continuous integration;
 * `.gitignore`;
 * `input/`: examples and tests;
@@ -127,8 +131,10 @@ The RP2 source tree is organized as follows:
 * `setup.py`: dynamic packaging configuration file;
 * `src/dali`: DaLI code, including classes for transactions, ODS and config genator, transaction resolver, etc.;
 * `src/dali/data/`: spreadsheet templates that are used by the ODS generator;
+* `src/dali/plugin/country/`: country plugins/entry points;
 * `src/dali/plugin/input/csv/`: CSV-based data loader plugins;
 * `src/dali/plugin/input/rest/`: REST-based data loader plugins;
+* `src/dali/plugin/pair_converter/`: pair converter plugins;
 * `src/stubs/`: DaLI relies on third-party libraries, some of which don't have typing information, so it is added here;
 * `tests/`: unit tests.
 
@@ -198,52 +204,59 @@ To create a Pypi distribution:
 DaLI's control flow is as follows (see [dali_main.py](src/dali/dali_main.py)):
 * parse the INI configuration file which includes plugin initialization parameters and global configuration sections;
 * discover and instantiate pair converter plugins using the initialization parameters from the config file and store them in a list to be passed to the transaction resolver (see below);
-* discover and instantiate data loader plugins using the initialization parameters from the config file and call their load() method, which reads data from native sources (CSV files or REST endpoints) and returns it in a normalized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
-* join the lists returned by plugin load() calls and pass them to the [transaction resolver](src/dali/transaction_resolver.py), which merges incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
+* discover and instantiate data loader plugins using the initialization parameters from the config file and call their `load()` method, which reads data from native sources (CSV files or REST endpoints) and returns it in a standardized format: a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances. This list can contain instances of any `AbstractTransaction` subclass: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together);
+* join the lists returned by plugin `load()` calls and pass them to the [transaction resolver](src/dali/transaction_resolver.py), which merges incomplete transactions, filling in any missing information (e.g. the spot price) and returning a normalized list of transactions (see below for more details);
 * pass the resolved data to the RP2 [ODS input file generator](src/dali/ods_generator.py) and the RP2 [config file generator](src/dali/config_generator.py), which create the input files for RP2.
 
-### The Transaction Resolver
-The [transaction resolver](src/dali/transaction_resolver.py) is a critical component of DaLI and has the purpose of merging and normalizing transaction data from data loader plugins. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the `to_exchange`, `to_holder` and `crypto_received` fields of the IntraTransaction (so it fills them with `Keyword.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the `from_exchange`, `from_holder` and `crypto_sent` fields of the IntraTransaction. So how does DaLI merge these two incomplete transaction parts into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction to pair them: typically this is the transaction hash, but in certain cases it could also be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for pairs of incomplete ones with the same `unique_id` and merges them into a single one (see also the FAQ on [unique_id population](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field)).
+## The Transaction Resolver
+The [transaction resolver](src/dali/transaction_resolver.py) is a critical component of DaLI and has the purpose of merging and normalizing transaction data from data loader plugins. Data loader plugins operate on incomplete information: e.g. if a transaction transfers crypto from Coinbase to Trezor, the Coinbase data loader plugin has no way of knowing that the destination address represents a Trezor account (because Coinbase itself doesn't have this information): so the plugin cannot fill the `to_exchange`, `to_holder` and `crypto_received` fields of the IntraTransaction (so it fills them with `Keyword.UNKNOWN`). Similarly the Trezor data loader plugin cannot know that the source address belongs to a Coinbase account and therefore it cannot fill the `from_exchange`, `from_holder` and `crypto_sent` fields of the IntraTransaction (so it fills them with `Keyword.UNKNOWN`). So how does DaLI merge these two incomplete transaction parts into one complete IntraTransaction? It uses the transaction resolver, which relies on the `unique_id` field of each incomplete transaction to pair them: typically this is the transaction hash, but in certain special cases it could also be an exchange-specific value that identifies uniquely the transaction. The transaction resolver analyzes all generated transactions, looks for pairs of incomplete ones with the same `unique_id` and merges them into a single one (be sure to read the FAQ on [how to populate the unique_id field](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field), which discusses this topic in detail).
 
-For this reason it's essential that all data loader plugins populate the `unique_id` field as best they can: without it the transaction resolver cannot merge incomplete data. Sometimes hash information is missing (especially in CSV files) and so it's impossible to populate the `unique_id` field: in such cases it's still possible to write a plugin, but the user will have to manually modify the generated result and perform transaction resolution manually, which is not ideal.
+For this reason it's essential that all data loader plugins populate the `unique_id` field as best they can and with a global identifier that is understood by all plugins (again, the transaction hash): without it the transaction resolver cannot merge incomplete data. Sometimes hash information is missing (especially in CSV files) and so it's impossible to populate the `unique_id` field: in such cases use `Keyword.UNKNOWN`, but the user will have to manually modify the generated result and perform transaction resolution manually, which is not ideal.
 
 Another feature of the transaction resolver is filling in or converting certain fiat values, using the pair converter plugin list passed to it:
-* `spot_price`: sometimes the native sources read by data loader plugins don't provide this information. If instructed by the user with the `-c` option, the transaction resolver tries to retrieve this information from pair converter plugins;
+* `spot_price`: sometimes the native sources read by data loader plugins don't provide this information. If instructed by the user with the `-s` option, the transaction resolver tries to retrieve this information from pair converter plugins;
 * foreign fiat values: transactions that occurred on foreign exchanges can have their fiat values denominated in non-native fiat. When the transaction resolver detects this condition, it converts these foreign fiat values to native fiat (e.g. USD for US, JPY for Japan, etc.), using pair converter plugins.
 
-### Plugin Development
-DaLI has a plugin architecture for data loaders and pair converters, which makes it extensible for new use cases:
-* data loader plugins read crypto data from a native source (REST endpoint or CSV file) and convert it into DaLI's internal format
-* pair converter plugins convert from a currency to another (both fiat and crypto)
+## Plugin Development
+DaLI has a plugin architecture for data loaders, pair converters and countries, which makes it extensible for new use cases:
+* data loader plugins read crypto data from a native source (REST endpoint or CSV file) and convert it into DaLI's internal format;
+* pair converter plugins convert from a currency to another (both fiat and crypto);
+* country plugins enable support for new countries.
 
-#### Data Loader Plugin Development
-All data loader plugins are subclasses of [AbstractInputPlugin](src/dali/abstract_input_plugin.py) and they must:
-* invoke the superclass constructor in their own constructor;
-* implement the `load()` method, which reads data from the native source and returns a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances, which can be of any of the following classes: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together). The fields of transaction classes are described [here](docs/configuration_file.md#manual-section-csv).
-
+### Data Loader Plugin Development
 Data loader plugins live in one of the following directories, depending on their type (CSV or REST):
 * `src/dali/plugin/input/csv/`;
 * `src/dali/plugin/input/rest/`.
 
-If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`. The `unique_id` requires special attention, because the transaction resolver uses it to match and join incomplete transactions: the plugin must ensure to [populate it with the correct value](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field).
+If at all possible [prefer implementing a REST plugin over a CSV](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#should-i-implement-a-csv-or-a-rest-data-loader-plugin) one, because CSV sources are often incomplete.
 
-For an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin, for an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin.
-
-#### Pair Converter Plugin Development
-All pair converter plugins are subclasses of [AbstractPairConverterPlugin](src/dali/abstract_pair_converter_plugin.py) and they must:
+All data loader plugins are subclasses of [AbstractInputPlugin](src/dali/abstract_input_plugin.py).
+* define their own constructor with any custom parameters;
 * invoke the superclass constructor in their own constructor;
-* implement the `get_historic_bar_from_native_source()`, `name()` and `cache_key()` methods.
+* implement the `load()` method, which reads data from the native source and returns a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances, which can be of any of the following classes: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together). The fields of transaction classes are described [here](docs/configuration_file.md#manual-section-csv).
 
+If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`. The `unique_id` requires special attention, because the transaction resolver uses it to match and join incomplete transactions: the plugin must ensure to [populate it with the correct value](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field). See the [transaction resolver](#the-transaction-resolver) section for more details on `unique_id`.
+
+For an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin, for an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin.
+
+### Pair Converter Plugin Development
 Pair converter plugins live in the following directory:
 * `src/dali/plugin/pair_converter`.
 
+All pair converter plugins are subclasses of [AbstractPairConverterPlugin](src/dali/abstract_pair_converter_plugin.py) and they must:
+* implement the `name()` method;
+* implement the `cache_key()` method;
+* implement the `get_historic_bar_from_native_source()` method.
+
 For an example of pair converter look at the [Historic-Crypto](src/dali/plugin/pair_converter/historic_crypto.py) plugin.
 
-#### Country Plugin Development
-Country plugins are reused from RP2. To add support for a new country in DaLI:
+### Country Plugin Development
+Country plugins are reused from RP2 and their DaLI counterpart has trivial implementation.
+
+To add support for a new country in DaLI:
 * [add a country plugin to RP2](https://github.com/eprbell/rp2/blob/main/README.dev.md#adding-support-for-a-new-country);
 * add a new Python file to the `src/dali/plugin/country` directory and name it after the [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) 2-letter code for the country;
-* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main`. As an example see the [us.py](src/dali/plugin/country/us.py) file;
+* in the newly added file add a DaLI-specific entry point instantiating the new country instance and passing it to `dali_main()`. As an example see the [us.py](src/dali/plugin/country/us.py) file;
 * add a console script to setup.cfg pointing the new country dali_entry (see the US example in the console_scripts section of setup.cfg).
 
 ### Plugin Laundry List
@@ -256,24 +269,23 @@ When submitting a new plugin open a [PR](https://github.com/eprbell/dali-rp2/pul
 
 Data-loader-specific list:
 
-6. the plugin lives in `src/dali/plugin/input/csv/` or `src/dali/plugin/input/rest/`, depending on its type;
-7. the plugin creates transactions that have `unique_id` populated (typically with the hash), unless the information is missing from the native source: this is essential to the proper operation of the [transaction resolver](#the-transaction-resolver);
-8. CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
-    ```
-    # CSV Format: timestamp; type; transaction_id; address; fee; total
-    ```
-9. REST plugins have three comments at the beginning of the file, containing links to:
+6. the plugin lives in `src/dali/plugin/input/rest/` or `src/dali/plugin/input/csv/`, depending on its type;
+7. the plugin creates transactions that have `unique_id` populated (typically with the transaction hash), unless the information is missing from the native source: this is essential to the proper operation of the [transaction resolver](#the-transaction-resolver);
+8. REST plugins have three comments at the beginning of the file, containing links to:
   * REST API documentation
   * authentication procedure documentation
   * URL of the REST endpoint
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This makes it easier to review the code. For example:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This makes it easier to review the code. E.g.:
 ```
     # REST API: https://developers.coinbase.com/api/v2
     # Authentication: https://developers.coinbase.com/docs/wallet/api-key-authentication
     # Endpoint: https://api.coinbase.com
 ```
-
+9. CSV plugins have a comment at the beginning of the file, documenting the format. E.g.:
+    ```
+    # CSV Format: timestamp; type; transaction_id; address; fee; total
+    ```
 10. REST plugins document what a sample JSON response looks like after the JSON call.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This also makes it easier to review the code. For example:
@@ -286,11 +298,10 @@ Data-loader-specific list:
     #   },
     # ]
 ```
-
 11. the plugin's `load()` method is implemented and returns a list of AbstractTransaction subclasses;
 12. the plugin's `__init__()` method calls the superclass constructor:
     ```
-    super().__init__(account_holder)
+    super().__init__(account_holder, native_fiat=native_fiat)
     ```
 13. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameters to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
