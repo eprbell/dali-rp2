@@ -17,8 +17,8 @@
 import logging
 import re
 from csv import reader
-from typing import List, Optional
 from decimal import Decimal
+from typing import List, Optional
 
 from rp2.logger import create_logger
 
