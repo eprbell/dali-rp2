@@ -18,6 +18,7 @@
 * **[Reporting Bugs](#reporting-bugs)**
 * **[Contributing to the Repository](#contributing-to-the-repository)**
   * [Submitting Pull Requests](#submitting-pull-requests)
+* **[Contributing with an Ecosystem Project](#contributing-with-an-ecosystem-project)**
 
 ## Reporting Bugs
 Feel free to submit bugs via [Issue Tracker](https://github.com/eprbell/dali-rp2/issues), but **PLEASE READ THE FOLLOWING FIRST**: DaLI reads data from exchanges using REST APIs, which require API key, secret and / or passphrase. NEVER share your API key, secret and passphrase with anyone! DaLI stores the crypto data it reads locally on the user's machine and doesn't send this data elsewhere. Logs and outputs can be useful to reproduce a bug, so a user can decide (or not) to share them to help fix a problem. If you decide to share this information, be mindful of what you post or send out: stack traces are typically free of personal data, but DaLI logs and outputs, while very useful to reproduce an issue, may contain information that can identify you and your transactions. Before posting such data publicly or even sending it privately to the maintainers of DaLI, make sure that:
@@ -36,3 +37,6 @@ Feel free to submit pull requests. Please follow these practices:
 * add [unit tests](tests/) for any new code;
 * ensure your commits are atomic (one feature per commit);
 * write a clear log message for your commits.
+
+## Contributing with an Ecosystem Project
+Read about the [RP2 Ecosystem](https://github.com/eprbell/rp2/blob/main/README.md#rp2-ecosystem).
