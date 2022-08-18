@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import cProfile
+from multiprocessing.pool import ThreadPool
 import os
 import sys
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
@@ -20,7 +21,7 @@ from configparser import ConfigParser
 from importlib import import_module
 from inspect import Signature, signature
 from pathlib import Path
-from typing import Any, Dict, List, Set, Type, Union
+from typing import Any, Dict, List, NamedTuple, Set, Type, Union
 
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import LOG_FILE
@@ -55,6 +56,12 @@ from dali.transaction_resolver import resolve_transactions
 _VERSION: str = "0.4.12"
 
 
+class _InputPluginHelperArgs(NamedTuple):
+    input_plugin: AbstractInputPlugin
+    package_name: str
+    use_cache: bool
+
+
 def dali_main(country: AbstractCountry) -> None:
     if "RP2_ENABLE_PROFILER" in os.environ:
         cProfile.runctx("_dali_main_internal(country)", globals(), locals())
@@ -79,8 +86,6 @@ def _dali_main_internal(country: AbstractCountry) -> None:
         parser.print_help()
         sys.exit(1)
 
-    transactions: List[AbstractTransaction] = []
-
     try:
         LOGGER.info("Country: %s", country.country_iso_code)
 
@@ -88,8 +93,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
         ini_config.read(args.ini_file)
 
         pair_converter_list: List[AbstractPairConverterPlugin] = []
-
-        input_plugin_found: bool = False
+        input_plugin_args_list: List[_InputPluginHelperArgs] = []
         section_name: str
         for section_name in ini_config.sections():
             # Plugin sections can have extra trailing words to make them unique: this way there can be multiple sections
@@ -137,32 +141,14 @@ def _dali_main_internal(country: AbstractCountry) -> None:
                     sys.exit(1)
                 plugin_configuration[Keyword.NATIVE_FIAT.value] = dali_configuration[Keyword.NATIVE_FIAT.value]
                 input_plugin: AbstractInputPlugin = plugin_module.InputPlugin(**plugin_configuration)
-                LOGGER.info("Reading crypto data using plugin '%s'", section_name)
                 LOGGER.debug("InputPlugin object: '%s'", input_plugin)
                 if not hasattr(input_plugin, "load"):
                     LOGGER.error("Plugin '%s' has no 'load' method. Exiting...", normalized_section_name)
                     sys.exit(1)
+                LOGGER.info("Initialized input plugin '%s'", section_name)
+                input_plugin_args_list.append(_InputPluginHelperArgs(input_plugin, section_name, args.use_cache))
 
-                plugin_transactions: List[AbstractTransaction]
-                if args.use_cache and input_plugin.cache_key() is not None:
-                    cache = input_plugin.load_from_cache()
-                    if cache:
-                        LOGGER.info("Reading plugin load result from cache")
-                        plugin_transactions = cache
-                    else:
-                        plugin_transactions = input_plugin.load()
-                        input_plugin.save_to_cache(plugin_transactions)
-                else:
-                    plugin_transactions = input_plugin.load()
-
-                for transaction in plugin_transactions:
-                    if not isinstance(transaction, AbstractTransaction):
-                        LOGGER.error("Plugin '%s' returned a non-transaction object: %s. Exiting...", normalized_section_name, str(transaction))  # type: ignore
-                        sys.exit(1)
-                transactions.extend(plugin_transactions)
-                input_plugin_found = True
-
-        if not input_plugin_found:
+        if not input_plugin_args_list:
             LOGGER.error("No input plugin configuration found in config file. Exiting...")
             sys.exit(1)
 
@@ -172,6 +158,11 @@ def _dali_main_internal(country: AbstractCountry) -> None:
             LOGGER.info("No pair converter plugins found in configuration file: using default pair converters.")
 
         dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
+
+        with ThreadPool(args.thread_count) as pool:
+            result_list = pool.map(_input_plugin_helper, input_plugin_args_list)
+
+        transactions: List[AbstractTransaction] = [transaction for result in result_list for transaction in result]
 
         LOGGER.info("Resolving transactions")
         resolved_transactions: List[AbstractTransaction] = resolve_transactions(transactions, dali_configuration, args.read_spot_price_from_web)
@@ -188,6 +179,30 @@ def _dali_main_internal(country: AbstractCountry) -> None:
     LOGGER.info("Log file: %s", LOG_FILE)
     LOGGER.info("Generated output directory: %s", args.output_dir)
     LOGGER.info("Done")
+
+def _input_plugin_helper(args: _InputPluginHelperArgs) -> List[AbstractTransaction]:
+    input_plugin: AbstractInputPlugin = args.input_plugin
+    package_name: str = args.package_name
+    use_cache: bool = args.use_cache
+    plugin_transactions: List[AbstractTransaction]
+    if use_cache and input_plugin.cache_key() is not None:
+        cache = input_plugin.load_from_cache()
+        if cache:
+            LOGGER.info("Reading crypto data for plugin '%s' from cache", package_name)
+            plugin_transactions = cache
+        else:
+            LOGGER.info("Reading crypto data using plugin '%s'", package_name)
+            plugin_transactions = input_plugin.load()
+            input_plugin.save_to_cache(plugin_transactions)
+    else:
+        LOGGER.info("Reading crypto data using plugin '%s'", package_name)
+        plugin_transactions = input_plugin.load()
+
+    for transaction in plugin_transactions:
+        if not isinstance(transaction, AbstractTransaction):
+            LOGGER.error("Plugin '%s' returned a non-transaction object: %s. Exiting...", package_name, str(transaction))  # type: ignore
+            sys.exit(1)
+    return plugin_transactions
 
 
 def _setup_argument_parser() -> ArgumentParser:
@@ -230,6 +245,15 @@ def _setup_argument_parser() -> ArgumentParser:
         "--read-spot-price-from-web",
         action="store_true",
         help="Read spot price from the Internet, for transactions where it's missing",
+    )
+    parser.add_argument(
+        "-t",
+        "--thread-count",
+        action="store",
+        default=1,
+        help="Number of concurrent threads for data loaders",
+        metavar="THREAD_COUNT",
+        type=int,
     )
     parser.add_argument(
         "-v",
