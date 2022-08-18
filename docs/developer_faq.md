@@ -56,8 +56,10 @@ Some examples of this:
 * BlockFI CSVs don't contain the hash or any other transaction id;
 * Coinbase CSVs contain an internal transaction id, but it's not the hash.
 
+There is one more nuanced detail to this topic. If the transaction is complete and DOESN'T need resolution (e.g. a BUY or a SELL transaction), then it's ok to use an internal exchange id as the `unique_id`: it will help document the transaction and can be helpful when looking it up in the logs.
+
 Check the following for more details:
-*  [transaction resolver dev docs](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#the-transaction-resolver)
+* [transaction resolver dev docs](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#the-transaction-resolver)
 * [manual plugin docs](https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md#partial-transactions-and-transaction-resolution), which contain an example of how users would use the `unique_id` field in manual plugin CSV files to finish incomplete transactions for unsupported exchanges.
 
 ## Should I Implement a CSV or a REST Data Loader Plugin?
