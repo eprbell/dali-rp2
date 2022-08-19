@@ -14,6 +14,14 @@
 
 # RP2 Change Log
 
+## 0.5.0
+* add top-level multi-thread support: it's now possible to run data loader plugins in parallel, using the -t option (which selects the number of parallel threads)
+* added Nexo CSV input plugin
+* Coinbase REST input plugin: added support for Coinbase Earn Reversals (due to CC refunds, etc.)
+* BlockFI CSV input plugin: added new transaction types
+* revised and improved all documentation
+* added FAQs
+
 ## 0.4.12
 * added country plugin infrastructure (US is the default country plugin). Default fiat is no longer hardcoded to USD (it now comes from the country plugin)
 * updated generators and rest of the code to use the native fiat from the country plugin (previously it was hard coded as USD)
