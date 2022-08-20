@@ -116,7 +116,7 @@ class TestSwapFill:
 
         assert out_transaction.asset == "BTC"
         assert out_transaction.timestamp == "2020-12-11 00:20:14.693676+0000"
-        assert out_transaction.transaction_type == "SELL"
+        assert out_transaction.transaction_type == "Sell"
         assert out_transaction.spot_price == "50000.00000000"
         assert out_transaction.crypto_out_no_fee == "0.5000000000000000"
         assert out_transaction.crypto_fee == "0.0005000000000000"
@@ -126,7 +126,7 @@ class TestSwapFill:
 
         assert in_transaction.asset == "ETH"
         assert in_transaction.timestamp == "2020-12-11 00:20:14.693676+0000"
-        assert in_transaction.transaction_type == "BUY"
+        assert in_transaction.transaction_type == "Buy"
         assert in_transaction.spot_price == "2500.0000000000000000"
         assert in_transaction.crypto_in == "10.00000000"
         assert in_transaction.crypto_fee == "0"
