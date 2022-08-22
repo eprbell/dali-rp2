@@ -162,7 +162,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             return self._get_fiat_exchange_rate(timestamp, from_asset, to_asset)
 
         if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT:
-            self.__logger.debug(f"Using default exchange {self.__default_exchange} type for {exchange}")
+            self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
             exchange = self.__default_exchange
 
         # Caching of exchanges
