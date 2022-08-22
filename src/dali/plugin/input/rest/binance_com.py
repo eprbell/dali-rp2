@@ -169,21 +169,22 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder, native_fiat)
         self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM}/{self.account_holder}")
         self.__cache_key: str = f"{self.__BINANCE_COM.lower()}-{account_holder}"
-        self.client: binance = binance(
+        self.__client: binance = binance(
             {
                 "apiKey": api_key,
+                "enableRateLimit": True,
                 "secret": api_secret,
             }
         )
-        self.username = username
+        self.__username = username
 
         # We have to know what markets and algos are on Binance so that we can pull orders using the market
-        self.markets: List[str] = []
-        self.algos: List[str] = []
+        self.__markets: List[str] = []
+        self.__algos: List[str] = []
 
         # We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
-        self.start_time: datetime = datetime(2017, 7, 13, 0, 0, 0, 0)
-        self.start_time_ms: int = int(self.start_time.timestamp()) * _MS_IN_SECOND
+        self.__start_time: datetime = datetime(2017, 7, 13, 0, 0, 0, 0)
+        self.__start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
@@ -210,16 +211,16 @@ class InputPlugin(AbstractInputPlugin):
         out_transactions: List[OutTransaction] = []
         intra_transactions: List[IntraTransaction] = []
 
-        ccxt_markets: Any = self.client.fetch_markets()
+        ccxt_markets: Any = self.__client.fetch_markets()
         for market in ccxt_markets:
             self.__logger.debug("Market: %s", json.dumps(market))
-            self.markets.append(market[_ID])
+            self.__markets.append(market[_ID])
 
-        if self.username:
-            binance_algos = self.client.sapiGetMiningPubAlgoList()
+        if self.__username:
+            binance_algos = self.__client.sapiGetMiningPubAlgoList()
             for algo in binance_algos[_DATA]:
                 self.__logger.debug("Algo: %s", json.dumps(algo))
-                self.algos.append(algo[_ALGO_NAME])
+                self.__algos.append(algo[_ALGO_NAME])
 
         self._process_deposits(in_transactions, out_transactions, intra_transactions)
         self._process_gains(in_transactions, out_transactions)
@@ -242,7 +243,7 @@ class InputPlugin(AbstractInputPlugin):
     ) -> None:
 
         # We need milliseconds for Binance
-        current_start = self.start_time_ms
+        current_start = self.__start_time_ms
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # Crypto Deposits can only be pulled in 90 day windows
@@ -252,7 +253,7 @@ class InputPlugin(AbstractInputPlugin):
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
         # No limit on the date range
         # fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
-        fiat_payments = self.client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self.start_time_ms, _END_TIME: now_time}))
+        fiat_payments = self.__client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self.__start_time_ms, _END_TIME: now_time}))
         # {
         #   "code": "000000",
         #   "message": "success",
@@ -283,7 +284,7 @@ class InputPlugin(AbstractInputPlugin):
         # Process crypto deposits (limited to 90 day windows), fetches 1000 transactions
         while current_start < now_time:
             # The CCXT function only retrieves fiat deposits if you provide a valid 'legalMoney' code as variable.
-            crypto_deposits = self.client.fetch_deposits(params=({_START_TIME: current_start, _END_TIME: current_end}))
+            crypto_deposits = self.__client.fetch_deposits(params=({_START_TIME: current_start, _END_TIME: current_end}))
 
             # CCXT returns a standardized response from fetch_deposits. 'info' is the exchange-specific information
             # in this case from Binance.com
@@ -341,7 +342,7 @@ class InputPlugin(AbstractInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as withdrawls, but with _TRANSACTION_TYPE set to 0 (for deposits)
-        fiat_deposits = self.client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self.start_time_ms, _END_TIME: now_time}))
+        fiat_deposits = self.__client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self.__start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -372,7 +373,7 @@ class InputPlugin(AbstractInputPlugin):
         ### Regular Dividends from Staking (including Eth staking) and Savings (Lending) after around May 8th, 2021 01:00 UTC.
 
         # We need milliseconds for Binance
-        current_start = self.start_time_ms
+        current_start = self.__start_time_ms
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # The exact moment when Binance switched to unified dividends is unknown/unpublished.
@@ -386,7 +387,7 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.debug("Pulling dividends/subscriptions/redemptions from %s to %s", current_start, current_end)
 
             # CCXT doesn't have a standard way to pull income, we must use the underlying API endpoint
-            dividends = self.client.sapiGetAssetAssetDividend(params=({_START_TIME: current_start, _END_TIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT}))
+            dividends = self.__client.sapiGetAssetAssetDividend(params=({_START_TIME: current_start, _END_TIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT}))
             # {
             #     "rows":[
             #         {
@@ -440,7 +441,7 @@ class InputPlugin(AbstractInputPlugin):
         old_savings: bool = False
 
         # Reset window
-        current_start = self.start_time_ms
+        current_start = self.__start_time_ms
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
         # The cummulative interest from a positionID
@@ -457,7 +458,7 @@ class InputPlugin(AbstractInputPlugin):
 
             self.__logger.debug("Pulling locked staking from older api system from %s to %s", current_start, current_end)
 
-            locked_staking = self.client.sapi_get_staking_stakingrecord(
+            locked_staking = self.__client.sapi_get_staking_stakingrecord(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _INTEREST_PARAMETER, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -491,7 +492,7 @@ class InputPlugin(AbstractInputPlugin):
                 total_current_interest[position_id] = total_current_interest.get(position_id, ZERO) + RP2Decimal(str(stake_dividend[_AMOUNT]))
                 total_current_payments[position_id] = total_current_payments.get(position_id, 0) + 1
 
-            locked_subscriptions = self.client.sapi_get_staking_stakingrecord(
+            locked_subscriptions = self.__client.sapi_get_staking_stakingrecord(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _SUBSCRIPTION, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -522,7 +523,7 @@ class InputPlugin(AbstractInputPlugin):
                 else:
                     current_subscriptions[subscription[_ASSET]] = {f"{RP2Decimal(subscription[_AMOUNT]):.13f}": subscription}
 
-            locked_redemptions = self.client.sapi_get_staking_stakingrecord(
+            locked_redemptions = self.__client.sapi_get_staking_stakingrecord(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _REDEMPTION, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -615,7 +616,7 @@ class InputPlugin(AbstractInputPlugin):
         # Old system Flexible Savings
 
         # Reset window
-        current_start = self.start_time_ms
+        current_start = self.__start_time_ms
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
         # We will step backward in time from the switch over
@@ -623,7 +624,7 @@ class InputPlugin(AbstractInputPlugin):
 
             self.__logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
 
-            flexible_saving = self.client.sapi_get_lending_union_interesthistory(
+            flexible_saving = self.__client.sapi_get_lending_union_interesthistory(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _LENDING_TYPE: _DAILY, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -670,12 +671,12 @@ class InputPlugin(AbstractInputPlugin):
         ### Mining Income
 
         # username is only required when pulling mining data
-        for algo in self.algos:
+        for algo in self.__algos:
             # Binance uses pages for mining payments
             current_page = 1
             while True:
-                results = self.client.sapiGetMiningPaymentList(
-                    params=({_ALGO: algo, _USERNAME: self.username, _PAGE_INDEX: current_page, _PAGE_SIZE: _MINING_PAGE_LIMIT})
+                results = self.__client.sapiGetMiningPaymentList(
+                    params=({_ALGO: algo, _USERNAME: self.__username, _PAGE_INDEX: current_page, _PAGE_SIZE: _MINING_PAGE_LIMIT})
                 )
                 # {
                 #   "code": 0,
@@ -749,11 +750,11 @@ class InputPlugin(AbstractInputPlugin):
 
         # Binance requires a symbol/market
         # max limit is 1000
-        for market in self.markets:
-            since: int = self.start_time_ms
+        for market in self.__markets:
+            since: int = self.__start_time_ms
             while True:
                 try:
-                    market_trades = self.client.fetch_my_trades(symbol=market, since=since, limit=_TRADE_RECORD_LIMIT)
+                    market_trades = self.__client.fetch_my_trades(symbol=market, since=since, limit=_TRADE_RECORD_LIMIT)
                     #   {
                     #       'info':         { ... },                    // the original decoded JSON as is
                     #       'id':           '12345-67890:09876/54321',  // string trade id
@@ -796,7 +797,7 @@ class InputPlugin(AbstractInputPlugin):
         ### Dust Trades
 
         # We need milliseconds for Binance
-        current_start = self.start_time_ms
+        current_start = self.__start_time_ms
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # We will pull in 30 day periods
@@ -804,7 +805,7 @@ class InputPlugin(AbstractInputPlugin):
         # Maybe we can set a smaller window in the .ini file?
         current_end = current_start + _THIRTY_DAYS_IN_MS
         while current_start < now_time:
-            dust_trades = self.client.fetch_my_dust_trades(params=({_START_TIME: current_start, _END_TIME: current_end}))
+            dust_trades = self.__client.fetch_my_dust_trades(params=({_START_TIME: current_start, _END_TIME: current_end}))
             # CCXT returns the same json as .fetch_trades()
 
             # Binance only returns 100 dust trades per call. If we hit the limit we will have to crawl
@@ -847,7 +848,7 @@ class InputPlugin(AbstractInputPlugin):
     def _process_withdrawals(self, out_transactions: List[OutTransaction], intra_transactions: List[IntraTransaction]) -> None:
 
         # We need milliseconds for Binance
-        current_start = self.start_time_ms
+        current_start = self.__start_time_ms
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
         # Crypto Withdrawls can only be pulled in 90 day windows
@@ -857,7 +858,7 @@ class InputPlugin(AbstractInputPlugin):
         # Process crypto withdrawls (limited to 90 day windows), fetches 1000 transactions
         while current_start < now_time:
             # The CCXT function only retrieves fiat deposits if you provide a valid 'legalMoney' code as variable.
-            crypto_withdrawals = self.client.fetch_withdrawals(params=({_START_TIME: current_start, _END_TIME: current_end}))
+            crypto_withdrawals = self.__client.fetch_withdrawals(params=({_START_TIME: current_start, _END_TIME: current_end}))
 
             # CCXT returns a standardized response from fetch_withdrawls. 'info' is the exchange-specific information
             # in this case from Binance.com
@@ -915,7 +916,7 @@ class InputPlugin(AbstractInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_withdrawls by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as deposits, but with _TRANSACTION_TYPE set to 1 (for withdrawls)
-        fiat_withdrawals = self.client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _START_TIME: self.start_time_ms, _END_TIME: now_time}))
+        fiat_withdrawals = self.__client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _START_TIME: self.__start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -1016,7 +1017,7 @@ class InputPlugin(AbstractInputPlugin):
                     )
 
             # Is this a plain buy or a conversion?
-            if trade.quote_asset in self.client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat ever traded on Binance.com)
+            if trade.quote_asset in self.__client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat ever traded on Binance.com)
                 fiat_in_with_fee = RP2Decimal(str(transaction[_COST]))
                 fiat_fee = RP2Decimal(crypto_fee)
                 spot_price = RP2Decimal(str(transaction[_PRICE]))
@@ -1169,7 +1170,7 @@ class InputPlugin(AbstractInputPlugin):
         crypto_out_with_fee: RP2Decimal = crypto_out_no_fee + crypto_fee
 
         # Is this a plain buy or a conversion?
-        if trade.quote_asset in self.client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat ever traded on Binance.com)
+        if trade.quote_asset in self.__client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat ever traded on Binance.com)
             fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
             fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
             spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
