@@ -18,6 +18,9 @@ from typing import Dict, NamedTuple, Optional, cast
 from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2TypeError
 
+import logging
+from rp2.logger import create_logger
+
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
@@ -41,12 +44,17 @@ class AbstractPairConverterPlugin:
         result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
         self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
+        self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def cache_key(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
+
+    @property
+    def logger(self) -> logging.Logger:
+        return self.__logger
 
     @property
     def historical_price_type(self) -> str:
