@@ -41,8 +41,8 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin.client, "sapiGetFiatPayments").return_value = {
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin._InputPlugin__client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
             "message": "success",
             "data": [
@@ -75,8 +75,8 @@ class TestBinance:
             "success": True,
         }
 
-        mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
-        mocker.patch.object(plugin.client, "fetch_deposits").return_value = [
+        mocker.patch.object(plugin, "_InputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_deposits").return_value = [
             {
                 "info": {
                     "amount": "0.00999800",
@@ -113,7 +113,7 @@ class TestBinance:
             }
         ]
 
-        mocker.patch.object(plugin.client, "sapiGetFiatOrders").return_value = {
+        mocker.patch.object(plugin._InputPlugin__client, "sapiGetFiatOrders").return_value = {
             "code": "000000",
             "message": "success",
             "data": [
@@ -196,8 +196,8 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin.client, "fetch_my_trades").return_value = [
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_my_trades").return_value = [
             # Trade using BNB for fee payment
             {
                 "info": {"sample": "data"},  # the original decoded JSON as is
@@ -301,7 +301,7 @@ class TestBinance:
         ]
 
         # CCXT abstracts dust trades into regular trades, so no testing is necessary
-        mocker.patch.object(plugin.client, "fetch_my_dust_trades").return_value = []
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_my_dust_trades").return_value = []
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
@@ -458,10 +458,10 @@ class TestBinance:
             username="user",
             native_fiat="USD",
         )
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin.client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
-        mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
-        mocker.patch.object(plugin.client, "sapiGetAssetAssetDividend").return_value = {
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin._InputPlugin__client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
+        mocker.patch.object(plugin, "_InputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin._InputPlugin__client, "sapiGetAssetAssetDividend").return_value = {
             "rows": [
                 {"id": 1637366104, "amount": "0.00001600", "asset": "BETH", "divTime": 1563189166000, "enInfo": "ETH 2.0 Staking", "tranId": 2968885920},
                 {"id": 1631750237, "amount": "0.51206985", "asset": "BUSD", "divTime": 1563189165000, "enInfo": "Flexible Savings", "tranId": 2968885920},
@@ -470,7 +470,7 @@ class TestBinance:
         }
 
         # Only mining type 0 transactions are supported
-        mocker.patch.object(plugin.client, "sapiGetMiningPaymentList").return_value = {
+        mocker.patch.object(plugin._InputPlugin__client, "sapiGetMiningPaymentList").return_value = {
             "code": 0,
             "msg": "",
             "data": {
@@ -573,7 +573,7 @@ class TestBinance:
 
             return result
 
-        mocker.patch.object(plugin.client, "sapi_get_staking_stakingrecord").side_effect = penalized_locked_staking
+        mocker.patch.object(plugin._InputPlugin__client, "sapi_get_staking_stakingrecord").side_effect = penalized_locked_staking
 
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         mocker.patch.object(plugin, "_process_trades").return_value = None
@@ -642,9 +642,9 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        mocker.patch.object(plugin.client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
-        mocker.patch.object(plugin.client, "fetch_withdrawals").return_value = [
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin, "_InputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin._InputPlugin__client, "fetch_withdrawals").return_value = [
             {
                 "info": {
                     "amount": "0.00999800",
@@ -681,7 +681,7 @@ class TestBinance:
             }
         ]
 
-        mocker.patch.object(plugin.client, "sapiGetFiatOrders").return_value = {
+        mocker.patch.object(plugin._InputPlugin__client, "sapiGetFiatOrders").return_value = {
             "code": "000000",
             "message": "success",
             "data": [

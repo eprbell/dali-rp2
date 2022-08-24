@@ -1017,7 +1017,7 @@ class InputPlugin(AbstractInputPlugin):
                     )
 
             # Is this a plain buy or a conversion?
-            if trade.quote_asset in self.__client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat ever traded on Binance.com)
+            if trade.quote_asset in self.__client.options[_LEGAL_MONEY]:  # Is this fiat? (options[_LEGAL_MONEY] is a list of all fiat traded on Binance.com)
                 fiat_in_with_fee = RP2Decimal(str(transaction[_COST]))
                 fiat_fee = RP2Decimal(crypto_fee)
                 spot_price = RP2Decimal(str(transaction[_PRICE]))
