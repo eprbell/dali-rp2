@@ -29,7 +29,7 @@ from datetime import datetime, timezone
 from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
-from ccxt import DDoSProtection, InvalidNonce, binance
+from ccxt import DDoSProtection, Exchange, InvalidNonce, binance
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -188,6 +188,9 @@ class InputPlugin(AbstractInputPlugin):
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
+
+    def client(self) -> Optional[Exchange]:
+        return self.__client
 
     @staticmethod
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
