@@ -45,7 +45,7 @@ class TestBinanceCsv:
         # Buy ETH autoinvest
         assert eth_transaction_in.asset == "ETH"
         assert eth_transaction_in.timestamp == "2022-05-01 14:00:00+0000"
-        assert eth_transaction_in.transaction_type == Keyword.BUY.value
+        assert eth_transaction_in.transaction_type == Keyword.BUY.value.capitalize()
         assert eth_transaction_in.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(eth_transaction_in.crypto_in) == RP2Decimal("0.01")
         assert eth_transaction_in.crypto_fee is None
@@ -55,7 +55,7 @@ class TestBinanceCsv:
 
         assert eth_transaction_out.asset == "USDT"
         assert eth_transaction_out.timestamp == "2022-05-01 14:00:00+0000"
-        assert eth_transaction_out.transaction_type == Keyword.SELL.value
+        assert eth_transaction_out.transaction_type == Keyword.SELL.value.capitalize()
         assert eth_transaction_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(eth_transaction_out.crypto_out_no_fee) == RP2Decimal("10.00")
         assert RP2Decimal(eth_transaction_out.crypto_fee) == RP2Decimal("0.0025")
@@ -66,7 +66,7 @@ class TestBinanceCsv:
         # Buy BTC autoinvest
         assert btc_transaction_in.asset == "BTC"
         assert btc_transaction_in.timestamp == "2022-05-01 14:00:00+0000"
-        assert btc_transaction_in.transaction_type == Keyword.BUY.value
+        assert btc_transaction_in.transaction_type == Keyword.BUY.value.capitalize()
         assert btc_transaction_in.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(btc_transaction_in.crypto_in) == RP2Decimal("0.002")
         assert btc_transaction_in.crypto_fee is None
@@ -76,7 +76,7 @@ class TestBinanceCsv:
 
         assert btc_transaction_out.asset == "USDT"
         assert btc_transaction_out.timestamp == "2022-05-01 14:00:00+0000"
-        assert btc_transaction_out.transaction_type == Keyword.SELL.value
+        assert btc_transaction_out.transaction_type == Keyword.SELL.value.capitalize()
         assert btc_transaction_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(btc_transaction_out.crypto_out_no_fee) == RP2Decimal("20.00")
         assert RP2Decimal(btc_transaction_out.crypto_fee) == RP2Decimal("0.005")
@@ -103,7 +103,7 @@ class TestBinanceCsv:
 
         assert betheth_transaction_in.asset == "BETH"
         assert betheth_transaction_in.timestamp == "2021-03-01 12:00:00+0000"
-        assert betheth_transaction_in.transaction_type == Keyword.BUY.value
+        assert betheth_transaction_in.transaction_type == Keyword.BUY.value.capitalize()
         assert betheth_transaction_in.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(betheth_transaction_in.crypto_in) == RP2Decimal("0.1")
         assert betheth_transaction_in.crypto_fee is None
@@ -113,7 +113,7 @@ class TestBinanceCsv:
 
         assert betheth_transaction_out.asset == "ETH"
         assert betheth_transaction_out.timestamp == "2021-03-01 12:00:00+0000"
-        assert betheth_transaction_out.transaction_type == Keyword.SELL.value
+        assert betheth_transaction_out.transaction_type == Keyword.SELL.value.capitalize()
         assert betheth_transaction_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(betheth_transaction_out.crypto_out_no_fee) == RP2Decimal("0.1")
         assert RP2Decimal(betheth_transaction_out.crypto_fee) == ZERO
