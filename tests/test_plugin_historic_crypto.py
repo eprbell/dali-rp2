@@ -74,7 +74,7 @@ class TestHistoricCryptoPlugin:
 
         # Load plugin cache and verify
         cache = load_from_cache(plugin.cache_key())
-        key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD")
+        key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD", "Coinbase")
         assert len(cache) == 1, str(cache)
         assert key in cache
         data = cache[key]
