@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=protected-access
+
 import datetime
 from typing import Any, Dict, List
 
@@ -161,7 +163,7 @@ class TestBinance:
 
         assert fiat_in_transaction.asset == "LUNA"
         assert int(parser.parse(fiat_in_transaction.timestamp).timestamp()) * 1000 == 1624529919000
-        assert fiat_in_transaction.transaction_type == Keyword.BUY.value
+        assert fiat_in_transaction.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(fiat_in_transaction.spot_price) == RP2Decimal("4.437472")
         assert RP2Decimal(fiat_in_transaction.crypto_in) == RP2Decimal("4.462")
         assert fiat_in_transaction.crypto_fee is None
@@ -179,7 +181,7 @@ class TestBinance:
 
         assert fiat_deposit.asset == "EUR"
         assert int(parser.parse(fiat_deposit.timestamp).timestamp()) * 1000 == 1627501026000
-        assert fiat_deposit.transaction_type == Keyword.BUY.value
+        assert fiat_deposit.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(fiat_deposit.spot_price) == RP2Decimal("1")
         assert RP2Decimal(fiat_deposit.crypto_in) == RP2Decimal("15.00")
         assert RP2Decimal(str(fiat_deposit.crypto_fee)) == RP2Decimal("0.20")
@@ -336,7 +338,7 @@ class TestBinance:
         # Buy with BNB as fee payment
         assert bnb_sell_transaction.asset == "BTC"
         assert int(parser.parse(bnb_sell_transaction.timestamp).timestamp()) * 1000 == 1502962946000
-        assert bnb_sell_transaction.transaction_type == Keyword.SELL.value
+        assert bnb_sell_transaction.transaction_type == Keyword.SELL.value.capitalize()
         assert bnb_sell_transaction.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(bnb_sell_transaction.crypto_out_no_fee) == RP2Decimal("0.10376526")
         assert RP2Decimal(bnb_sell_transaction.crypto_fee) == RP2Decimal("0")
@@ -346,7 +348,7 @@ class TestBinance:
 
         assert bnb_buy_transaction.asset == "ETH"
         assert int(parser.parse(bnb_buy_transaction.timestamp).timestamp()) * 1000 == 1502962946000
-        assert bnb_buy_transaction.transaction_type == Keyword.BUY.value
+        assert bnb_buy_transaction.transaction_type == Keyword.BUY.value.capitalize()
         assert bnb_buy_transaction.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(bnb_buy_transaction.crypto_in) == RP2Decimal("1.5")
         assert RP2Decimal(str(bnb_buy_transaction.crypto_fee)) == RP2Decimal("0")
@@ -356,7 +358,7 @@ class TestBinance:
 
         assert bnb_fee_transaction.asset == "BNB"
         assert int(parser.parse(bnb_fee_transaction.timestamp).timestamp()) * 1000 == 1502962946000
-        assert bnb_fee_transaction.transaction_type == Keyword.FEE.value
+        assert bnb_fee_transaction.transaction_type == Keyword.FEE.value.capitalize()
         assert bnb_fee_transaction.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(bnb_fee_transaction.crypto_out_no_fee) == RP2Decimal("0")
         assert RP2Decimal(bnb_fee_transaction.crypto_fee) == RP2Decimal("0.0015")
@@ -367,7 +369,7 @@ class TestBinance:
         # Buy with base asset as fee payment
         assert buy_conversion_out.asset == "BTC"
         assert int(parser.parse(buy_conversion_out.timestamp).timestamp()) * 1000 == 1502962947000
-        assert buy_conversion_out.transaction_type == Keyword.SELL.value
+        assert buy_conversion_out.transaction_type == Keyword.SELL.value.capitalize()
         assert buy_conversion_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(buy_conversion_out.crypto_out_no_fee) == RP2Decimal("0.20753052")
         assert RP2Decimal(buy_conversion_out.crypto_fee) == RP2Decimal("0")
@@ -377,7 +379,7 @@ class TestBinance:
 
         assert buy_conversion_in.asset == "ETH"
         assert int(parser.parse(buy_conversion_in.timestamp).timestamp()) * 1000 == 1502962947000
-        assert buy_conversion_in.transaction_type == Keyword.BUY.value
+        assert buy_conversion_in.transaction_type == Keyword.BUY.value.capitalize()
         assert buy_conversion_in.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(buy_conversion_in.crypto_in) == RP2Decimal("3")
         assert RP2Decimal(str(buy_conversion_in.crypto_fee)) == RP2Decimal("0.0015")
@@ -388,7 +390,7 @@ class TestBinance:
         # Sell with quote asset as fee payment
         assert sell_conversion_order_out.asset == "ETH"
         assert int(parser.parse(sell_conversion_order_out.timestamp).timestamp()) * 1000 == 1502962948000
-        assert sell_conversion_order_out.transaction_type == Keyword.SELL.value
+        assert sell_conversion_order_out.transaction_type == Keyword.SELL.value.capitalize()
         assert sell_conversion_order_out.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(sell_conversion_order_out.crypto_out_no_fee) == RP2Decimal("6")
         assert RP2Decimal(sell_conversion_order_out.crypto_fee) == RP2Decimal("0")
@@ -398,7 +400,7 @@ class TestBinance:
 
         assert sell_conversion_order_in.asset == "BTC"
         assert int(parser.parse(sell_conversion_order_in.timestamp).timestamp()) * 1000 == 1502962948000
-        assert sell_conversion_order_in.transaction_type == Keyword.BUY.value
+        assert sell_conversion_order_in.transaction_type == Keyword.BUY.value.capitalize()
         assert sell_conversion_order_in.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(sell_conversion_order_in.crypto_in) == RP2Decimal("0.41506104")
         assert RP2Decimal(str(sell_conversion_order_in.crypto_fee)) == RP2Decimal("0.0015")
@@ -409,7 +411,7 @@ class TestBinance:
         # Fiat buy with base asset as a fee
         assert buy_fiat_order_out.asset == "GBP"
         assert int(parser.parse(buy_fiat_order_out.timestamp).timestamp()) * 1000 == 1502962949000
-        assert buy_fiat_order_out.transaction_type == Keyword.SELL.value
+        assert buy_fiat_order_out.transaction_type == Keyword.SELL.value.capitalize()
         assert RP2Decimal(buy_fiat_order_out.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_out.crypto_out_no_fee) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_out.crypto_fee) == RP2Decimal("0")
@@ -420,7 +422,7 @@ class TestBinance:
 
         assert buy_fiat_order_in.asset == "BTC"
         assert int(parser.parse(buy_fiat_order_in.timestamp).timestamp()) * 1000 == 1502962949000
-        assert buy_fiat_order_in.transaction_type == Keyword.BUY.value
+        assert buy_fiat_order_in.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(buy_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(buy_fiat_order_in.crypto_in) == RP2Decimal("1")
         assert RP2Decimal(str(buy_fiat_order_in.crypto_fee)) == RP2Decimal("0.002")
@@ -431,7 +433,7 @@ class TestBinance:
         # Fiat sell with quote asset as a fee
         assert sell_fiat_order_out.asset == "BTC"
         assert int(parser.parse(sell_fiat_order_out.timestamp).timestamp()) * 1000 == 1502962950000
-        assert sell_fiat_order_out.transaction_type == Keyword.SELL.value
+        assert sell_fiat_order_out.transaction_type == Keyword.SELL.value.capitalize()
         assert RP2Decimal(sell_fiat_order_out.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(sell_fiat_order_out.crypto_out_no_fee) == RP2Decimal("1")
         assert RP2Decimal(sell_fiat_order_out.crypto_fee) == RP2Decimal("0")
@@ -441,7 +443,7 @@ class TestBinance:
 
         assert sell_fiat_order_in.asset == "GBP"
         assert int(parser.parse(sell_fiat_order_in.timestamp).timestamp()) * 1000 == 1502962950000
-        assert sell_fiat_order_in.transaction_type == Keyword.BUY.value
+        assert sell_fiat_order_in.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(sell_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(sell_fiat_order_in.crypto_in) == RP2Decimal("23000.01")
         assert RP2Decimal(str(sell_fiat_order_in.crypto_fee)) == RP2Decimal("40")
@@ -596,7 +598,7 @@ class TestBinance:
         # Make sure it identifies this as staking income
         assert eth_staking.asset == "BETH"
         assert int(parser.parse(eth_staking.timestamp).timestamp()) * 1000 == 1563189166000
-        assert eth_staking.transaction_type == Keyword.STAKING.value
+        assert eth_staking.transaction_type == Keyword.STAKING.value.capitalize()
         assert eth_staking.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(eth_staking.crypto_in) == RP2Decimal("0.00001600")
         assert eth_staking.crypto_fee is None
@@ -606,7 +608,7 @@ class TestBinance:
 
         assert busd_savings.asset == "BUSD"
         assert int(parser.parse(busd_savings.timestamp).timestamp()) * 1000 == 1563189165000
-        assert busd_savings.transaction_type == Keyword.INTEREST.value
+        assert busd_savings.transaction_type == Keyword.INTEREST.value.capitalize()
         assert busd_savings.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(busd_savings.crypto_in) == RP2Decimal("0.51206985")
         assert busd_savings.crypto_fee is None
@@ -616,7 +618,7 @@ class TestBinance:
 
         assert early_redeem_fee.asset == "BTC"
         assert int(parser.parse(early_redeem_fee.timestamp).timestamp()) * 1000 == _EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_DAY * 5 + _MS_IN_HOUR * 13
-        assert early_redeem_fee.transaction_type == Keyword.FEE.value
+        assert early_redeem_fee.transaction_type == Keyword.FEE.value.capitalize()
         assert early_redeem_fee.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(early_redeem_fee.crypto_out_no_fee) == RP2Decimal("0")
         assert RP2Decimal(str(early_redeem_fee.crypto_out_with_fee)) == RP2Decimal("0.05")
@@ -626,7 +628,7 @@ class TestBinance:
 
         assert mining_deposit.asset == "BTC"
         assert int(parser.parse(mining_deposit.timestamp).timestamp()) * 1000 == 1607529600000
-        assert mining_deposit.transaction_type == Keyword.MINING.value
+        assert mining_deposit.transaction_type == Keyword.MINING.value.capitalize()
         assert mining_deposit.spot_price == Keyword.UNKNOWN.value
         assert RP2Decimal(mining_deposit.crypto_in) == RP2Decimal("0.85426469")
         assert mining_deposit.crypto_fee is None
@@ -727,7 +729,7 @@ class TestBinance:
 
         assert fiat_withdrawal.asset == "EUR"
         assert int(parser.parse(fiat_withdrawal.timestamp).timestamp()) * 1000 == 1627501026000
-        assert fiat_withdrawal.transaction_type == Keyword.SELL.value
+        assert fiat_withdrawal.transaction_type == Keyword.SELL.value.capitalize()
         assert RP2Decimal(fiat_withdrawal.spot_price) == RP2Decimal("1")
         assert RP2Decimal(fiat_withdrawal.crypto_out_no_fee) == RP2Decimal("15.00")
         assert RP2Decimal(str(fiat_withdrawal.crypto_fee)) == RP2Decimal("0.20")
