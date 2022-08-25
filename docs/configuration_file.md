@@ -32,7 +32,7 @@
 
 ## Introduction
 
-The configuration file is in [INI format](https://en.wikipedia.org/wiki/INI_file) and it is used to initialize data loader plugins and configure DaLI's behavior. It contains a sequence of configuration sections, which are of two types:
+The configuration file is in [INI format](https://en.wikipedia.org/wiki/INI_file) and it is used to initialize data loader and pair converter plugins and to configure DaLI's behavior. It contains a sequence of configuration sections, which are of the following types:
 * builtin sections: they configure general DaLI behavior (format of the output ODS file, hints on how to generate certain transactions, etc.);
 * data loader plugin sections: they select data loader plugins to run (e.g. Coinbase REST, Trezor CSV, etc.) and contain their initialization parameters;
 * pair converter plugin sections: they are optional and select pair converter plugins to use for filling missing spot price and converting foreign fiat to native fiat (e.g. USD for US, JPY for Japan, etc.).
@@ -41,7 +41,6 @@ Look at [test_config.ini](../config/test_config.ini) for an example of a configu
 
 The example shows several concepts described in this document (see sections below for more details):
 * [transaction hints](#transaction-hints-section): a transaction is recast from intra to out in the `transaction_hints` section of test_config.ini;
-* configurable historical market data behaviors;
 * multiple instances of the same plugin: test_config.ini has two Trezor sections with different qualifiers and parameters (this captures two different Trezor wallets);
 * multiple people filing together: test_config.ini has a section for Alice's Trezor and another for Bob's Trezor;
 * unsupported exchanges/wallets: the [manual](#manual-section-csv) section of test_config.ini points to [test_manual_in.csv](../input/test_manual_in.csv) containing buy transactions on FTX (which is not yet supported directly by DaLI);
@@ -69,7 +68,7 @@ DaLI comes with a few builtin plugins, but more are needed: help us make DaLI a 
 This plugin is REST-based and requires setting up API Keys in your Coinbase account settings (click on the API link).
 
 **IMPORTANT NOTE**:
-* When setting up API key/secret, only use read permissions (DaLI does NOT need write permissions).
+* when setting up API key/secret, only use read permissions (DaLI does NOT need write permissions);
 * store your API key and secret safely and NEVER share it with anyone!
 
 Initialize this plugin section as follows:
@@ -87,7 +86,7 @@ Note: the `thread_count` parameter is optional and denotes the number of paralle
 This plugin is REST-based and requires setting up API Keys in your Coinbase Pro account settings (click on the API link).
 
 **IMPORTANT NOTE**:
-* When setting up API key/secret/passphrase, only use read permissions (DaLI does NOT need write permissions).
+* when setting up API key/secret/passphrase, only use read permissions (DaLI does NOT need write permissions);
 * store your API key, secret and passphrase safely and NEVER share it with anyone!
 
 Initialize this plugin section as follows:
@@ -170,22 +169,22 @@ intra_csv_file = <em>&lt;intra_csv_file&gt;</em>
 
 The `in_csv_file` contains transactions describing crypto being acquired. Line 1 is considered a header line and it's ignored. Subsequent lines have the following format:
 * `unique_id` (optional): unique identifier for the transaction. It's useful to match partial intra transactions (see below) and it can be omitted in other cases;
-* `timestamp`: time at which the transaction occurred. DaLI can parse most timestamp formats, but timestamps must always include: year, month, day, hour, minute, second and timezone (milliseconds are optional). E.g.: "2020-01-21 11:15:00+00:00";
+* `timestamp`: [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) format time at which the transaction occurred. Timestamps must always include: year, month, day, hour, minute, second and timezone (milliseconds are optional). E.g.: "2020-01-21 11:15:00+00:00";
 * `asset`: which cryptocurrency was transacted (e.g. BTC, ETH, etc.);
 * `exchange`: exchange or wallet on which the transaction occurred;
 * `holder`: exchange account or wallet owner;
 * `transaction_type`: AIRDROP, BUY, DONATE, GIFT, HARDFORK, INCOME, INTEREST, MINING, STAKING or WAGES;
 * `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_in`: how much of the given cryptocurrency was acquired with the transaction;
-* `crypto_fee`: transaction fee (if it was paid in crypto). This is mutually exclusive with `fiat_fee`;
+* `crypto_fee` (optional): transaction fee (if it was paid in crypto). This is mutually exclusive with `fiat_fee`;
 * `fiat_in_no_fee` (optional): fiat value of the transaction without fee;
 * `fiat_in_with_fee` (optional): fiat value of the transaction with fee;
-* `fiat_fee`: transaction fee (if it was paid in fiat). This is mutually exclusive with `crypto_fee`;
+* `fiat_fee` (optional): transaction fee (if it was paid in fiat). This is mutually exclusive with `crypto_fee`;
 * `notes` (optional): user-provided description of the transaction.
 
 The `out_csv_file` contains transactions describing crypto being disposed of. Line 1 is considered a header line and it's ignored. Subsequent lines have the following format:
 * `unique_id` (optional): unique identifier for the transaction. It's useful to match partial intra transactions (see below) and it can be omitted in other cases;
-* `timestamp`: time at which the transaction occurred. DaLI can parse most timestamp formats, but timestamps must always include: year, month, day, hour, minute, second and timezone (milliseconds are optional). E.g.: "2020-01-21 11:15:00+00:00";
+* `timestamp`: [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) format time at which the transaction occurred. Timestamps must always include: year, month, day, hour, minute, second and timezone (milliseconds are optional). E.g.: "2020-01-21 11:15:00+00:00";
 * `asset`: which cryptocurrency was transacted (e.g. BTC, ETH, etc.);
 * `exchange`: exchange or wallet on which the transaction occurred;
 * `holder`: exchange account or wallet owner;
@@ -200,7 +199,7 @@ The `out_csv_file` contains transactions describing crypto being disposed of. Li
 
 The `intra_csv_file` contains transactions describing crypto being moved across accounts controlled by the same user (or people filing together). Line 1 is considered a header line and it's ignored. Subsequent lines have the following format:
 * `unique_id`: unique identifier for the transaction. It's useful to match partial intra transactions (see below) and it can be omitted in other cases;
-* `timestamp`: time at which the transaction occurred. DaLI can parse most timestamp formats, but timestamps must always include: year, month, day, hour, minute, second and timezone (milliseconds are optional). E.g.: "2020-01-21 11:15:00+00:00";
+* `timestamp`: [ISO8601](https://en.wikipedia.org/wiki/ISO_8601) format time at which the transaction occurred. Timestamps must always include: year, month, day, hour, minute, second and timezone (milliseconds are optional). E.g.: "2020-01-21 11:15:00+00:00";
 * `asset`: which cryptocurrency was transacted (e.g. BTC, ETH, etc.);
 * `from_exchange` (optional): exchange or wallet from which the transfer of cryptocurrency occurred;
 * `from_holder` (optional): owner of the exchange account or wallet from which the transfer of cryptocurrency occurred;
@@ -281,7 +280,9 @@ A pair converter plugin has the purpose of converting a currency to another (bot
 Where:
 * *`<parameter>`* and *`<value>`* are plugin-specific name-value pairs used to initialize a specific instance of the plugin. They are described in the plugin-specific sections below.
 
-Pair converters are optional: if they are missing from the configuration file DaLI selects a default one.
+The order in which pair converter sections are defined in the configuration file denotes the priority used by DaLI when looking for price data: it starts by querying the first pair converter in the configuration file, if it doesn't find a result it queries the second, and so on.
+
+Pair converters are optional: if they are missing from the configuration file DaLI uses a default pair converter list.
 
 ### Historic Crypto
 This plugin is based on the Historic_Crypto Python library.
@@ -293,7 +294,7 @@ historical_price_type = <em>&lt;historical_price_type&gt;</em>
 </pre>
 
 Where:
-* `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
+* `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLI downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
 
 ## Builtin Sections
 Builtin sections are used as global configuration of DaLI's behavior.

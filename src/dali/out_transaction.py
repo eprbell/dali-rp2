@@ -25,7 +25,7 @@ class OutTransaction(AbstractTransaction):
         Keyword.type_check_from_string(value)
         if not is_transaction_type_valid(Keyword.OUT.value, value):
             raise Exception(f"Invalid transaction type {value} for {cls.__name__}")
-        return value
+        return value.capitalize()
 
     def __init__(
         self,

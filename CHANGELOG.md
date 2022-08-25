@@ -14,6 +14,10 @@
 
 # RP2 Change Log
 
+## 0.5.1
+* updated RP2 dependency to latest version, which fixes 2 bugs in HIFO. If you're using HIFO be sure to use RP2 1.10 or better.
+* tweaked documentation
+
 ## 0.5.0
 * add top-level multi-thread support: it's now possible to run data loader plugins in parallel, using the -t option (which selects the number of parallel threads)
 * added Nexo CSV input plugin
