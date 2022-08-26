@@ -17,6 +17,8 @@ import os
 import pickle  # nosec
 from typing import Any
 
+from rp2.rp2_error import RP2TypeError
+
 CACHE_DIR: str = ".dali_cache"
 
 
@@ -25,7 +27,10 @@ def load_from_cache(cache_name: str) -> Any:
     if not os.path.exists(cache_path):
         return None
     with open(cache_path, "rb") as cache_file:
-        result: Any = pickle.load(cache_file)  # nosec
+        try:
+            result: Any = pickle.load(cache_file)  # nosec
+        except TypeError:
+            raise RP2TypeError(f"Cache format changed for {cache_path}: delete the cache file and rerun DaLI")
         return result
 
 
