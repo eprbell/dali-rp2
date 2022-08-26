@@ -29,8 +29,8 @@ def load_from_cache(cache_name: str) -> Any:
     with open(cache_path, "rb") as cache_file:
         try:
             result: Any = pickle.load(cache_file)  # nosec
-        except TypeError:
-            raise RP2TypeError(f"Cache format changed for {cache_path}: delete the cache file and rerun DaLI")
+        except TypeError as exc:
+            raise RP2TypeError(f"Cache format changed for {cache_path}: delete the cache file and rerun DaLI") from exc
         return result
 
 
