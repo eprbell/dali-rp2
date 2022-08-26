@@ -49,6 +49,9 @@ class coinbase(Exchange):
 class coinbasepro(Exchange):
     def __init__(self, config: Dict[str, str]) -> None: ...
 
+class gateio(Exchange):
+    def __init__(self, config: Dict[str, str]) -> None: ...
+
 class kraken(Exchange):
     def __init__(self, config: Dict[str, str]) -> None: ...
 
