@@ -211,7 +211,7 @@ def _setup_argument_parser() -> ArgumentParser:
             "Generate RP2 input and configuration files. Links:\n"
             "- documentation: https://github.com/eprbell/dali-rp2/blob/main/README.md\n"
             "- FAQ: https://github.com/eprbell/dali-rp2/blob/main/docs/user_faq.md\n"
-            "- leave a star on Github: https://github.com/eprbell/dali-rp2"
+            "- support DaLI by leaving a star on Github: https://github.com/eprbell/dali-rp2"
         ),
         formatter_class=RawTextHelpFormatter,
     )
