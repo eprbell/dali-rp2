@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.5.0 Developer Guide
+# DaLI for RP2 v0.5.2 Developer Guide
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -286,18 +286,30 @@ Data-loader-specific list:
     ```
     # CSV Format: timestamp; type; transaction_id; address; fee; total
     ```
-10. the plugin's `load()` method is implemented and returns a list of AbstractTransaction subclasses;
-11. the plugin's `__init__()` method calls the superclass constructor:
+10. REST plugins document what a sample JSON response looks like after the JSON call.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This also makes it easier to review the code. For example:
+```
+    # [
+    #   {
+    #     'time': '1624233772000', // epoch timestamp in ms
+    #     'asset': 'BTC',          // locked asset
+    #     'amount': '0.017666',    // Amount locked
+    #   },
+    # ]
+```
+11. the plugin's `load()` method is implemented and returns a list of AbstractTransaction subclasses;
+12. the plugin's `__init__()` method calls the superclass constructor:
     ```
     super().__init__(account_holder, native_fiat=native_fiat)
     ```
-12. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameters to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
+13. the plugin's `__init__()` method creates a plugin-specific logger with a name that uniquely identifies the specific instance of the plugin (typically you can add a subset of constructor parameters to ensure uniqueness): this way log lines can be easily distinguished by plugin instance. Example of a plugin-specific log in the constructor of the Trezor plugin:
     ```
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR}/{currency}/{self.__account_nickname}/{self.account_holder}")
     ```
-13. the plugin uses `self.__logger.debug()` throughout its code to capture all native-format data (which is is useful for debugging). Note that `logger.debug()` calls only occur if the user sets `LOG_LEVEL=DEBUG`;
-14. REST plugins have one or more [unit tests](tests/): use pytest-mock to simulate network calls (see [test_plugin_coinbase.py](tests/test_plugin_coinbase.py) for an example of this);
+14. the plugin uses `self.__logger.debug()` throughout its code to capture all native-format data (which is is useful for debugging). Note that `logger.debug()` calls only occur if the user sets `LOG_LEVEL=DEBUG`;
 15. CSV plugins have one or more [unit test](tests/);
+16. REST plugins have one or more [unit tests](tests/): use pytest-mock to simulate network calls (see [test_plugin_coinbase.py](tests/test_plugin_coinbase.py) for an example of this);
 
 ## Frequently Asked Developer Questions
 Read the [frequently asked developer questions](docs/developer_faq.md).

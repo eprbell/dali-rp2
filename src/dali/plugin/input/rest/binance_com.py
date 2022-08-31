@@ -24,11 +24,14 @@
 
 import json
 import logging
+
+import re
 from datetime import datetime, timezone
 from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
-from ccxt import DDoSProtection, InvalidNonce, binance
+
+from ccxt import DDoSProtection, Exchange, InvalidNonce, binance
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -70,7 +73,7 @@ _INSERT_TIME: str = "insertTime"
 _INTEREST_PARAMETER: str = "INTEREST"
 _INTEREST_FIELD: str = "interest"
 _IS_DUST: str = "isDust"
-_IS_FIATPAYMENT: str = "isFiatPayment"
+_IS_FIAT_PAYMENT: str = "isFiatPayment"
 _LEGAL_MONEY: str = "legalMoney"
 _LENDING_TYPE: str = "lendingType"
 _LIMIT: str = "limit"
@@ -83,29 +86,29 @@ _PAGE_SIZE: str = "pageSize"
 _POSITION_ID: str = "positionId"
 _PRICE: str = "price"
 _PRODUCT: str = "product"
-_PROFITAMOUNT: str = "profitAmount"
+_PROFIT_AMOUNT: str = "profitAmount"
 _REDEMPTION: str = "REDEMPTION"
 _ROWS: str = "rows"
 _SELL: str = "sell"  # CCXT only variable
 _SIDE: str = "side"  # CCXT only variable
 _SIZE: str = "size"
 _STAKING: str = "STAKING"
-_STARTTIME: str = "startTime"
+_START_TIME: str = "startTime"
 _STATUS: str = "status"
-_SOURCEAMOUNT: str = "sourceAmount"
+_SOURCE_AMOUNT: str = "sourceAmount"
 _SUBSCRIPTION: str = "SUBSCRIPTION"
 _SYMBOL: str = "symbol"
 _TIME: str = "time"
 _TIMESTAMP: str = "timestamp"  # CCXT only variable
-_TRANID: str = "tranId"
-_TRANSACTIONTYPE: str = "transactionType"
+_TRAN_ID: str = "tranId"
+_TRANSACTION_TYPE: str = "transactionType"
 _TOTAL: str = "total"
-_TOTALFEE: str = "totalFee"
-_TOTALNUM: str = "totalNum"
+_TOTAL_FEE: str = "totalFee"
+_TOTAL_NUM: str = "totalNum"
 _TYPE: str = "type"
-_TXID: str = "txid"  # CCXT doesn't capitalize I
-_TXNTYPE: str = "txnType"
-_UPDATETIME: str = "updateTime"
+_TX_ID: str = "txid"  # CCXT doesn't capitalize I
+_TXN_TYPE: str = "txnType"
+_UPDATE_TIME: str = "updateTime"
 _USERNAME: str = "userName"
 _WITHDRAWAL: str = "withdrawal"  # CCXT only variable
 
@@ -125,17 +128,18 @@ _TRADE_RECORD_LIMIT: int = 1000
 _WITHDRAWAL_RECORD_LIMIT: int = 1000
 
 # Types of Binance Dividends
-_BNBVAULT = "BNB Vault"
-_ETHSTAKING = "ETH 2.0 Staking"
-_FLEXIBLESAVINGS = "Flexible Savings"
-_LAUNCHPOOL = "Launchpool"
-_LOCKEDSAVINGS = "Locked Savings"
-_LOCKEDSTAKING = "Locked Staking"
-_SOLOAIRDROP = "SOLO airdrop"
+_BNB_VAULT = "BNB Vault"
+_ETH_STAKING = "ETH 2.0 Staking"
+_FLEXIBLE_SAVINGS = "Flexible Savings"
+_LAUNCH_POOL = "Launchpool"
+_LOCKED_SAVINGS = "Locked Savings"
+_LOCKED_STAKING = "Locked Staking"
+_SOLO_AIRDROP = "SOLO airdrop"
+_GENERAL_STAKING = "STAKING"
 
-_AIRDROP_LIST = [_SOLOAIRDROP]
-_INTEREST_LIST = [_FLEXIBLESAVINGS, _LOCKEDSAVINGS]
-_STAKING_LIST = [_ETHSTAKING, _LOCKEDSTAKING, _BNBVAULT, _LAUNCHPOOL]
+_AIRDROP_LIST = [_SOLO_AIRDROP]
+_INTEREST_LIST = [_FLEXIBLE_SAVINGS, _LOCKED_SAVINGS]
+_STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING]
 
 
 class _ProcessAccountResult(NamedTuple):
@@ -212,7 +216,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     @staticmethod
     def _rp2timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
         rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
-        
+
         return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
     @staticmethod
@@ -248,4 +252,3 @@ class InputPlugin(AbstractCcxtInputPlugin):
     ### Multiple Transaction Processing
 
     def _process_trades(self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction]) -> None:
-

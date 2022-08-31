@@ -17,7 +17,7 @@ from inspect import signature
 from typing import Callable, Dict, List, NamedTuple, Optional, Union
 
 from dateutil.parser import parse
-from rp2.configuration import to_string
+from prezzemolo.utility import to_string
 
 from dali.configuration import Keyword, is_internal_field, is_unknown
 
