@@ -53,9 +53,102 @@ _THIRTY_DAYS_IN_MS: int = 2592000000
 _ONE_DAY_IN_MS: int = 86400000
 _MS_IN_SECOND: int = 1000
 
-# Default names
-_DEFAULT_PLUGIN_NAME: str = "Abstract_CCXT_Plugin"
-_DEFAULT_EXCHANGE_NAME: str = "CCXT_Compatible_Exchange"
+class AbstractPaginationDetails:
+
+    def __init__(self, limit: int, markets: Optional[List[str]] = None) -> None:
+        self.__limit: int = limit
+        self.__markets: List[str] = markets
+        self.__market_count: int
+
+    def evaluate_loop_expression(self, results: Any) -> bool:
+        raise NotImplementedError("Abstract method")
+
+    def init_loop(self) -> None:       
+        self.__market_count = 0
+
+    def get_market(self) -> str:
+        if self.__markets:
+            return self.__markets[self.__market_count]
+        return None
+
+    def has_more_markets(self) -> bool:
+        if self.__markets:
+            return self.__market_count + 1 < len(self.__markets)
+        else:
+            return False
+
+    @property
+    def symbol(self) -> str:
+        raise NotImplementedError("Abstract method")
+
+    @property
+    def since(self) -> int:
+        raise NotImplementedError("Abstract method")
+
+    @property
+    def limit(self) -> int:
+        raise NotImplementedError("Abstract method")
+
+    @property
+    def parameters(self) -> Dict[str, Union[str,int]]:
+        raise NotImplementedError("Abstract method")
+
+class DateBasedPaginationDetails(AbstractPaginationDetails):
+    
+    def __init__(
+        self, limit: int, exchange_start_time: int, markets: Optional[List[str]] = None
+    ) -> None:
+
+        super().__init__(limit, markets)
+        self.__exchange_start_time: int = exchange_start_time
+        self.__parameters: List[str, Union[str, int]] = []
+        self.init_loop()
+
+    def evaluate_loop_expression(self, current_results: Any) -> bool:
+
+        # Did we reach the end of this market?
+        end_market: bool = False
+
+        if len(results):
+            # All times are inclusive
+            self.__since = results[len(results) - 1][_TIMESTAMP] + 1
+        else:
+            end_market = True
+
+        if end_market and self.has_more_markets():
+            self.__since = self.__exchange_start_time
+            self.next_market()
+            return True
+        else:
+            return False
+
+    def init_loop(self) -> None:
+
+        super().init_loop()
+        self.__since: int = self.__exchange_start_time 
+        self.__parameters = []
+
+    @property
+    def symbol(self) -> str:
+        return self.get_market()
+
+    @property
+    def since(self) -> int:
+        return self.__since
+
+    @property
+    def limit(self) -> int:
+        return self.__limit
+
+    @property
+    def parameters(self) -> Dict[str, Union[str, int]]:
+        return self.__parameters
+
+class IdBasedPaginationDetails(AbstractPaginationDetails):
+    ...
+
+class PageNumberBasedPaginationDetails(AbstractPaginationDetails):
+    ...
 
 class _ProcessAccountResult(NamedTuple):
     in_transactions: List[InTransaction]
@@ -75,8 +168,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def __init__(
         self,
         account_holder: str,
-        api_key: str,
-        api_secret: str,
         native_fiat: str,
 		exchange_start_time: datetime,
     ) -> None:
@@ -84,29 +175,51 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         super().__init__(account_holder, native_fiat)
         self.__logger: logging.Logger = create_logger(f"{exchange_name}/{self.account_holder}")
         self.__cache_key: str = f"{exchange_name.lower()}-{account_holder}"
-        self.client: Exchange = exchange_class(
-            {
-                "apiKey": api_key,
-                "secret": api_secret,
-                "enableRateLimit": True, 
-            }
-        )
+        self.__client: Exchange = initialize_client()
 
-        self.markets: List[str] = []
-        self.start_time: datetime = exchange_start_time
-        self.start_time_ms: int = int(self.start_time.timestamp()) * _MS_IN_SECOND
-
-    def cache_key(self) -> Optional[str]:
-        return self.__cache_key
+        self.__markets: List[str] = []
+        self.__start_time: datetime = exchange_start_time
+        self.__start_time_ms: int = int(self.start_time.timestamp()) * _MS_IN_SECOND
 
     def plugin_name(self) -> Optional[str]:
-        return _DEFAULT_PLUGIN_NAME
+        raise NotImplementedError("Abstract method")
 
-    def exchange_class(self) -> Exchange
-        raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
+    def cache_key(self) -> Optional[str]:
+        raise NotImplementedError("Abstract method")
 
-    def exchange_name(self) -> Optional[str]:
-        return _DEFAULT_EXCHANGE_NAME
+    def logger(self) -> logging.Logger:
+        raise NotImplementedError("Abstract method")
+
+    def initialize_client(self) -> Exchange:
+        raise NotImplementedError("Abstract method")
+
+    def exchange_name(self) -> str:
+        raise NotImplementedError("Abstract method")
+
+    def get_process_deposits_pagination_details(self) -> AbstractPaginationDetails:
+        raise NotImplementedError("Abstract method")
+
+    def get_process_withdrawals_pagination_details(self) -> AbstractPaginationDetails:
+        raise NotImplementedError("Abstract method")
+
+    # Some exchanges require you to loop through all markets for trades
+    def get_process_trades_pagination_details(self) -> AbstractPaginationDetails:
+        raise NotImplementedError("Abstract method")
+
+    @property
+    def markets(self) -> List[str]:
+        if self.__markets:
+            return self.__markets
+        else:
+            ccxt_markets: Any = self.client.fetch_markets()
+            for market in ccxt_markets:
+                self.__logger.debug("Market: %s", json.dumps(market))
+                self.__markets.append(market[_ID])
+            return self.__markets
+
+    @property
+    def start_time_ms(self) -> int:
+        return self.__start_time_ms          
 
     @staticmethod
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
@@ -129,15 +242,12 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         in_transactions: List[InTransaction] = []
         out_transactions: List[OutTransaction] = []
         intra_transactions: List[IntraTransaction] = []
+        process_account_results: List[_ProcessAccountResult] = []
 
-        ccxt_markets: Any = self.client.fetch_markets()
-        for market in ccxt_markets:
-            self.__logger.debug("Market: %s", json.dumps(market))
-            self.markets.append(market[_ID])
+        # TODO - pull valid fiat from abstract_converter_plugin? 
+        # This is sometimes needed to filter out buys from conversions.
 
-        # TODO - Pull valid fiat from abstract_converter_plugin
-
-        # TODO - Call standard list of unified functions (Trade, Deposit, Withdrawal)
+       self._process_trades(in_transactions, out_transactions)
 
         result.extend(in_transactions)
         result.extend(out_transactions)
@@ -147,13 +257,42 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     ### Multiple Transaction Processing or Pagination Methods
 
-    # TODO - _process_trades()
-    # TODO - _process_deposits() - need generic fetch_deposits()
-    # TODO - _process_withdrawals()
+    def _process_trades(
+        self,
+        in_transactions: List[InTransaction],
+        out_transactions: List[OutTransaction],
+    ) -> None:
 
-    # TODO - generic pagination methods that take functions?
+        pagination_details: AbstractPaginationDetails = self.get_process_trades_pagination_details()
+        while pagination_details.evaluate_loop_expression(trades)
+            trades = self.__client.fetch_my_trades(
+                symbol=pagination_details.symbol,
+                since=pagination_details.since,
+                limit=pagination_details.limit,
+                params=pagination_details.parameters,
+            )
+
+            with ThreadPool(self.__thread_count) as pool:
+                processing_result_list = pool.map(self._process_buy_and_sell, trades)
+                self.__logger.debug("Trade: %s", json.dumps(trade))
+                    
+            for processing_result in processing_result_list:
+                if processing_result is None:
+                    continue
+                if processing_result.in_transactions:
+                    in_transactions.extend(processing_result.in_transactions)
+                if processing_result.out_transactions:
+                    out_transactions.extend(processing_result.out_transactions)
+                if processing_result.intra_transactions:
+                    intra_transactions.extend(processing_result.intra_transactions)
+
 
     ### Single Transaction Processing
+
+    def _process_buy_and_sell(self, transaction: Any) -> _ProcessAccountResult:
+        pass
+
+
 
     def _process_buy(
         self, transaction: Any, exchange: str, in_transaction_list: List[InTransaction], out_transaction_list: List[OutTransaction], notes: Optional[str] = None
