@@ -20,24 +20,21 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
-# pylint: disable=too-many-lines
+# pylint: disable=fixme
 
 import json
 import logging
+from datetime import datetime
+from typing import List, NamedTuple, Optional
 
-import re
-from datetime import datetime, timezone
-from time import sleep
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from ccxt import Exchange, binance
 
-
-from ccxt import DDoSProtection, Exchange, InvalidNonce, binance
-from rp2.logger import create_logger
-from rp2.rp2_decimal import ZERO, RP2Decimal
-
-from dali.abstract_input_plugin import AbstractInputPlugin
+from dali.abstract_ccxt_input_plugin import (
+    AbstractCcxtInputPlugin,
+    AbstractPaginationDetails,
+    DateBasedPaginationDetails,
+)
 from dali.abstract_transaction import AbstractTransaction
-from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
@@ -169,22 +166,22 @@ class InputPlugin(AbstractCcxtInputPlugin):
         username: Optional[str] = None,
     ) -> None:
 
-        super().__init__(account_holder, native_fiat, datetime(2017, 7, 13, 0, 0, 0, 0))
-        self.__logger: logging.Logger = create_logger(f"{self.__BINANCE_COM}/{self.account_holder}")
-        self.__cache_key: str = f"{self.__BINANCE_COM.lower()}-{account_holder}"
-        self.username = username
+        self.__api_key = api_key
+        self.__api_secret = api_secret
+        super().__init__(account_holder, datetime(2017, 7, 13, 0, 0, 0, 0), native_fiat)
+        self.__username = username
 
         # We have to know what markets and algos are on Binance so that we can pull orders using the market
-        self.algos: List[str] = []
+        self.__algos: List[str] = []
 
     def exchange_name(self) -> str:
-        return self.__BINANCE_COM
+        return self.__EXCHANGE_NAME
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
 
-    def plugin_name(self) -> Optional[str]:
-        return self.__EXCHANGE_NAME
+    def plugin_name(self) -> str:
+        return self.__PLUGIN_NAME
 
     def logger(self) -> logging.Logger:
         return self.__logger
@@ -192,41 +189,25 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def initialize_client(self) -> Exchange:
         return binance(
             {
-                "apiKey": api_key,
+                "apiKey": self.__api_key,
                 "enableRateLimit": True,
-                "secret": api_secret,
+                "secret": self.__api_secret,
             }
         )
 
     def get_process_deposits_pagination_details(self) -> AbstractPaginationDetails:
-#        raise NotImplementedError("Abstract method")
+        #        raise NotImplementedError("Abstract method")
         pass
 
     def get_process_withdrawals_pagination_details(self) -> AbstractPaginationDetails:
-#        raise NotImplementedError("Abstract method")
+        #        raise NotImplementedError("Abstract method")
         pass
 
     def get_process_trades_pagination_details(self) -> AbstractPaginationDetails:
-        return pagination_details: DateBasedPaginationDetails = DateBasedPaginationDetails(
+        return DateBasedPaginationDetails(
             limit=_TRADE_RECORD_LIMIT,
             exchange_start_time=self.start_time_ms,
             markets=self.markets,
-        )
-
-    @staticmethod
-    def _rp2timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
-        rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
-
-        return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
-
-    @staticmethod
-    def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> _Trade:
-        assets = market_pair.split("/")
-        return _Trade(
-            base_asset=assets[0],
-            quote_asset=assets[1],
-            base_info=f"{base_amount} {assets[0]}",
-            quote_info=f"{quote_amount} {assets[1]}",
         )
 
     def load(self) -> List[AbstractTransaction]:
@@ -235,11 +216,11 @@ class InputPlugin(AbstractCcxtInputPlugin):
         out_transactions: List[OutTransaction] = []
         intra_transactions: List[IntraTransaction] = []
 
-        if self.username:
-            binance_algos = self.client.sapiGetMiningPubAlgoList()
+        if self.__username:
+            binance_algos = self.client.sapiGetMiningPubAlgoList()  # type: ignore
             for algo in binance_algos[_DATA]:
                 self.__logger.debug("Algo: %s", json.dumps(algo))
-                self.algos.append(algo[_ALGO_NAME])
+                self.__algos.append(algo[_ALGO_NAME])
 
         self._process_trades(in_transactions, out_transactions)
 
@@ -248,7 +229,3 @@ class InputPlugin(AbstractCcxtInputPlugin):
         result.extend(intra_transactions)
 
         return result
-
-    ### Multiple Transaction Processing
-
-    def _process_trades(self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction]) -> None:
