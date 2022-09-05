@@ -85,9 +85,6 @@ class _Trade(NamedTuple):
 
 
 class AbstractPaginationDetailSet:
-    def __init__(self, markets: Optional[List[str]] = None) -> None:
-        raise NotImplementedError("Abstract method")
-
     def __iter__(self) -> "AbstractPaginationDetailsIterator":
         raise NotImplementedError("Abstract method")
 
