@@ -31,8 +31,8 @@ from ccxt import Exchange, binance
 
 from dali.abstract_ccxt_input_plugin import (
     AbstractCcxtInputPlugin,
-    AbstractPaginationDetails,
-    DateBasedPaginationDetails,
+    AbstractPaginationDetailSet,
+    DateBasedPaginationDetailSet,
 )
 from dali.abstract_transaction import AbstractTransaction
 from dali.in_transaction import InTransaction
@@ -195,16 +195,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
             }
         )
 
-    def get_process_deposits_pagination_details(self) -> AbstractPaginationDetails:
+    def get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         #        raise NotImplementedError("Abstract method")
         pass
 
-    def get_process_withdrawals_pagination_details(self) -> AbstractPaginationDetails:
+    def get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         #        raise NotImplementedError("Abstract method")
         pass
 
-    def get_process_trades_pagination_details(self) -> AbstractPaginationDetails:
-        return DateBasedPaginationDetails(
+    def get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+        return DateBasedPaginationDetailSet(
             limit=_TRADE_RECORD_LIMIT,
             exchange_start_time=self.start_time_ms,
             markets=self.markets,

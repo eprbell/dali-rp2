@@ -64,16 +64,55 @@ _ONE_DAY_IN_MS: int = 86400000
 _MS_IN_SECOND: int = 1000
 
 
-class AbstractPaginationDetails:
-    def __init__(self, markets: Optional[List[str]] = None) -> None:
-        self.__markets: Optional[List[str]] = markets
-        self.__market_count: int = 0
+class _PaginationDetails(NamedTuple):
+    symbol: Optional[str]
+    since: Optional[int]
+    limit: Optional[int]
+    params: Optional[Dict[str, Union[int, str, None]]]
 
-    def evaluate_loop_expression(self, current_results: Any) -> bool:
+
+class _ProcessAccountResult(NamedTuple):
+    in_transactions: List[InTransaction]
+    out_transactions: List[OutTransaction]
+    intra_transactions: List[IntraTransaction]
+
+
+class _Trade(NamedTuple):
+    base_asset: str
+    quote_asset: str
+    base_info: str
+    quote_info: str
+
+
+class AbstractPaginationDetailSet:
+    def __init__(self, markets: Optional[List[str]] = None) -> None:
         raise NotImplementedError("Abstract method")
 
-    def init_loop(self) -> None:
-        self.__market_count = 0
+    def __iter__(self) -> "AbstractPaginationDetailsIterator":
+        raise NotImplementedError("Abstract method")
+
+
+class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
+    def __init__(
+        self, limit: Optional[int], exchange_start_time: int, markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None
+    ) -> None:
+
+        super().__init__()
+        self.__exchange_start_time: int = exchange_start_time
+        self.__limit: Optional[int] = limit
+        self.__markets: Optional[List[str]] = markets
+        self.__params: Optional[Dict[str, Union[int, str, None]]] = params
+
+    def __iter__(self) -> "DateBasedPaginationDetailsIterator":
+        return DateBasedPaginationDetailsIterator(self.__limit, self.__exchange_start_time, self.__markets, self.__params)
+
+
+class AbstractPaginationDetailsIterator:
+    def __init__(self, limit: Optional[int], markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None) -> None:
+        self.__limit: Optional[int] = limit
+        self.__markets: Optional[List[str]] = markets
+        self.__market_count: int = 0
+        self.__params: Optional[Dict[str, Union[int, str, None]]] = params
 
     def get_market(self) -> Optional[str]:
         if self.__markets:
@@ -88,74 +127,70 @@ class AbstractPaginationDetails:
     def next_market(self) -> None:
         self.__market_count += 1
 
-    @property
-    def symbol(self) -> Optional[str]:
+    def update_fetched_elements(self, current_results: Any) -> None:
         raise NotImplementedError("Abstract method")
 
     @property
-    def since(self) -> int:
-        raise NotImplementedError("Abstract method")
+    def limit(self) -> Optional[int]:
+        return self.__limit
 
     @property
-    def limit(self) -> int:
-        raise NotImplementedError("Abstract method")
+    def since(self) -> Optional[int]:
+        return None
 
     @property
-    def parameters(self) -> Optional[Dict[str, Union[int, str, None]]]:
+    def params(self) -> Optional[Dict[str, Union[int, str, None]]]:
+        return self.__params
+
+    def __next__(self) -> _PaginationDetails:
         raise NotImplementedError("Abstract method")
 
 
-class DateBasedPaginationDetails(AbstractPaginationDetails):
-    def __init__(self, limit: int, exchange_start_time: int, markets: Optional[List[str]] = None) -> None:
+class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
+    def __init__(
+        self, limit: Optional[int], exchange_start_time: int, markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None
+    ) -> None:
 
-        super().__init__(markets)
+        super().__init__(limit, markets, params)
+        self.__end_of_data = False
+        self.__since: Optional[int] = exchange_start_time
         self.__exchange_start_time: int = exchange_start_time
-        self.__limit: int = limit
-        self.__parameters: Optional[Dict[str, Union[int, str, None]]] = None
-        self.__since: int = self.__exchange_start_time
 
-    def evaluate_loop_expression(self, current_results: Any) -> bool:
-
-        # First time the loop is executed, results will be None
-        if current_results is None:
-            return True
-
-        # Did we reach the end of this market?
-        end_market: bool = False
+    def update_fetched_elements(self, current_results: Any) -> None:
 
         if len(current_results):
             # All times are inclusive
             self.__since = current_results[len(current_results) - 1][_TIMESTAMP] + 1
-        else:
-            end_market = True
-
-        if end_market and self.has_more_markets():
+        elif self.has_more_markets():
+            # we have reached the end of one market, now let's move on to the next
             self.__since = self.__exchange_start_time
             self.next_market()
-            return True
-        return False
+        else:
+            self.__end_of_data = True
 
-    def init_loop(self) -> None:
-
-        super().init_loop()
-        self.__since = self.__exchange_start_time
-        self.__parameters = None
+    def __next__(self) -> _PaginationDetails:
+        while not self.__end_of_data:
+            return _PaginationDetails(
+                symbol=self.get_market(),
+                since=self.__since,
+                limit=self.limit,
+                params=self.params,
+            )
+        raise StopIteration(self)
 
     @property
-    def symbol(self) -> Optional[str]:
-        return self.get_market()
+    def exchange_start_time(self) -> Optional[int]:
+        return self.__exchange_start_time
 
     @property
-    def since(self) -> int:
+    def since(self) -> Optional[int]:
         return self.__since
 
-    @property
-    def limit(self) -> int:
-        return self.__limit
-
-    @property
-    def parameters(self) -> Optional[Dict[str, Union[int, str, None]]]:
-        return self.__parameters
+    @since.setter
+    def since(self, value: int) -> None:
+        if value < self.__exchange_start_time:
+            raise ValueError("Since time is before exchange start time")
+        self.__since = value
 
 
 # class IdBasedPaginationDetails(AbstractPaginationDetails):
@@ -163,19 +198,6 @@ class DateBasedPaginationDetails(AbstractPaginationDetails):
 
 # class PageNumberBasedPaginationDetails(AbstractPaginationDetails):
 #     ...
-
-
-class _ProcessAccountResult(NamedTuple):
-    in_transactions: List[InTransaction]
-    out_transactions: List[OutTransaction]
-    intra_transactions: List[IntraTransaction]
-
-
-class _Trade(NamedTuple):
-    base_asset: str
-    quote_asset: str
-    base_info: str
-    quote_info: str
 
 
 class AbstractCcxtInputPlugin(AbstractInputPlugin):
@@ -215,18 +237,18 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def exchange_name(self) -> str:
         raise NotImplementedError("Abstract method")
 
-    def get_process_deposits_pagination_details(self) -> AbstractPaginationDetails:
+    def get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         raise NotImplementedError("Abstract method")
 
-    def get_process_withdrawals_pagination_details(self) -> AbstractPaginationDetails:
+    def get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         raise NotImplementedError("Abstract method")
 
     # Some exchanges require you to loop through all markets for trades
-    def get_process_trades_pagination_details(self) -> AbstractPaginationDetails:
+    def get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         raise NotImplementedError("Abstract method")
 
     @property
-    def client(self) -> Optional[Exchange]:
+    def client(self) -> Exchange:
         return self.__client
 
     @property
@@ -283,51 +305,59 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transactions: List[OutTransaction],
     ) -> None:
 
-        pagination_details: AbstractPaginationDetails = self.get_process_trades_pagination_details()
-        trades: Optional[List[Dict[str, Union[str, float]]]] = None
-        while pagination_details.evaluate_loop_expression(trades):
-            trades = self.__client.fetch_my_trades(
-                symbol=pagination_details.symbol,
-                since=pagination_details.since,
-                limit=pagination_details.limit,
-                params=pagination_details.parameters,
-            )
-            #   {
-            #       'info':         { ... },                    // the original decoded JSON as is
-            #       'id':           '12345-67890:09876/54321',  // string trade id
-            #       'timestamp':    1502962946216,              // Unix timestamp in milliseconds
-            #       'datetime':     '2017-08-17 12:42:48.000',  // ISO8601 datetime with milliseconds
-            #       'symbol':       'ETH/BTC',                  // symbol
-            #       'order':        '12345-67890:09876/54321',  // string order id or undefined/None/null
-            #       'type':         'limit',                    // order type, 'market', 'limit' or undefined/None/null
-            #       'side':         'buy',                      // direction of the trade, 'buy' or 'sell'
-            #       'takerOrMaker': 'taker',                    // string, 'taker' or 'maker'
-            #       'price':        0.06917684,                 // float price in quote currency
-            #       'amount':       1.5,                        // amount of base currency
-            #       'cost':         0.10376526,                 // total cost, `price * amount`,
-            #       'fee':          {                           // provided by exchange or calculated by ccxt
-            #           'cost':  0.0015,                        // float
-            #           'currency': 'ETH',                      // usually base currency for buys, quote currency for sells
-            #           'rate': 0.002,                          // the fee rate (if available)
-            #       },
-            #   }
+        pagination_detail_set: AbstractPaginationDetailSet = self.get_process_trades_pagination_detail_set()
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        try:
+            while True:
+                pagination_details: _PaginationDetails = next(pagination_detail_iterator)
+                trades: Optional[List[Dict[str, Union[str, float]]]] = self.__client.fetch_my_trades(
+                    symbol=pagination_details.symbol,
+                    since=pagination_details.since,
+                    limit=pagination_details.limit,
+                    params=pagination_details.params,
+                )
+                #   {
+                #       'info':         { ... },                    // the original decoded JSON as is
+                #       'id':           '12345-67890:09876/54321',  // string trade id
+                #       'timestamp':    1502962946216,              // Unix timestamp in milliseconds
+                #       'datetime':     '2017-08-17 12:42:48.000',  // ISO8601 datetime with milliseconds
+                #       'symbol':       'ETH/BTC',                  // symbol
+                #       'order':        '12345-67890:09876/54321',  // string order id or undefined/None/null
+                #       'type':         'limit',                    // order type, 'market', 'limit' or undefined/None/null
+                #       'side':         'buy',                      // direction of the trade, 'buy' or 'sell'
+                #       'takerOrMaker': 'taker',                    // string, 'taker' or 'maker'
+                #       'price':        0.06917684,                 // float price in quote currency
+                #       'amount':       1.5,                        // amount of base currency
+                #       'cost':         0.10376526,                 // total cost, `price * amount`,
+                #       'fee':          {                           // provided by exchange or calculated by ccxt
+                #           'cost':  0.0015,                        // float
+                #           'currency': 'ETH',                      // usually base currency for buys, quote currency for sells
+                #           'rate': 0.002,                          // the fee rate (if available)
+                #       },
+                #   }
 
-            # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
-            # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
-            # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas `amount` is the *base* volume).
-            # * The cost field itself is there mostly for convenience and can be deduced from other fields.
-            # * The ``cost`` of the trade is a *"gross"* value. That is the value pre-fee, and the fee has to be applied afterwards.
+                # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
+                # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
+                # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas `amount` is the *base* volume).
+                # * The cost field itself is there mostly for convenience and can be deduced from other fields.
+                # * The ``cost`` of the trade is a *"gross"* value. That is the value pre-fee, and the fee has to be applied afterwards.
 
-            with ThreadPool(self.__thread_count) as pool:
-                processing_result_list: List[Optional[_ProcessAccountResult]] = pool.map(self._process_buy_and_sell, trades)  # type: ignore
+                pagination_detail_iterator.update_fetched_elements(trades)
 
-            for processing_result in processing_result_list:
-                if processing_result is None:
-                    continue
-                if processing_result.in_transactions:
-                    in_transactions.extend(processing_result.in_transactions)
-                if processing_result.out_transactions:
-                    out_transactions.extend(processing_result.out_transactions)
+                with ThreadPool(self.__thread_count) as pool:
+                    processing_result_list: List[Optional[_ProcessAccountResult]] = pool.map(self._process_buy_and_sell, trades)  # type: ignore
+
+                for processing_result in processing_result_list:
+                    if processing_result is None:
+                        continue
+                    if processing_result.in_transactions:
+                        in_transactions.extend(processing_result.in_transactions)
+                    if processing_result.out_transactions:
+                        out_transactions.extend(processing_result.out_transactions)
+
+        except StopIteration:
+            # End of pagination details
+            pass
 
     ### Single Transaction Processing
 
@@ -346,7 +376,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         crypto_fee: RP2Decimal
 
         # TODO not CCXT standard
-        # If _IS_FIATPAYMENT in transaction: - TODO Fiat payment processing, may not need
+        # If _IS_FIATPAYMENT in transaction: - TODO This is part of the implicit API and will need to
+        # be converted to CCXT in order to get processed.
         # in_transaction_list.append(
         #     InTransaction(
         #         plugin=self.plugin_name(),

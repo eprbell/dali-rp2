@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from itertools import chain, repeat
+
 # import datetime
 from typing import Any
 
+from ccxt import Exchange
 from dateutil import parser
 from rp2.rp2_decimal import RP2Decimal
 
@@ -199,111 +202,117 @@ class TestBinance:
             native_fiat="GBP",
         )
 
-        client = plugin.client
+        client: Exchange = plugin.client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(client, "fetch_my_trades").return_value = [
-            # Trade using BNB for fee payment
-            {
-                "info": {"sample": "data"},  # the original decoded JSON as is
-                "id": "12345-67890:09876/54321",  # string trade id
-                "timestamp": 1502962946000,  # Unix timestamp in milliseconds
-                "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
-                "symbol": "ETH/BTC",  # symbol
-                "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
-                "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
-                "side": "buy",  # direction of the trade, 'buy' or 'sell'
-                "takerOrMaker": "taker",  # string, 'taker' or 'maker'
-                "price": 0.06917684,  # float price in quote currency
-                "amount": 1.5,  # amount of base currency
-                "cost": 0.10376526,  # total cost, `price * amount`,
-                "fee": {  # provided by exchange or calculated by ccxt
-                    "cost": 0.0015,  # float
-                    "currency": "BNB",  # usually base currency for buys, quote currency for sells
-                    "rate": 0.002,  # the fee rate (if available)
-                },
-            },
-            # Trade using the quote currency for fee payment
-            {
-                "info": {"sample": "data"},  # the original decoded JSON as is
-                "id": "12345-67890:09876/54321",  # string trade id
-                "timestamp": 1502962947000,  # Unix timestamp in milliseconds
-                "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
-                "symbol": "ETH/BTC",  # symbol
-                "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
-                "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
-                "side": "buy",  # direction of the trade, 'buy' or 'sell'
-                "takerOrMaker": "taker",  # string, 'taker' or 'maker'
-                "price": 0.06917684,  # float price in quote currency
-                "amount": 3,  # amount of base currency
-                "cost": 0.20753052,  # total cost, `price * amount`,
-                "fee": {  # provided by exchange or calculated by ccxt
-                    "cost": 0.0015,  # float
-                    "currency": "ETH",  # usually base currency for buys, quote currency for sells
-                    "rate": 0.002,  # the fee rate (if available)
-                },
-            },
-            # Sell trade using the quote currency for fee payment
-            {
-                "info": {"sample": "data"},  # the original decoded JSON as is
-                "id": "12345-67890:09876/54321",  # string trade id
-                "timestamp": 1502962948000,  # Unix timestamp in milliseconds
-                "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
-                "symbol": "ETH/BTC",  # symbol
-                "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
-                "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
-                "side": "sell",  # direction of the trade, 'buy' or 'sell'
-                "takerOrMaker": "taker",  # string, 'taker' or 'maker'
-                "price": 0.06917684,  # float price in quote currency
-                "amount": 6,  # amount of base currency
-                "cost": 0.41506104,  # total cost, `price * amount`,
-                "fee": {  # provided by exchange or calculated by ccxt
-                    "cost": 0.0015,  # float
-                    "currency": "BTC",  # usually base currency for buys, quote currency for sells
-                    "rate": 0.002,  # the fee rate (if available)
-                },
-            },
-            # Fiat Buy
-            {
-                "info": {"sample": "data"},  # the original decoded JSON as is
-                "id": "12345-67890:09876/54321",  # string trade id
-                "timestamp": 1502962949000,  # Unix timestamp in milliseconds
-                "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
-                "symbol": "BTC/GBP",  # symbol
-                "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
-                "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
-                "side": "buy",  # direction of the trade, 'buy' or 'sell'
-                "takerOrMaker": "taker",  # string, 'taker' or 'maker'
-                "price": 23000.01,  # float price in quote currency
-                "amount": 1,  # amount of base currency
-                "cost": 23000.01,  # total cost, `price * amount`,
-                "fee": {  # provided by exchange or calculated by ccxt
-                    "cost": 0.002,  # float
-                    "currency": "BTC",  # usually base currency for buys, quote currency for sells
-                    "rate": 0.002,  # the fee rate (if available)
-                },
-            },
-            # Fiat Sell
-            {
-                "info": {"sample": "data"},  # the original decoded JSON as is
-                "id": "12345-67890:09876/54321",  # string trade id
-                "timestamp": 1502962950000,  # Unix timestamp in milliseconds
-                "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
-                "symbol": "BTC/GBP",  # symbol
-                "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
-                "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
-                "side": "sell",  # direction of the trade, 'buy' or 'sell'
-                "takerOrMaker": "taker",  # string, 'taker' or 'maker'
-                "price": 23000.01,  # float price in quote currency
-                "amount": 1,  # amount of base currency
-                "cost": 23000.01,  # total cost, `price * amount`,
-                "fee": {  # provided by exchange or calculated by ccxt
-                    "cost": 40,  # float
-                    "currency": "GBP",  # usually base currency for buys, quote currency for sells
-                    "rate": 0.002,  # the fee rate (if available)
-                },
-            },
-        ]
+        # itertools.chain / repeat allows us to return one value once, and empty values after that
+        mocker.patch.object(client, "fetch_my_trades").side_effect = chain(
+            [
+                [
+                    # Trade using BNB for fee payment
+                    {
+                        "info": {"sample": "data"},  # the original decoded JSON as is
+                        "id": "12345-67890:09876/54321",  # string trade id
+                        "timestamp": 1502962946000,  # Unix timestamp in milliseconds
+                        "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
+                        "symbol": "ETH/BTC",  # symbol
+                        "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
+                        "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
+                        "side": "buy",  # direction of the trade, 'buy' or 'sell'
+                        "takerOrMaker": "taker",  # string, 'taker' or 'maker'
+                        "price": 0.06917684,  # float price in quote currency
+                        "amount": 1.5,  # amount of base currency
+                        "cost": 0.10376526,  # total cost, `price * amount`,
+                        "fee": {  # provided by exchange or calculated by ccxt
+                            "cost": 0.0015,  # float
+                            "currency": "BNB",  # usually base currency for buys, quote currency for sells
+                            "rate": 0.002,  # the fee rate (if available)
+                        },
+                    },
+                    # Trade using the quote currency for fee payment
+                    {
+                        "info": {"sample": "data"},  # the original decoded JSON as is
+                        "id": "12345-67890:09876/54321",  # string trade id
+                        "timestamp": 1502962947000,  # Unix timestamp in milliseconds
+                        "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
+                        "symbol": "ETH/BTC",  # symbol
+                        "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
+                        "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
+                        "side": "buy",  # direction of the trade, 'buy' or 'sell'
+                        "takerOrMaker": "taker",  # string, 'taker' or 'maker'
+                        "price": 0.06917684,  # float price in quote currency
+                        "amount": 3,  # amount of base currency
+                        "cost": 0.20753052,  # total cost, `price * amount`,
+                        "fee": {  # provided by exchange or calculated by ccxt
+                            "cost": 0.0015,  # float
+                            "currency": "ETH",  # usually base currency for buys, quote currency for sells
+                            "rate": 0.002,  # the fee rate (if available)
+                        },
+                    },
+                    # Sell trade using the quote currency for fee payment
+                    {
+                        "info": {"sample": "data"},  # the original decoded JSON as is
+                        "id": "12345-67890:09876/54321",  # string trade id
+                        "timestamp": 1502962948000,  # Unix timestamp in milliseconds
+                        "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
+                        "symbol": "ETH/BTC",  # symbol
+                        "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
+                        "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
+                        "side": "sell",  # direction of the trade, 'buy' or 'sell'
+                        "takerOrMaker": "taker",  # string, 'taker' or 'maker'
+                        "price": 0.06917684,  # float price in quote currency
+                        "amount": 6,  # amount of base currency
+                        "cost": 0.41506104,  # total cost, `price * amount`,
+                        "fee": {  # provided by exchange or calculated by ccxt
+                            "cost": 0.0015,  # float
+                            "currency": "BTC",  # usually base currency for buys, quote currency for sells
+                            "rate": 0.002,  # the fee rate (if available)
+                        },
+                    },
+                    # Fiat Buy
+                    {
+                        "info": {"sample": "data"},  # the original decoded JSON as is
+                        "id": "12345-67890:09876/54321",  # string trade id
+                        "timestamp": 1502962949000,  # Unix timestamp in milliseconds
+                        "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
+                        "symbol": "BTC/GBP",  # symbol
+                        "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
+                        "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
+                        "side": "buy",  # direction of the trade, 'buy' or 'sell'
+                        "takerOrMaker": "taker",  # string, 'taker' or 'maker'
+                        "price": 23000.01,  # float price in quote currency
+                        "amount": 1,  # amount of base currency
+                        "cost": 23000.01,  # total cost, `price * amount`,
+                        "fee": {  # provided by exchange or calculated by ccxt
+                            "cost": 0.002,  # float
+                            "currency": "BTC",  # usually base currency for buys, quote currency for sells
+                            "rate": 0.002,  # the fee rate (if available)
+                        },
+                    },
+                    # Fiat Sell
+                    {
+                        "info": {"sample": "data"},  # the original decoded JSON as is
+                        "id": "12345-67890:09876/54321",  # string trade id
+                        "timestamp": 1502962950000,  # Unix timestamp in milliseconds
+                        "datetime": "2017-08-17 12:42:48.000",  # ISO8601 datetime with milliseconds
+                        "symbol": "BTC/GBP",  # symbol
+                        "order": "12345-67890:09876/54321",  # string order id or undefined/None/null
+                        "type": "limit",  # order type, 'market', 'limit' or undefined/None/null
+                        "side": "sell",  # direction of the trade, 'buy' or 'sell'
+                        "takerOrMaker": "taker",  # string, 'taker' or 'maker'
+                        "price": 23000.01,  # float price in quote currency
+                        "amount": 1,  # amount of base currency
+                        "cost": 23000.01,  # total cost, `price * amount`,
+                        "fee": {  # provided by exchange or calculated by ccxt
+                            "cost": 40,  # float
+                            "currency": "GBP",  # usually base currency for buys, quote currency for sells
+                            "rate": 0.002,  # the fee rate (if available)
+                        },
+                    },
+                ]
+            ],
+            repeat([]),
+        )
 
         # CCXT abstracts dust trades into regular trades, so no testing is necessary
         mocker.patch.object(client, "fetch_my_dust_trades").return_value = []
