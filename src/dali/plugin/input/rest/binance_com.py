@@ -196,8 +196,12 @@ class InputPlugin(AbstractCcxtInputPlugin):
         )
 
     def get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
-        #        raise NotImplementedError("Abstract method")
-        pass
+        return DateBasedPaginationDetailSet(
+            limit=_DEPOSIT_RECORD_LIMIT,
+            exchange_start_time=self.start_time_ms,
+            markets=self.markets,
+            window=_NINETY_DAYS_IN_MS,
+        )
 
     def get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         #        raise NotImplementedError("Abstract method")
@@ -223,6 +227,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 self.__algos.append(algo[_ALGO_NAME])
 
         self._process_trades(in_transactions, out_transactions)
+        self._process_deposits(intra_transactions)
 
         result.extend(in_transactions)
         result.extend(out_transactions)

@@ -47,13 +47,16 @@ _DATE_TIME: str = "datetime"
 _DEPOSIT: str = "deposit"
 _FEE: str = "fee"
 _ID: str = "id"
+_INDICATED_AMOUNT: str = "indicatedAmount"
 _IS_FIATPAYMENT: str = "is_fiat_payment"
 _ORDER: str = "order"
 _PRICE: str = "price"
 _SELL: str = "sell"
 _SIDE: str = "side"
+_STATUS: str = "status"
 _SYMBOL: str = "symbol"
 _TIMESTAMP: str = "timestamp"
+_TYPE: str = "type"
 _TX_ID: str = "txid"  # CCXT doesn't capitalize I
 _WITHDRAWAL: str = "withdrawal"
 
@@ -91,7 +94,12 @@ class AbstractPaginationDetailSet:
 
 class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
     def __init__(
-        self, limit: Optional[int], exchange_start_time: int, markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None
+        self,
+        exchange_start_time: int,
+        limit: Optional[int] = None,
+        markets: Optional[List[str]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = None,
+        window: Optional[int] = None,
     ) -> None:
 
         super().__init__()
@@ -99,9 +107,10 @@ class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
         self.__limit: Optional[int] = limit
         self.__markets: Optional[List[str]] = markets
         self.__params: Optional[Dict[str, Union[int, str, None]]] = params
+        self.__window: Optional[int] = window
 
     def __iter__(self) -> "DateBasedPaginationDetailsIterator":
-        return DateBasedPaginationDetailsIterator(self.__limit, self.__exchange_start_time, self.__markets, self.__params)
+        return DateBasedPaginationDetailsIterator(self.__exchange_start_time, self.__limit, self.__markets, self.__params, self.__window)
 
 
 class AbstractPaginationDetailsIterator:
@@ -145,20 +154,39 @@ class AbstractPaginationDetailsIterator:
 
 class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
     def __init__(
-        self, limit: Optional[int], exchange_start_time: int, markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None
+        self,
+        exchange_start_time: int,
+        limit: Optional[int] = None,
+        markets: Optional[List[str]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = None,
+        window: Optional[int] = None,
     ) -> None:
 
         super().__init__(limit, markets, params)
         self.__end_of_data = False
         self.__since: Optional[int] = exchange_start_time
         self.__exchange_start_time: int = exchange_start_time
+        self.__now: int = int(datetime.now().timestamp()) * _MS_IN_SECOND
+        self.__window: Optional[int] = window
 
     def update_fetched_elements(self, current_results: Any) -> None:
 
-        if len(current_results):
-            # All times are inclusive
-            self.__since = current_results[len(current_results) - 1][_TIMESTAMP] + 1
-        elif self.has_more_markets():
+        end_of_market: bool = False
+
+        # Update Since if needed otherwise end_of_market
+        if self.__since is not None:
+            if len(current_results):
+                # All times are inclusive
+                self.__since = current_results[len(current_results) - 1][_TIMESTAMP] + 1
+            elif self.__window:
+                self.__since += self.__window
+
+            if self.__since > self.__now:  # type: ignore
+                end_of_market = True
+        else:
+            end_of_market = True
+
+        if end_of_market and self.has_more_markets():
             # we have reached the end of one market, now let's move on to the next
             self.__since = self.__exchange_start_time
             self.next_market()
@@ -287,6 +315,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction] = []
 
         self._process_trades(in_transactions, out_transactions)
+        self._process_deposits(intra_transactions)
 
         result.extend(in_transactions)
         result.extend(out_transactions)
@@ -295,6 +324,75 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return result
 
     ### Multiple Transaction Processing or Pagination Methods
+
+    def _process_deposits(
+        self,
+        intra_transactions: List[IntraTransaction],
+    ) -> None:
+
+        pagination_detail_set: AbstractPaginationDetailSet = self.get_process_deposits_pagination_detail_set()
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        try:
+            while True:
+                pagination_details: _PaginationDetails = next(pagination_detail_iterator)
+                deposits = self.__client.fetch_deposits(
+                    code=pagination_details.symbol,
+                    since=pagination_details.since,
+                    limit=pagination_details.limit,
+                    params=pagination_details.params,
+                )
+                # CCXT returns a standardized response from fetch_deposits. 'info' is the exchange-specific information
+                # in this case from Binance.com
+
+                # {
+                #   'info': {
+                #       'amount': '0.00999800',
+                #       'coin': 'PAXG',
+                #       'network': 'ETH',
+                #       'status': '1',
+                #       'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                #       'addressTag': '',
+                #       'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                #       'insertTime': '1599621997000',
+                #       'transferType': '0',
+                #       'confirmTimes': '12/12',
+                #       'unlockConfirm': '12/12',
+                #       'walletType': '0'
+                #   },
+                #   'id': None,
+                #   'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                #   'timestamp': 1599621997000,
+                #   'datetime': '2020-09-09T03:26:37.000Z',
+                #   'network': 'ETH',
+                #   'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                #   'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                #   'addressFrom': None,
+                #   'tag': None,
+                #   'tagTo': None,
+                #   'tagFrom': None,
+                #   'type': 'deposit',
+                #   'amount': 0.00999800,
+                #   'currency': 'PAXG',
+                #   'status': 'ok',
+                #   'updated': None,
+                #   'internal': False,
+                #   'fee': None
+                # }
+
+                pagination_detail_iterator.update_fetched_elements(deposits)
+
+                with ThreadPool(self.__thread_count) as pool:
+                    processing_result_list: List[Optional[_ProcessAccountResult]] = pool.map(self._process_transfer, deposits)
+
+                for processing_result in processing_result_list:
+                    if processing_result is None:
+                        continue
+                    if processing_result.intra_transactions:
+                        intra_transactions.extend(processing_result.intra_transactions)
+
+        except StopIteration:
+            # End of pagination details
+            pass
 
     def _process_trades(
         self,
@@ -499,7 +597,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
 
-    # def _process_deposit(self, transaction: Any, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
+    # def _process_deposit(self, transaction: Any, notes: Optional[str] = None) -> None:
+    #     in_transaction_list: List[InTransaction] = []
 
     #     amount: RP2Decimal = RP2Decimal(transaction[_INDICATED_AMOUNT])
     #     fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
@@ -525,6 +624,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     #             notes=notes,
     #         )
     #     )
+
+    #     return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
 
     # def _process_gain(self, transaction: Any, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
 
@@ -658,47 +759,53 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         return _ProcessAccountResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
 
-    # def _process_transfer(self, transaction: Any, intra_transaction_list: List[IntraTransaction]) -> None:
+    def _process_transfer(self, transaction: Any) -> _ProcessAccountResult:
+        if transaction[_STATUS] == "failed":
+            self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
+        else:
+            intra_transaction_list: List[IntraTransaction] = []
 
-    #     # This is a CCXT list must convert to string from float
-    #     amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
+            # This is a CCXT list must convert to string from float
+            amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
 
-    #     if transaction[_TYPE] == _DEPOSIT:
-    #         intra_transaction_list.append(
-    #             IntraTransaction(
-    #                 plugin=self.plugin_name(),
-    #                 unique_id=transaction[_TXID],
-    #                 raw_data=json.dumps(transaction),
-    #                 timestamp=transaction[_DATE_TIME],
-    #                 asset=transaction[_CURRENCY],
-    #                 from_exchange=Keyword.UNKNOWN.value,
-    #                 from_holder=Keyword.UNKNOWN.value,
-    #                 to_exchange=self.exchange_name(),
-    #                 to_holder=self.account_holder,
-    #                 spot_price=Keyword.UNKNOWN.value,
-    #                 crypto_sent=Keyword.UNKNOWN.value,
-    #                 crypto_received=str(amount),
-    #             )
-    #         )
-    #     elif transaction[_TYPE] == _WITHDRAWAL:
-    #         intra_transaction_list.append(
-    #             IntraTransaction(
-    #                 plugin=self.plugin_name(),
-    #                 unique_id=transaction[_TXID],
-    #                 raw_data=json.dumps(transaction),
-    #                 timestamp=transaction[_DATE_TIME],
-    #                 asset=transaction[_CURRENCY],
-    #                 from_exchange=self.exchange_name(),
-    #                 from_holder=self.account_holder,
-    #                 to_exchange=Keyword.UNKNOWN.value,
-    #                 to_holder=Keyword.UNKNOWN.value,
-    #                 spot_price=Keyword.UNKNOWN.value,
-    #                 crypto_sent=str(amount),
-    #                 crypto_received=Keyword.UNKNOWN.value,
-    #             )
-    #         )
-    #     else:
-    #         self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
+            if transaction[_TYPE] == _DEPOSIT:
+                intra_transaction_list.append(
+                    IntraTransaction(
+                        plugin=self.plugin_name(),
+                        unique_id=transaction[_TX_ID],
+                        raw_data=json.dumps(transaction),
+                        timestamp=transaction[_DATE_TIME],
+                        asset=transaction[_CURRENCY],
+                        from_exchange=Keyword.UNKNOWN.value,
+                        from_holder=Keyword.UNKNOWN.value,
+                        to_exchange=self.exchange_name(),
+                        to_holder=self.account_holder,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_sent=Keyword.UNKNOWN.value,
+                        crypto_received=str(amount),
+                    )
+                )
+            elif transaction[_TYPE] == _WITHDRAWAL:
+                intra_transaction_list.append(
+                    IntraTransaction(
+                        plugin=self.plugin_name(),
+                        unique_id=transaction[_TX_ID],
+                        raw_data=json.dumps(transaction),
+                        timestamp=transaction[_DATE_TIME],
+                        asset=transaction[_CURRENCY],
+                        from_exchange=self.exchange_name(),
+                        from_holder=self.account_holder,
+                        to_exchange=Keyword.UNKNOWN.value,
+                        to_holder=Keyword.UNKNOWN.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_sent=str(amount),
+                        crypto_received=Keyword.UNKNOWN.value,
+                    )
+                )
+            else:
+                self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
+
+        return _ProcessAccountResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)
 
     # def _process_withdrawal(self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
 
