@@ -152,7 +152,7 @@ class TestBinance:
 
         mocker.patch.object(plugin, "_process_trades").return_value = None
         # mocker.patch.object(plugin, "_process_gains").return_value = None
-        # mocker.patch.object(plugin, "_process_withdrawals").return_value = None
+        mocker.patch.object(plugin, "_process_withdrawals").return_value = None
 
         result = plugin.load()
 
@@ -319,7 +319,7 @@ class TestBinance:
         mocker.patch.object(client, "fetch_my_dust_trades").return_value = []
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         # mocker.patch.object(plugin, "_process_gains").return_value = None
-        # mocker.patch.object(plugin, "_process_withdrawals").return_value = None
+        mocker.patch.object(plugin, "_process_withdrawals").return_value = None
 
         result = plugin.load()
 
@@ -653,112 +653,113 @@ class TestBinance:
     #     assert mining_deposit.fiat_in_with_fee is None
     #     assert mining_deposit.fiat_fee is None
 
-    # def test_withdrawals(self, mocker: Any) -> None:
-    #     plugin = InputPlugin(
-    #         account_holder="tester",
-    #         api_key="a",
-    #         api_secret="b",
-    #         native_fiat="USD",
-    #     )
+    def test_withdrawals(self, mocker: Any) -> None:
+        plugin = InputPlugin(
+            account_holder="tester",
+            api_key="a",
+            api_secret="b",
+            native_fiat="USD",
+        )
 
-    #     client = plugin.client()
+        client = plugin.client
 
-    #     mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-    #     mocker.patch.object(plugin, "_InputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
-    #     mocker.patch.object(client, "fetch_withdrawals").return_value = [
-    #         {
-    #             "info": {
-    #                 "amount": "0.00999800",
-    #                 "coin": "PAXG",
-    #                 "network": "ETH",
-    #                 "status": "1",
-    #                 "address": "0x788cabe9236ce061e5a892e1a59395a81fc8d62c",
-    #                 "addressTag": "",
-    #                 "txId": "0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3",
-    #                 "insertTime": "1599621997000",
-    #                 "transferType": "0",
-    #                 "confirmTimes": "12/12",
-    #                 "unlockConfirm": "12/12",
-    #                 "walletType": "0",
-    #             },
-    #             "id": None,
-    #             "txid": "0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3",
-    #             "timestamp": 1599621997000,
-    #             "datetime": "2020-09-09T03:26:37.000Z",
-    #             "network": "ETH",
-    #             "address": "0x788cabe9236ce061e5a892e1a59395a81fc8d62c",
-    #             "addressTo": "0x788cabe9236ce061e5a892e1a59395a81fc8d62c",
-    #             "addressFrom": None,
-    #             "tag": None,
-    #             "tagTo": None,
-    #             "tagFrom": None,
-    #             "type": "withdrawal",
-    #             "amount": 0.00999800,
-    #             "currency": "PAXG",
-    #             "status": "ok",
-    #             "updated": None,
-    #             "internal": False,
-    #             "fee": None,
-    #         }
-    #     ]
+        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(client, "fetch_withdrawals").return_value = [
+            {
+                "info": {
+                    "amount": "0.00999800",
+                    "coin": "PAXG",
+                    "network": "ETH",
+                    "status": "1",
+                    "address": "0x788cabe9236ce061e5a892e1a59395a81fc8d62c",
+                    "addressTag": "",
+                    "txId": "0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3",
+                    "insertTime": "1599621997000",
+                    "transferType": "0",
+                    "confirmTimes": "12/12",
+                    "unlockConfirm": "12/12",
+                    "walletType": "0",
+                },
+                "id": None,
+                "txid": "0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3",
+                "timestamp": 1599621997000,
+                "datetime": "2020-09-09T03:26:37.000Z",
+                "network": "ETH",
+                "address": "0x788cabe9236ce061e5a892e1a59395a81fc8d62c",
+                "addressTo": "0x788cabe9236ce061e5a892e1a59395a81fc8d62c",
+                "addressFrom": None,
+                "tag": None,
+                "tagTo": None,
+                "tagFrom": None,
+                "type": "withdrawal",
+                "amount": 0.00999800,
+                "currency": "PAXG",
+                "status": "ok",
+                "updated": None,
+                "internal": False,
+                "fee": None,
+            }
+        ]
 
-    #     mocker.patch.object(client, "sapiGetFiatOrders").return_value = {
-    #         "code": "000000",
-    #         "message": "success",
-    #         "data": [
-    #             {
-    #                 "orderNo": "25ced37075c1470ba8939d0df2316e23",
-    #                 "fiatCurrency": "EUR",
-    #                 "indicatedAmount": "15.00",
-    #                 "amount": "14.80",
-    #                 "totalFee": "0.20",
-    #                 "method": "card",
-    #                 "status": "Completed",
-    #                 "createTime": 1627501026000,
-    #                 "updateTime": 1627501027000,
-    #             },
-    #             {
-    #                 "orderNo": "25ced37075c1470ba8939d0df2316e24",
-    #                 "fiatCurrency": "EUR",
-    #                 "indicatedAmount": "30.00",
-    #                 "amount": "29.60",
-    #                 "totalFee": "0.40",
-    #                 "method": "card",
-    #                 "status": "Failed",
-    #                 "createTime": 1627501028000,
-    #                 "updateTime": 1627501029000,
-    #             },
-    #         ],
-    #         "total": 2,
-    #         "success": True,
-    #     }
+        mocker.patch.object(client, "sapiGetFiatOrders").return_value = {
+            "code": "000000",
+            "message": "success",
+            "data": [
+                {
+                    "orderNo": "25ced37075c1470ba8939d0df2316e23",
+                    "fiatCurrency": "EUR",
+                    "indicatedAmount": "15.00",
+                    "amount": "14.80",
+                    "totalFee": "0.20",
+                    "method": "card",
+                    "status": "Completed",
+                    "createTime": 1627501026000,
+                    "updateTime": 1627501027000,
+                },
+                {
+                    "orderNo": "25ced37075c1470ba8939d0df2316e24",
+                    "fiatCurrency": "EUR",
+                    "indicatedAmount": "30.00",
+                    "amount": "29.60",
+                    "totalFee": "0.40",
+                    "method": "card",
+                    "status": "Failed",
+                    "createTime": 1627501028000,
+                    "updateTime": 1627501029000,
+                },
+            ],
+            "total": 2,
+            "success": True,
+        }
 
-    #     mocker.patch.object(plugin, "_process_trades").return_value = None
-    #     mocker.patch.object(plugin, "_process_gains").return_value = None
-    #     mocker.patch.object(plugin, "_process_deposits").return_value = None
+        mocker.patch.object(plugin, "_process_trades").return_value = None
+        # mocker.patch.object(plugin, "_process_gains").return_value = None
+        mocker.patch.object(plugin, "_process_deposits").return_value = None
 
-    #     result = plugin.load()
+        result = plugin.load()
 
-    #     # 1 crypto Transfer +
-    #     # 1 fiat withdrawal = 2
-    #     assert len(result) == 2
+        # 1 crypto Transfer +
+        # 1 fiat withdrawal = 2
+        # assert len(result) == 2
+        assert len(result) == 1
 
-    #     crypto_withdrawal_transaction: IntraTransaction = result[1]  # type: ignore
-    #     fiat_withdrawal: OutTransaction = result[0]  # type: ignore
+        crypto_withdrawal_transaction: IntraTransaction = result[0]  # type: ignore
+        # fiat_withdrawal: OutTransaction = result[0]  # type: ignore
 
-    #     assert fiat_withdrawal.asset == "EUR"
-    #     assert int(parser.parse(fiat_withdrawal.timestamp).timestamp()) * 1000 == 1627501026000
-    #     assert fiat_withdrawal.transaction_type == Keyword.SELL.value.capitalize()
-    #     assert RP2Decimal(fiat_withdrawal.spot_price) == RP2Decimal("1")
-    #     assert RP2Decimal(fiat_withdrawal.crypto_out_no_fee) == RP2Decimal("15.00")
-    #     assert RP2Decimal(str(fiat_withdrawal.crypto_fee)) == RP2Decimal("0.20")
-    #     assert fiat_withdrawal.fiat_out_no_fee is None
-    #     assert fiat_withdrawal.fiat_fee is None
-    #     assert fiat_withdrawal.fiat_ticker == "EUR"
+        # assert fiat_withdrawal.asset == "EUR"
+        # assert int(parser.parse(fiat_withdrawal.timestamp).timestamp()) * 1000 == 1627501026000
+        # assert fiat_withdrawal.transaction_type == Keyword.SELL.value.capitalize()
+        # assert RP2Decimal(fiat_withdrawal.spot_price) == RP2Decimal("1")
+        # assert RP2Decimal(fiat_withdrawal.crypto_out_no_fee) == RP2Decimal("15.00")
+        # assert RP2Decimal(str(fiat_withdrawal.crypto_fee)) == RP2Decimal("0.20")
+        # assert fiat_withdrawal.fiat_out_no_fee is None
+        # assert fiat_withdrawal.fiat_fee is None
+        # assert fiat_withdrawal.fiat_ticker == "EUR"
 
-    #     assert crypto_withdrawal_transaction.asset == "PAXG"
-    #     assert int(parser.parse(crypto_withdrawal_transaction.timestamp).timestamp()) * 1000 == 1599621997000
-    #     assert crypto_withdrawal_transaction.to_exchange == Keyword.UNKNOWN.value
-    #     assert crypto_withdrawal_transaction.from_exchange == "Binance.com"
-    #     assert crypto_withdrawal_transaction.crypto_received == Keyword.UNKNOWN.value
-    #     assert RP2Decimal(crypto_withdrawal_transaction.crypto_sent) == RP2Decimal("0.00999800")
+        assert crypto_withdrawal_transaction.asset == "PAXG"
+        assert int(parser.parse(crypto_withdrawal_transaction.timestamp).timestamp()) * 1000 == 1599621997000
+        assert crypto_withdrawal_transaction.to_exchange == Keyword.UNKNOWN.value
+        assert crypto_withdrawal_transaction.from_exchange == "Binance.com"
+        assert crypto_withdrawal_transaction.crypto_received == Keyword.UNKNOWN.value
+        assert RP2Decimal(crypto_withdrawal_transaction.crypto_sent) == RP2Decimal("0.00999800")
