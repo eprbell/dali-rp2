@@ -314,8 +314,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transactions: List[OutTransaction] = []
         intra_transactions: List[IntraTransaction] = []
 
-        self._process_trades(in_transactions, out_transactions)
         self._process_deposits(intra_transactions)
+        self._process_trades(in_transactions, out_transactions)
+        self._process_withdrawals(intra_transactions)
 
         result.extend(in_transactions)
         result.extend(out_transactions)
@@ -449,6 +450,71 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                         in_transactions.extend(processing_result.in_transactions)
                     if processing_result.out_transactions:
                         out_transactions.extend(processing_result.out_transactions)
+
+        except StopIteration:
+            # End of pagination details
+            pass
+
+    def _process_withdrawals(
+        self,
+        intra_transactions: List[IntraTransaction],
+    ) -> None:
+
+        pagination_detail_set: AbstractPaginationDetailSet = self.get_process_withdrawals_pagination_detail_set()
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        try:
+            while True:
+                pagination_details: _PaginationDetails = next(pagination_detail_iterator)
+                withdrawals: Optional[List[Dict[str, Union[str, float]]]] = self.__client.fetch_withdrawals(
+                    code=pagination_details.symbol,
+                    since=pagination_details.since,
+                    limit=pagination_details.limit,
+                    params=pagination_details.params,
+                )
+                # {
+                #   'info': {
+                #       'amount': '0.00999800',
+                #       'coin': 'PAXG',
+                #       'network': 'ETH',
+                #       'status': '1',
+                #       'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                #       'addressTag': '',
+                #       'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                #       'insertTime': '1599621997000',
+                #       'transferType': '0',
+                #       'confirmTimes': '12/12',
+                #       'unlockConfirm': '12/12',
+                #       'walletType': '0'
+                #   },
+                #   'id': None,
+                #   'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                #   'timestamp': 1599621997000,
+                #   'datetime': '2020-09-09T03:26:37.000Z',
+                #   'network': 'ETH',
+                #   'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                #   'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                #   'addressFrom': None,
+                #   'tag': None,
+                #   'tagTo': None,
+                #   'tagFrom': None,
+                #   'type': 'withdrawal',
+                #   'amount': 0.00999800,
+                #   'currency': 'PAXG',
+                #   'status': 'ok',
+                #   'updated': None,
+                #   'internal': False,
+                #   'fee': None
+                # }
+                pagination_detail_iterator.update_fetched_elements(withdrawals)
+
+                with ThreadPool(self.__thread_count) as pool:
+                    processing_result_list: List[Optional[_ProcessAccountResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
+
+                for processing_result in processing_result_list:
+                    if processing_result is None:
+                        continue
+                    if processing_result.intra_transactions:
+                        intra_transactions.extend(processing_result.intra_transactions)
 
         except StopIteration:
             # End of pagination details
