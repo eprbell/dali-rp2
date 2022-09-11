@@ -66,6 +66,8 @@ _THIRTY_DAYS_IN_MS: int = 2592000000
 _ONE_DAY_IN_MS: int = 86400000
 _MS_IN_SECOND: int = 1000
 
+_DEFAULT_WINDOW: int = _THIRTY_DAYS_IN_MS
+
 
 class _PaginationDetails(NamedTuple):
     symbol: Optional[str]
@@ -110,7 +112,47 @@ class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
         self.__window: Optional[int] = window
 
     def __iter__(self) -> "DateBasedPaginationDetailsIterator":
-        return DateBasedPaginationDetailsIterator(self.__exchange_start_time, self.__limit, self.__markets, self.__params, self.__window)
+        return DateBasedPaginationDetailsIterator(
+            self.__exchange_start_time,
+            self.__limit,
+            self.__markets,
+            self.__params,
+            self.__window,
+        )
+
+    @property
+    def window(self) -> int:
+        if self.__window:
+            return self.__window
+        return _DEFAULT_WINDOW
+
+
+class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
+    def __init__(
+        self,
+        exchange_start_time: int,
+        start_time_key: str,
+        end_time_key: str,
+        window: int,
+        limit: Optional[int] = None,
+        markets: Optional[List[str]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = None,
+    ) -> None:
+
+        super().__init__(exchange_start_time, limit, markets, params, window)
+        self.__start_time_key: str = start_time_key
+        self.__end_time_key: str = end_time_key
+
+    def __iter__(self) -> "CustomDateBasedPaginationDetailsIterator":
+        return CustomDateBasedPaginationDetailsIterator(
+            self.__exchange_start_time,
+            self.__start_time_key,
+            self.__end_time_key,
+            self.window,
+            self.__limit,
+            self.__markets,
+            self.__params,
+        )
 
 
 class AbstractPaginationDetailsIterator:
@@ -204,12 +246,50 @@ class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
         raise StopIteration(self)
 
     @property
-    def exchange_start_time(self) -> Optional[int]:
+    def window(self) -> int:
+        if self.__window:
+            return self.__window
+        return _DEFAULT_WINDOW
+
+
+class CustomDateBasedPaginationDetailsIterator(DateBasedPaginationDetailsIterator):
+    def __init__(
+        self,
+        exchange_start_time: int,
+        start_time_key: str,
+        end_time_key: str,
+        window: int,
+        limit: Optional[int] = None,
+        markets: Optional[List[str]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = None,
+    ) -> None:
+
+        super().__init__(exchange_start_time, limit, markets, params, window)
+        self.__start_time_key: str = start_time_key
+        self.__end_time_key: str = end_time_key
+
+    def __next__(self) -> _PaginationDetails:
+
+        while not self.__end_of_data:
+            base_details: _PaginationDetails = super().__next__()
+            end_of_window: int = self.since + self.window
+            if base_details.params:
+                base_details.params[self.__start_time_key] = self.since
+                base_details.params[self.__end_time_key] = end_of_window
+            else:
+                base_details._replace(params={self.__start_time_key: self.since, self.__end_time_key: end_of_window})
+            return base_details
+        raise StopIteration(self)
+
+    @property
+    def exchange_start_time(self) -> int:
         return self.__exchange_start_time
 
     @property
-    def since(self) -> Optional[int]:
-        return self.__since
+    def since(self) -> int:
+        if self.__since:
+            return self.__since
+        return self.exchange_start_time
 
     @since.setter
     def since(self, value: int) -> None:
@@ -233,16 +313,22 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         self,
         account_holder: str,
         exchange_start_time: datetime,
-        native_fiat: Optional[str] = "USD",
-        thread_count: Optional[int] = __DEFAULT_THREAD_COUNT,
+        native_fiat: Optional[str],
+        thread_count: Optional[int],
     ) -> None:
 
         super().__init__(account_holder, native_fiat)
-        self.__logger: logging.Logger = create_logger(f"{self.exchange_name}/{self.account_holder}")
+        self.__logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
         self.__cache_key: str = f"{str(self.exchange_name).lower()}-{account_holder}"
         self.__client: Exchange = self.initialize_client()
-        self.__native_fiat: Optional[str] = native_fiat
-        self.__thread_count: Optional[int] = thread_count
+        if native_fiat:
+            self.__native_fiat: str = native_fiat
+        else:
+            self.__native_fiat = "USD"
+        if thread_count:
+            self.__thread_count: int = thread_count
+        else:
+            self.__thread_count = self.__DEFAULT_THREAD_COUNT
         self.__markets: List[str] = []
         self.__start_time: datetime = exchange_start_time
         self.__start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
@@ -252,9 +338,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
-
-    def logger(self) -> logging.Logger:
-        raise NotImplementedError("Abstract method")
 
     def initialize_client(self) -> Exchange:
         raise NotImplementedError("Abstract method")
@@ -277,6 +360,10 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return self.__client
 
     @property
+    def logger(self) -> logging.Logger:
+        return self.__logger
+
+    @property
     def markets(self) -> List[str]:
 
         if self.__markets:
@@ -291,6 +378,10 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     @property
     def start_time_ms(self) -> int:
         return self.__start_time_ms
+
+    @property
+    def thread_count(self) -> int:
+        return self.__thread_count
 
     @staticmethod
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
@@ -315,8 +406,10 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction] = []
 
         self._process_deposits(intra_transactions)
+        self._process_gains(in_transactions, out_transactions)
         self._process_trades(in_transactions, out_transactions)
         self._process_withdrawals(intra_transactions)
+        self._process_implicit_api(in_transactions, out_transactions, intra_transactions)
 
         result.extend(in_transactions)
         result.extend(out_transactions)
@@ -394,6 +487,21 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         except StopIteration:
             # End of pagination details
             pass
+
+    def _process_gains(
+        self,
+        in_transactions: List[InTransaction],
+        out_transactions: List[OutTransaction],
+    ) -> None:
+        raise NotImplementedError("Abstract method")
+
+    def _process_implicit_api(
+        self,
+        in_transactions: List[InTransaction],
+        out_transactions: List[OutTransaction],
+        intra_transactions: List[IntraTransaction],
+    ) -> None:
+        raise NotImplementedError("Abstract method")
 
     def _process_trades(
         self,
@@ -536,30 +644,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
 
-        # TODO not CCXT standard
-        # If _IS_FIATPAYMENT in transaction: - TODO This is part of the implicit API and will need to
-        # be converted to CCXT in order to get processed.
-        # in_transaction_list.append(
-        #     InTransaction(
-        #         plugin=self.plugin_name(),
-        #         unique_id=transaction[_ORDER_NO],
-        #         raw_data=json.dumps(transaction),
-        #         timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
-        #         asset=transaction[_CRYPTOCURRENCY],
-        #         exchange=self.exchange_name(),
-        #         holder=self.account_holder,
-        #         transaction_type=Keyword.BUY.value,
-        #         spot_price=str(RP2Decimal(transaction[_PRICE])),
-        #         crypto_in=transaction[_OBTAIN_AMOUNT],
-        #         crypto_fee=None,
-        #         fiat_in_no_fee=str(RP2Decimal(transaction[_SOURCEAMOUNT]) - RP2Decimal(transaction[_TOTALFEE])),
-        #         fiat_in_with_fee=str(transaction[_SOURCEAMOUNT]),
-        #         fiat_fee=str(RP2Decimal(transaction[_TOTALFEE])),
-        #         fiat_ticker=transaction[_FIAT_CURRENCY],
-        #         notes=(f"Buy transaction for fiat payment orderNo - " f"{transaction[_ORDER_NO]}"),
-        #     )
-        # )
-
         trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
         if transaction[_SIDE] == _BUY:
             out_asset = trade.quote_asset
@@ -581,7 +665,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             transaction_fee = transaction[_FEE][_COST]
 
             # Users can use other crypto assets to pay for trades
-            # CCXT standard format
             if transaction[_FEE][_CURRENCY] != out_asset and float(transaction_fee) > 0:
                 out_transaction_list.append(
                     OutTransaction(
@@ -615,7 +698,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 transaction_notes = f"Fiat sell of {trade.base_asset} into {trade.quote_asset}"
                 fiat_in_no_fee = fiat_in_with_fee - fiat_fee
 
-            # CCXT standard format
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.plugin_name(),
@@ -640,7 +722,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         else:
             transaction_notes = f"Buy side of conversion from " f"{conversion_info}" f"({out_asset} out-transaction unique id: {transaction[_ID]}"
 
-            # CCXT standard format
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.plugin_name(),
@@ -774,7 +855,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
             spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
 
-            # CCXT standard format
             out_transaction_list.append(
                 OutTransaction(
                     plugin=self.plugin_name(),
@@ -798,7 +878,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         else:
             # CCXT does not report the value of the transaction in fiat
-            # CCXT standard format
             out_transaction_list.append(
                 OutTransaction(
                     plugin=self.plugin_name(),

@@ -14,7 +14,7 @@
 
 import datetime
 from itertools import chain, repeat
-from typing import Any
+from typing import Any, Dict, List
 
 from ccxt import Exchange
 from dateutil import parser
@@ -151,8 +151,9 @@ class TestBinance:
         }
 
         mocker.patch.object(plugin, "_process_trades").return_value = None
-        # mocker.patch.object(plugin, "_process_gains").return_value = None
+        mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
+        mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
         result = plugin.load()
 
@@ -318,8 +319,9 @@ class TestBinance:
         # CCXT abstracts dust trades into regular trades, so no testing is necessary
         mocker.patch.object(client, "fetch_my_dust_trades").return_value = []
         mocker.patch.object(plugin, "_process_deposits").return_value = None
-        # mocker.patch.object(plugin, "_process_gains").return_value = None
+        mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
+        mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
         result = plugin.load()
 
@@ -421,7 +423,6 @@ class TestBinance:
         assert sell_conversion_order_in.fiat_in_with_fee is None
         assert sell_conversion_order_in.fiat_fee is None
 
-        print(buy_fiat_order_out)
         # Fiat buy with base asset as a fee
         assert buy_fiat_order_out.asset == "GBP"
         assert int(parser.parse(buy_fiat_order_out.timestamp).timestamp()) * 1000 == 1502962949000
@@ -466,192 +467,193 @@ class TestBinance:
         assert sell_fiat_order_in.fiat_fee is None
         assert sell_fiat_order_in.fiat_ticker == "GBP"
 
-    # def test_gains(self, mocker: Any) -> None:
-    #     plugin = InputPlugin(
-    #         account_holder="tester",
-    #         api_key="a",
-    #         api_secret="b",
-    #         username="user",
-    #         native_fiat="USD",
-    #     )
+    def test_gains(self, mocker: Any) -> None:
+        plugin = InputPlugin(
+            account_holder="tester",
+            api_key="a",
+            api_secret="b",
+            username="user",
+            native_fiat="USD",
+        )
 
-    #     client = plugin.client()
+        client: Exchange = plugin.client
 
-    #     mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-    #     mocker.patch.object(client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
-    #     mocker.patch.object(plugin, "_InputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
-    #     mocker.patch.object(client, "sapiGetAssetAssetDividend").return_value = {
-    #         "rows": [
-    #             {"id": 1637366104, "amount": "0.00001600", "asset": "BETH", "divTime": 1563189166000, "enInfo": "ETH 2.0 Staking", "tranId": 2968885920},
-    #             {"id": 1631750237, "amount": "0.51206985", "asset": "BUSD", "divTime": 1563189165000, "enInfo": "Flexible Savings", "tranId": 2968885920},
-    #         ],
-    #         "total": 2,
-    #     }
+        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(client, "sapiGetAssetAssetDividend").return_value = {
+            "rows": [
+                {"id": 1637366104, "amount": "0.00001600", "asset": "BETH", "divTime": 1563189166000, "enInfo": "ETH 2.0 Staking", "tranId": 2968885920},
+                {"id": 1631750237, "amount": "0.51206985", "asset": "BUSD", "divTime": 1563189165000, "enInfo": "Flexible Savings", "tranId": 2968885920},
+            ],
+            "total": 2,
+        }
 
-    #     # Only mining type 0 transactions are supported
-    #     mocker.patch.object(client, "sapiGetMiningPaymentList").return_value = {
-    #         "code": 0,
-    #         "msg": "",
-    #         "data": {
-    #             "accountProfits": [
-    #                 {
-    #                     "time": 1586188800000,  # Mining date
-    #                     "type": "31",  # 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,
-    #                     # 32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
-    #                     "hashTransfer": None,  # Transferred Hashrate
-    #                     "transferAmount": None,  # Transferred Income
-    #                     "dayHashRate": 129129903378244,  # Daily Hashrate
-    #                     "profitAmount": 8.6083060304,  # Earnings Amount
-    #                     "coinName": "BTC",  # Coin Type
-    #                     "status": "2",  # Status：0:Unpaid， 1:Paying  2：Paid
-    #                 },
-    #                 {
-    #                     "time": 1607529600000,
-    #                     "coinName": "BTC",
-    #                     "type": "0",  # String
-    #                     "dayHashRate": 9942053925926,
-    #                     "profitAmount": 0.85426469,
-    #                     "hashTransfer": 200000000000,
-    #                     "transferAmount": 0.02180958,
-    #                     "status": "2",
-    #                 },
-    #             ],
-    #             "totalNum": 2,  # Total Rows
-    #             "pageSize": 20,  # Rows per page
-    #         },
-    #     }
+        # Only mining type 0 transactions are supported
+        mocker.patch.object(client, "sapiGetMiningPaymentList").return_value = {
+            "code": 0,
+            "msg": "",
+            "data": {
+                "accountProfits": [
+                    {
+                        "time": 1586188800000,  # Mining date
+                        "type": "31",  # 0:Mining Wallet,5:Mining Address,7:Pool Savings,8:Transferred,31:Income Transfer ,
+                        # 32:Hashrate Resale-Mining Wallet 33:Hashrate Resale-Pool Savings
+                        "hashTransfer": None,  # Transferred Hashrate
+                        "transferAmount": None,  # Transferred Income
+                        "dayHashRate": 129129903378244,  # Daily Hashrate
+                        "profitAmount": 8.6083060304,  # Earnings Amount
+                        "coinName": "BTC",  # Coin Type
+                        "status": "2",  # Status：0:Unpaid， 1:Paying  2：Paid
+                    },
+                    {
+                        "time": 1607529600000,
+                        "coinName": "BTC",
+                        "type": "0",  # String
+                        "dayHashRate": 9942053925926,
+                        "profitAmount": 0.85426469,
+                        "hashTransfer": 200000000000,
+                        "transferAmount": 0.02180958,
+                        "status": "2",
+                    },
+                ],
+                "totalNum": 2,  # Total Rows
+                "pageSize": 20,  # Rows per page
+            },
+        }
 
-    #     def penalized_locked_staking(params: Dict[str, str]) -> List[Dict[str, str]]:
-    #         # pylint: disable=unused-argument
-    #         result: List[Dict[str, str]] = []
+        def penalized_locked_staking(params: Dict[str, str]) -> List[Dict[str, str]]:
+            # pylint: disable=unused-argument
+            result: List[Dict[str, str]] = []
 
-    #         if params["txnType"] == "SUBSCRIPTION":
-    #             result = [
-    #                 {
-    #                     "time": str(_NORMAL_SUBSCRIPTION_TIME),
-    #                     "asset": "BTC",
-    #                     "amount": "1",
-    #                     "lockPeriod": "10",
-    #                     "type": "NORMAL",
-    #                     "status": "SUCCESS",
-    #                 },
-    #                 {
-    #                     "time": str(_EARLY_REDEEM_SUBSCRIPTION_TIME),
-    #                     "asset": "BTC",
-    #                     "amount": "1",
-    #                     "lockPeriod": "10",
-    #                     "type": "NORMAL",
-    #                     "status": "SUCCESS",
-    #                 },
-    #             ]
+            if params["txnType"] == "SUBSCRIPTION":
+                result = [
+                    {
+                        "time": str(_NORMAL_SUBSCRIPTION_TIME),
+                        "asset": "BTC",
+                        "amount": "1",
+                        "lockPeriod": "10",
+                        "type": "NORMAL",
+                        "status": "SUCCESS",
+                    },
+                    {
+                        "time": str(_EARLY_REDEEM_SUBSCRIPTION_TIME),
+                        "asset": "BTC",
+                        "amount": "1",
+                        "lockPeriod": "10",
+                        "type": "NORMAL",
+                        "status": "SUCCESS",
+                    },
+                ]
 
-    #         elif params["txnType"] == "REDEMPTION":
-    #             result = [
-    #                 {
-    #                     "positionId": "12345",
-    #                     "time": str(_NORMAL_SUBSCRIPTION_TIME + _MS_IN_DAY * 10 + _MS_IN_HOUR * 12),  # valid redemption time
-    #                     "asset": "BTC",
-    #                     "amount": "1",
-    #                     "deliverDate": str(_NORMAL_SUBSCRIPTION_TIME + _MS_IN_DAY * 10 + _MS_IN_HOUR * 13),  # Just needs to be later
-    #                     "status": "PAID",
-    #                 },
-    #                 {
-    #                     "positionId": "12346",
-    #                     "time": str(_EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_DAY * 5 + _MS_IN_HOUR * 12),  # invalid redemption time (6 days short)
-    #                     "asset": "BTC",
-    #                     "amount": "0.95",
-    #                     "deliverDate": str(_EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_DAY * 5 + _MS_IN_HOUR * 13),  # Just needs to be later
-    #                     "status": "PAID",
-    #                 },
-    #             ]
-    #         elif params["txnType"] == "INTEREST":
-    #             normal_interest_start: int = _NORMAL_SUBSCRIPTION_TIME + _MS_IN_HOUR * 6
-    #             early_redem_interest_start: int = _EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_HOUR * 6
-    #             for i in range(1, 11):
-    #                 result.append(
-    #                     {
-    #                         "positionId": "12345",
-    #                         "time": str(normal_interest_start + _MS_IN_DAY * i),
-    #                         "asset": "BTC",
-    #                         "amount": "0.01",
-    #                         "status": "SUCCESS",
-    #                     }
-    #                 )
+            elif params["txnType"] == "REDEMPTION":
+                result = [
+                    {
+                        "positionId": "12345",
+                        "time": str(_NORMAL_SUBSCRIPTION_TIME + _MS_IN_DAY * 10 + _MS_IN_HOUR * 12),  # valid redemption time
+                        "asset": "BTC",
+                        "amount": "1",
+                        "deliverDate": str(_NORMAL_SUBSCRIPTION_TIME + _MS_IN_DAY * 10 + _MS_IN_HOUR * 13),  # Just needs to be later
+                        "status": "PAID",
+                    },
+                    {
+                        "positionId": "12346",
+                        "time": str(_EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_DAY * 5 + _MS_IN_HOUR * 12),  # invalid redemption time (6 days short)
+                        "asset": "BTC",
+                        "amount": "0.95",
+                        "deliverDate": str(_EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_DAY * 5 + _MS_IN_HOUR * 13),  # Just needs to be later
+                        "status": "PAID",
+                    },
+                ]
+            elif params["txnType"] == "INTEREST":
+                normal_interest_start: int = _NORMAL_SUBSCRIPTION_TIME + _MS_IN_HOUR * 6
+                early_redem_interest_start: int = _EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_HOUR * 6
+                for i in range(1, 11):
+                    result.append(
+                        {
+                            "positionId": "12345",
+                            "time": str(normal_interest_start + _MS_IN_DAY * i),
+                            "asset": "BTC",
+                            "amount": "0.01",
+                            "status": "SUCCESS",
+                        }
+                    )
 
-    #                 # Early redemption doesn't get all the interest payments
-    #                 if i <= 5:
-    #                     result.append(
-    #                         {
-    #                             "positionId": "12346",
-    #                             "time": str(early_redem_interest_start + _MS_IN_DAY * i),
-    #                             "asset": "BTC",
-    #                             "amount": "0.01",
-    #                             "status": "SUCCESS",
-    #                         }
-    #                     )
+                    # Early redemption doesn't get all the interest payments
+                    if i <= 5:
+                        result.append(
+                            {
+                                "positionId": "12346",
+                                "time": str(early_redem_interest_start + _MS_IN_DAY * i),
+                                "asset": "BTC",
+                                "amount": "0.01",
+                                "status": "SUCCESS",
+                            }
+                        )
 
-    #         return result
+            return result
 
-    #     mocker.patch.object(client, "sapi_get_staking_stakingrecord").side_effect = penalized_locked_staking
+        mocker.patch.object(client, "sapi_get_staking_stakingrecord").side_effect = penalized_locked_staking
 
-    #     mocker.patch.object(plugin, "_process_deposits").return_value = None
-    #     mocker.patch.object(plugin, "_process_trades").return_value = None
-    #     mocker.patch.object(plugin, "_process_withdrawals").return_value = None
+        mocker.patch.object(plugin, "_process_deposits").return_value = None
+        mocker.patch.object(plugin, "_process_trades").return_value = None
+        mocker.patch.object(plugin, "_process_withdrawals").return_value = None
+        mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
-    #     result = plugin.load()
+        result = plugin.load()
 
-    #     # One Eth staking transaction +
-    #     # One BUSD savings transaction +
-    #     # 15 Interest transactions +
-    #     # 1 Early Redemption Penalty +
-    #     # One Mining transaction = 19
-    #     assert len(result) == 19
+        # One Eth staking transaction +
+        # One BUSD savings transaction +
+        # 15 Interest transactions +
+        # 1 Early Redemption Penalty +
+        # One Mining transaction = 19
+        assert len(result) == 19
 
-    #     eth_staking: InTransaction = result[0]  # type: ignore
-    #     busd_savings: InTransaction = result[1]  # type: ignore
-    #     early_redeem_fee: OutTransaction = result[18]  # type: ignore
-    #     mining_deposit: InTransaction = result[17]  # type: ignore
+        eth_staking: InTransaction = result[0]  # type: ignore
+        busd_savings: InTransaction = result[1]  # type: ignore
+        early_redeem_fee: OutTransaction = result[18]  # type: ignore
+        mining_deposit: InTransaction = result[17]  # type: ignore
 
-    #     # Make sure it identifies this as staking income
-    #     assert eth_staking.asset == "BETH"
-    #     assert int(parser.parse(eth_staking.timestamp).timestamp()) * 1000 == 1563189166000
-    #     assert eth_staking.transaction_type == Keyword.STAKING.value.capitalize()
-    #     assert eth_staking.spot_price == Keyword.UNKNOWN.value
-    #     assert RP2Decimal(eth_staking.crypto_in) == RP2Decimal("0.00001600")
-    #     assert eth_staking.crypto_fee is None
-    #     assert eth_staking.fiat_in_no_fee is None
-    #     assert eth_staking.fiat_in_with_fee is None
-    #     assert eth_staking.fiat_fee is None
+        # Make sure it identifies this as staking income
+        assert eth_staking.asset == "BETH"
+        assert int(parser.parse(eth_staking.timestamp).timestamp()) * 1000 == 1563189166000
+        assert eth_staking.transaction_type == Keyword.STAKING.value.capitalize()
+        assert eth_staking.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(eth_staking.crypto_in) == RP2Decimal("0.00001600")
+        assert eth_staking.crypto_fee is None
+        assert eth_staking.fiat_in_no_fee is None
+        assert eth_staking.fiat_in_with_fee is None
+        assert eth_staking.fiat_fee is None
 
-    #     assert busd_savings.asset == "BUSD"
-    #     assert int(parser.parse(busd_savings.timestamp).timestamp()) * 1000 == 1563189165000
-    #     assert busd_savings.transaction_type == Keyword.INTEREST.value.capitalize()
-    #     assert busd_savings.spot_price == Keyword.UNKNOWN.value
-    #     assert RP2Decimal(busd_savings.crypto_in) == RP2Decimal("0.51206985")
-    #     assert busd_savings.crypto_fee is None
-    #     assert busd_savings.fiat_in_no_fee is None
-    #     assert busd_savings.fiat_in_with_fee is None
-    #     assert busd_savings.fiat_fee is None
+        assert busd_savings.asset == "BUSD"
+        assert int(parser.parse(busd_savings.timestamp).timestamp()) * 1000 == 1563189165000
+        assert busd_savings.transaction_type == Keyword.INTEREST.value.capitalize()
+        assert busd_savings.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(busd_savings.crypto_in) == RP2Decimal("0.51206985")
+        assert busd_savings.crypto_fee is None
+        assert busd_savings.fiat_in_no_fee is None
+        assert busd_savings.fiat_in_with_fee is None
+        assert busd_savings.fiat_fee is None
 
-    #     assert early_redeem_fee.asset == "BTC"
-    #     assert int(parser.parse(early_redeem_fee.timestamp).timestamp()) * 1000 == _EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_DAY * 5 + _MS_IN_HOUR * 13
-    #     assert early_redeem_fee.transaction_type == Keyword.FEE.value.capitalize()
-    #     assert early_redeem_fee.spot_price == Keyword.UNKNOWN.value
-    #     assert RP2Decimal(early_redeem_fee.crypto_out_no_fee) == RP2Decimal("0")
-    #     assert RP2Decimal(str(early_redeem_fee.crypto_out_with_fee)) == RP2Decimal("0.05")
-    #     assert RP2Decimal(early_redeem_fee.crypto_fee) == RP2Decimal("0.05")
-    #     assert early_redeem_fee.fiat_out_no_fee is None
-    #     assert early_redeem_fee.fiat_fee is None
+        assert early_redeem_fee.asset == "BTC"
+        assert int(parser.parse(early_redeem_fee.timestamp).timestamp()) * 1000 == _EARLY_REDEEM_SUBSCRIPTION_TIME + _MS_IN_DAY * 5 + _MS_IN_HOUR * 13
+        assert early_redeem_fee.transaction_type == Keyword.FEE.value.capitalize()
+        assert early_redeem_fee.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(early_redeem_fee.crypto_out_no_fee) == RP2Decimal("0")
+        assert RP2Decimal(str(early_redeem_fee.crypto_out_with_fee)) == RP2Decimal("0.05")
+        assert RP2Decimal(early_redeem_fee.crypto_fee) == RP2Decimal("0.05")
+        assert early_redeem_fee.fiat_out_no_fee is None
+        assert early_redeem_fee.fiat_fee is None
 
-    #     assert mining_deposit.asset == "BTC"
-    #     assert int(parser.parse(mining_deposit.timestamp).timestamp()) * 1000 == 1607529600000
-    #     assert mining_deposit.transaction_type == Keyword.MINING.value.capitalize()
-    #     assert mining_deposit.spot_price == Keyword.UNKNOWN.value
-    #     assert RP2Decimal(mining_deposit.crypto_in) == RP2Decimal("0.85426469")
-    #     assert mining_deposit.crypto_fee is None
-    #     assert mining_deposit.fiat_in_no_fee is None
-    #     assert mining_deposit.fiat_in_with_fee is None
-    #     assert mining_deposit.fiat_fee is None
+        assert mining_deposit.asset == "BTC"
+        assert int(parser.parse(mining_deposit.timestamp).timestamp()) * 1000 == 1607529600000
+        assert mining_deposit.transaction_type == Keyword.MINING.value.capitalize()
+        assert mining_deposit.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(mining_deposit.crypto_in) == RP2Decimal("0.85426469")
+        assert mining_deposit.crypto_fee is None
+        assert mining_deposit.fiat_in_no_fee is None
+        assert mining_deposit.fiat_in_with_fee is None
+        assert mining_deposit.fiat_fee is None
 
     def test_withdrawals(self, mocker: Any) -> None:
         plugin = InputPlugin(
@@ -734,7 +736,7 @@ class TestBinance:
         }
 
         mocker.patch.object(plugin, "_process_trades").return_value = None
-        # mocker.patch.object(plugin, "_process_gains").return_value = None
+        mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_deposits").return_value = None
 
         result = plugin.load()
