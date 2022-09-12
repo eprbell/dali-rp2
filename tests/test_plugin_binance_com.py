@@ -14,7 +14,7 @@
 
 import datetime
 from itertools import chain, repeat
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from ccxt import Exchange
 from dateutil import parser
@@ -48,39 +48,6 @@ class TestBinance:
         client: Exchange = plugin.client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(client, "sapiGetFiatPayments").return_value = {
-            "code": "000000",
-            "message": "success",
-            "data": [
-                {
-                    "orderNo": "353fca443f06466db0c4dc89f94f027a",
-                    "sourceAmount": "20.0",  # Fiat trade amount
-                    "fiatCurrency": "EUR",  # Fiat token
-                    "obtainAmount": "4.462",  # Crypto trade amount
-                    "cryptoCurrency": "LUNA",  # Crypto token
-                    "totalFee": "0.2",  # Trade fee
-                    "price": "4.437472",
-                    "status": "Completed",  # Processing, Completed, Failed, Refunded
-                    "createTime": 1624529919000,
-                    "updateTime": 1624529919000,
-                },
-                {
-                    "orderNo": "353fca443f06466db0c4dc89f94f027b",
-                    "sourceAmount": "40.0",  # Fiat trade amount
-                    "fiatCurrency": "EUR",  # Fiat token
-                    "obtainAmount": "8.924",  # Crypto trade amount
-                    "cryptoCurrency": "LUNA",  # Crypto token
-                    "totalFee": "0.4",  # Trade fee
-                    "price": "4.437472",
-                    "status": "Failed",  # Processing, Completed, Failed, Refunded
-                    "createTime": 1624529920000,
-                    "updateTime": 1624529920000,
-                },
-            ],
-            "total": 2,
-            "success": True,
-        }
-
         mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_deposits").return_value = [
             {
@@ -119,37 +86,6 @@ class TestBinance:
             }
         ]
 
-        mocker.patch.object(client, "sapiGetFiatOrders").return_value = {
-            "code": "000000",
-            "message": "success",
-            "data": [
-                {
-                    "orderNo": "25ced37075c1470ba8939d0df2316e23",
-                    "fiatCurrency": "EUR",
-                    "indicatedAmount": "15.00",
-                    "amount": "14.80",
-                    "totalFee": "0.20",
-                    "method": "card",
-                    "status": "Completed",
-                    "createTime": 1627501026000,
-                    "updateTime": 1627501027000,
-                },
-                {
-                    "orderNo": "25ced37075c1470ba8939d0df2316e24",
-                    "fiatCurrency": "EUR",
-                    "indicatedAmount": "30.00",
-                    "amount": "29.60",
-                    "totalFee": "0.40",
-                    "method": "card",
-                    "status": "Failed",
-                    "createTime": 1627501028000,
-                    "updateTime": 1627501029000,
-                },
-            ],
-            "total": 2,
-            "success": True,
-        }
-
         mocker.patch.object(plugin, "_process_trades").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
@@ -157,26 +93,10 @@ class TestBinance:
 
         result = plugin.load()
 
-        # 1 completed Fiat Payment +
-        # 1 crypto Transfer +
-        # 1 fiat deposit = 3
-        # assert len(result) == 3
+        # 1 crypto Transfer
         assert len(result) == 1
 
-        # fiat_in_transaction: InTransaction = result[0]  # type: ignore
         crypto_deposit_transaction: IntraTransaction = result[0]  # type: ignore
-        # fiat_deposit: InTransaction = result[1]  # type: ignore
-
-        # assert fiat_in_transaction.asset == "LUNA"
-        # assert int(parser.parse(fiat_in_transaction.timestamp).timestamp()) * 1000 == 1624529919000
-        # assert fiat_in_transaction.transaction_type == Keyword.BUY.value.capitalize()
-        # assert RP2Decimal(fiat_in_transaction.spot_price) == RP2Decimal("4.437472")
-        # assert RP2Decimal(fiat_in_transaction.crypto_in) == RP2Decimal("4.462")
-        # assert fiat_in_transaction.crypto_fee is None
-        # assert RP2Decimal(str(fiat_in_transaction.fiat_in_no_fee)) == RP2Decimal("19.8")
-        # assert RP2Decimal(str(fiat_in_transaction.fiat_in_with_fee)) == RP2Decimal("20.0")
-        # assert RP2Decimal(str(fiat_in_transaction.fiat_fee)) == RP2Decimal("0.2")
-        # assert fiat_in_transaction.fiat_ticker == "EUR"
 
         assert crypto_deposit_transaction.asset == "PAXG"
         assert int(parser.parse(crypto_deposit_transaction.timestamp).timestamp()) * 1000 == 1599621997000
@@ -184,17 +104,6 @@ class TestBinance:
         assert crypto_deposit_transaction.to_exchange == "Binance.com"
         assert crypto_deposit_transaction.crypto_sent == Keyword.UNKNOWN.value
         assert RP2Decimal(crypto_deposit_transaction.crypto_received) == RP2Decimal("0.00999800")
-
-        # assert fiat_deposit.asset == "EUR"
-        # assert int(parser.parse(fiat_deposit.timestamp).timestamp()) * 1000 == 1627501026000
-        # assert fiat_deposit.transaction_type == Keyword.BUY.value.capitalize()
-        # assert RP2Decimal(fiat_deposit.spot_price) == RP2Decimal("1")
-        # assert RP2Decimal(fiat_deposit.crypto_in) == RP2Decimal("15.00")
-        # assert RP2Decimal(str(fiat_deposit.crypto_fee)) == RP2Decimal("0.20")
-        # assert fiat_deposit.fiat_in_no_fee is None
-        # assert fiat_deposit.fiat_in_with_fee is None
-        # assert fiat_deposit.fiat_fee is None
-        # assert fiat_deposit.fiat_ticker == "EUR"
 
     def test_trades(self, mocker: Any) -> None:
         plugin = InputPlugin(
@@ -655,6 +564,216 @@ class TestBinance:
         assert mining_deposit.fiat_in_with_fee is None
         assert mining_deposit.fiat_fee is None
 
+    def test_implicit_api(self, mocker: Any) -> None:
+        plugin = InputPlugin(
+            account_holder="tester",
+            api_key="a",
+            api_secret="b",
+            native_fiat="GBP",
+        )
+
+        client = plugin.client
+
+        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(client, "sapiGetFiatPayments").return_value = {
+            "code": "000000",
+            "message": "success",
+            "data": [
+                {
+                    "orderNo": "353fca443f06466db0c4dc89f94f027a",
+                    "sourceAmount": "20.0",  # Fiat trade amount
+                    "fiatCurrency": "EUR",  # Fiat token
+                    "obtainAmount": "4.462",  # Crypto trade amount
+                    "cryptoCurrency": "LUNA",  # Crypto token
+                    "totalFee": "0.2",  # Trade fee
+                    "price": "4.437472",
+                    "status": "Completed",  # Processing, Completed, Failed, Refunded
+                    "createTime": 1624529919000,
+                    "updateTime": 1624529919000,
+                },
+                {
+                    "orderNo": "353fca443f06466db0c4dc89f94f027c",
+                    "sourceAmount": "15.0",  # Fiat trade amount
+                    "fiatCurrency": "GBP",  # Fiat token
+                    "obtainAmount": "4.362",  # Crypto trade amount
+                    "cryptoCurrency": "LUNA",  # Crypto token
+                    "totalFee": "0.15",  # Trade fee
+                    "price": "3.4044016506",
+                    "status": "Completed",  # Processing, Completed, Failed, Refunded
+                    "createTime": 1624529915000,
+                    "updateTime": 1624529915000,
+                },
+                {
+                    "orderNo": "353fca443f06466db0c4dc89f94f027b",
+                    "sourceAmount": "40.0",  # Fiat trade amount
+                    "fiatCurrency": "EUR",  # Fiat token
+                    "obtainAmount": "8.924",  # Crypto trade amount
+                    "cryptoCurrency": "LUNA",  # Crypto token
+                    "totalFee": "0.4",  # Trade fee
+                    "price": "4.437472",
+                    "status": "Failed",  # Processing, Completed, Failed, Refunded
+                    "createTime": 1624529920000,
+                    "updateTime": 1624529920000,
+                },
+            ],
+            "total": 2,
+            "success": True,
+        }
+
+        def fiat_deposit_withdrawal(params: Dict[str, Union[int, str]]) -> Dict[str, Union[bool, int, List[Dict[str, Union[int, str]]], str]]:
+            # pylint: disable=unused-argument
+            result: Dict[str, Union[bool, int, List[Dict[str, Union[int, str]]], str]] = {}
+
+            # 0 - deposit
+            if params["transactionType"] == 0:
+                result = {
+                    "code": "000000",
+                    "message": "success",
+                    "data": [
+                        {
+                            "orderNo": "25ced37075c1470ba8939d0df2316e23",
+                            "fiatCurrency": "EUR",
+                            "indicatedAmount": "15.00",
+                            "amount": "14.80",
+                            "totalFee": "0.20",
+                            "method": "card",
+                            "status": "Completed",
+                            "createTime": 1627501026000,
+                            "updateTime": 1627501027000,
+                        },
+                        {
+                            "orderNo": "25ced37075c1470ba8939d0df2316e24",
+                            "fiatCurrency": "EUR",
+                            "indicatedAmount": "30.00",
+                            "amount": "29.60",
+                            "totalFee": "0.40",
+                            "method": "card",
+                            "status": "Failed",
+                            "createTime": 1627501028000,
+                            "updateTime": 1627501029000,
+                        },
+                    ],
+                    "total": 2,
+                    "success": True,
+                }
+            # 1 - withdrawal
+            elif params["transactionType"] == 1:
+                result = {
+                    "code": "000000",
+                    "message": "success",
+                    "data": [
+                        {
+                            "orderNo": "25ced37075c1470ba8939d0df2316e46",
+                            "fiatCurrency": "GBP",
+                            "indicatedAmount": "15.00",
+                            "amount": "14.80",
+                            "totalFee": "0.20",
+                            "method": "card",
+                            "status": "Completed",
+                            "createTime": 1627501036000,
+                            "updateTime": 1627501037000,
+                        },
+                        {
+                            "orderNo": "25ced37075c1470ba8939d0df2316e24",
+                            "fiatCurrency": "GBP",
+                            "indicatedAmount": "30.00",
+                            "amount": "29.60",
+                            "totalFee": "0.40",
+                            "method": "card",
+                            "status": "Failed",
+                            "createTime": 1627501038000,
+                            "updateTime": 1627501039000,
+                        },
+                    ],
+                    "total": 2,
+                    "success": True,
+                }
+
+            return result
+
+        mocker.patch.object(client, "sapiGetFiatOrders").side_effect = fiat_deposit_withdrawal
+
+        mocker.patch.object(plugin, "_process_trades").return_value = None
+        mocker.patch.object(plugin, "_process_gains").return_value = None
+        mocker.patch.object(plugin, "_process_withdrawals").return_value = None
+        mocker.patch.object(plugin, "_process_deposits").return_value = None
+
+        result = plugin.load()
+
+        # 1 fiat sell (priced in native fiat) +
+        # 1 crypto conversion +
+        # 1 crypto buy +
+        # 1 fiat deposit +
+        # 1 fiat withdrawal = 5
+        assert len(result) == 5
+
+        fiat_sell_transaction: OutTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and isinstance(item, OutTransaction)
+        )
+        crypto_conversion_transaction: InTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and isinstance(item, InTransaction)
+        )
+        crypto_buy_transaction: InTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and isinstance(item, InTransaction)
+        )
+        fiat_deposit: InTransaction = next(item for item in result if item.unique_id == "25ced37075c1470ba8939d0df2316e23" and isinstance(item, InTransaction))
+        fiat_withdrawal: OutTransaction = next(
+            item for item in result if item.unique_id == "25ced37075c1470ba8939d0df2316e46" and isinstance(item, OutTransaction)
+        )
+
+        # Purchase made in fiat other than native_fiat is a regular conversion
+        assert fiat_sell_transaction.asset == "EUR"
+        assert int(parser.parse(fiat_sell_transaction.timestamp).timestamp()) * 1000 == 1624529919000
+        assert fiat_sell_transaction.transaction_type == Keyword.SELL.value.capitalize()
+        assert fiat_sell_transaction.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(fiat_sell_transaction.crypto_out_no_fee) == RP2Decimal("20.0")
+        assert RP2Decimal(fiat_sell_transaction.crypto_fee) == RP2Decimal("0.2")
+        assert fiat_sell_transaction.fiat_out_no_fee is None
+        assert fiat_sell_transaction.fiat_fee is None
+
+        assert crypto_conversion_transaction.asset == "LUNA"
+        assert int(parser.parse(crypto_conversion_transaction.timestamp).timestamp()) * 1000 == 1624529919000
+        assert crypto_conversion_transaction.transaction_type == Keyword.BUY.value.capitalize()
+        assert crypto_conversion_transaction.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(crypto_conversion_transaction.crypto_in) == RP2Decimal("4.462")
+        assert crypto_conversion_transaction.crypto_fee is None
+        assert crypto_conversion_transaction.fiat_in_no_fee is None
+        assert crypto_conversion_transaction.fiat_in_with_fee is None
+        assert crypto_conversion_transaction.fiat_fee is None
+
+        assert crypto_buy_transaction.asset == "LUNA"
+        assert int(parser.parse(crypto_buy_transaction.timestamp).timestamp()) * 1000 == 1624529915000
+        assert crypto_buy_transaction.transaction_type == Keyword.BUY.value.capitalize()
+        assert RP2Decimal(crypto_buy_transaction.spot_price) == RP2Decimal("3.4044016506")
+        assert RP2Decimal(crypto_buy_transaction.crypto_in) == RP2Decimal("4.362")
+        assert crypto_buy_transaction.crypto_fee is None
+        assert RP2Decimal(str(crypto_buy_transaction.fiat_in_no_fee)) == RP2Decimal("14.85")
+        assert RP2Decimal(str(crypto_buy_transaction.fiat_in_with_fee)) == RP2Decimal("15.0")
+        assert RP2Decimal(str(crypto_buy_transaction.fiat_fee)) == RP2Decimal("0.15")
+        assert crypto_buy_transaction.fiat_ticker == "GBP"
+
+        assert fiat_deposit.asset == "EUR"
+        assert int(parser.parse(fiat_deposit.timestamp).timestamp()) * 1000 == 1627501026000
+        assert fiat_deposit.transaction_type == Keyword.BUY.value.capitalize()
+        assert RP2Decimal(fiat_deposit.spot_price) == RP2Decimal("1")
+        assert RP2Decimal(fiat_deposit.crypto_in) == RP2Decimal("15.00")
+        assert RP2Decimal(str(fiat_deposit.crypto_fee)) == RP2Decimal("0.20")
+        assert fiat_deposit.fiat_in_no_fee is None
+        assert fiat_deposit.fiat_in_with_fee is None
+        assert fiat_deposit.fiat_fee is None
+        assert fiat_deposit.fiat_ticker == "EUR"
+
+        assert fiat_withdrawal.asset == "GBP"
+        assert int(parser.parse(fiat_withdrawal.timestamp).timestamp()) * 1000 == 1627501036000
+        assert fiat_withdrawal.transaction_type == Keyword.SELL.value.capitalize()
+        assert RP2Decimal(fiat_withdrawal.spot_price) == RP2Decimal("1")
+        assert RP2Decimal(fiat_withdrawal.crypto_out_no_fee) == RP2Decimal("15.00")
+        assert RP2Decimal(str(fiat_withdrawal.crypto_fee)) == RP2Decimal("0.20")
+        assert fiat_withdrawal.fiat_out_no_fee is None
+        assert fiat_withdrawal.fiat_fee is None
+        assert fiat_withdrawal.fiat_ticker == "GBP"
+
     def test_withdrawals(self, mocker: Any) -> None:
         plugin = InputPlugin(
             account_holder="tester",
@@ -704,60 +823,17 @@ class TestBinance:
             }
         ]
 
-        mocker.patch.object(client, "sapiGetFiatOrders").return_value = {
-            "code": "000000",
-            "message": "success",
-            "data": [
-                {
-                    "orderNo": "25ced37075c1470ba8939d0df2316e23",
-                    "fiatCurrency": "EUR",
-                    "indicatedAmount": "15.00",
-                    "amount": "14.80",
-                    "totalFee": "0.20",
-                    "method": "card",
-                    "status": "Completed",
-                    "createTime": 1627501026000,
-                    "updateTime": 1627501027000,
-                },
-                {
-                    "orderNo": "25ced37075c1470ba8939d0df2316e24",
-                    "fiatCurrency": "EUR",
-                    "indicatedAmount": "30.00",
-                    "amount": "29.60",
-                    "totalFee": "0.40",
-                    "method": "card",
-                    "status": "Failed",
-                    "createTime": 1627501028000,
-                    "updateTime": 1627501029000,
-                },
-            ],
-            "total": 2,
-            "success": True,
-        }
-
         mocker.patch.object(plugin, "_process_trades").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_deposits").return_value = None
+        mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
         result = plugin.load()
 
-        # 1 crypto Transfer +
-        # 1 fiat withdrawal = 2
-        # assert len(result) == 2
+        # 1 crypto Transfer
         assert len(result) == 1
 
         crypto_withdrawal_transaction: IntraTransaction = result[0]  # type: ignore
-        # fiat_withdrawal: OutTransaction = result[0]  # type: ignore
-
-        # assert fiat_withdrawal.asset == "EUR"
-        # assert int(parser.parse(fiat_withdrawal.timestamp).timestamp()) * 1000 == 1627501026000
-        # assert fiat_withdrawal.transaction_type == Keyword.SELL.value.capitalize()
-        # assert RP2Decimal(fiat_withdrawal.spot_price) == RP2Decimal("1")
-        # assert RP2Decimal(fiat_withdrawal.crypto_out_no_fee) == RP2Decimal("15.00")
-        # assert RP2Decimal(str(fiat_withdrawal.crypto_fee)) == RP2Decimal("0.20")
-        # assert fiat_withdrawal.fiat_out_no_fee is None
-        # assert fiat_withdrawal.fiat_fee is None
-        # assert fiat_withdrawal.fiat_ticker == "EUR"
 
         assert crypto_withdrawal_transaction.asset == "PAXG"
         assert int(parser.parse(crypto_withdrawal_transaction.timestamp).timestamp()) * 1000 == 1599621997000

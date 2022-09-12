@@ -376,6 +376,10 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return self.__markets
 
     @property
+    def native_fiat(self) -> str:
+        return self.__native_fiat
+
+    @property
     def start_time_ms(self) -> int:
         return self.__start_time_ms
 
@@ -631,14 +635,13 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     ### Single Transaction Processing
 
     def _process_buy_and_sell(self, transaction: Any) -> _ProcessAccountResult:
-        self.__logger.debug("Trade: %s", json.dumps(transaction))
         results: _ProcessAccountResult = self._process_buy(transaction)
         results.out_transactions.extend(self._process_sell(transaction).out_transactions)
 
         return results
 
     def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
-
+        self.__logger.debug("Buy: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
         crypto_in: RP2Decimal
@@ -744,88 +747,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
 
-    # def _process_deposit(self, transaction: Any, notes: Optional[str] = None) -> None:
-    #     in_transaction_list: List[InTransaction] = []
-
-    #     amount: RP2Decimal = RP2Decimal(transaction[_INDICATED_AMOUNT])
-    #     fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
-    #     notes = f"{notes + '; ' if notes else ''}{'Fiat Deposit of '}; {transaction[_FIAT_CURRENCY]}"
-    #     # not CCXT standard
-    #     in_transaction_list.append(
-    #         InTransaction(
-    #             plugin=self.plugin_name(),
-    #             unique_id=transaction[_ORDER_NO],
-    #             raw_data=json.dumps(transaction),
-    #             timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
-    #             asset=transaction[_FIAT_CURRENCY],
-    #             exchange=self.exchange_name(),
-    #             holder=self.account_holder,
-    #             transaction_type=Keyword.BUY.value,
-    #             spot_price="1",
-    #             crypto_in=str(amount),
-    #             crypto_fee=str(fee),
-    #             fiat_in_no_fee=None,
-    #             fiat_in_with_fee=None,
-    #             fiat_fee=None,
-    #             fiat_ticker=transaction[_FIAT_CURRENCY],
-    #             notes=notes,
-    #         )
-    #     )
-
-    #     return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
-
-    # def _process_gain(self, transaction: Any, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None) -> None:
-
-    #     if transaction_type == Keyword.MINING:
-    #         amount: RP2Decimal = RP2Decimal(str(transaction[_PROFITAMOUNT]))
-    #         notes = f"{notes + '; ' if notes else ''}'Mining profit'"
-
-    #         # not CCXT standard
-    #         in_transaction_list.append(
-    #             InTransaction(
-    #                 plugin=self.plugin_name(),
-    #                 unique_id=Keyword.UNKNOWN.value,
-    #                 raw_data=json.dumps(transaction),
-    #                 timestamp=self._rp2timestamp_from_ms_epoch(transaction[_TIME]),
-    #                 asset=transaction[_COIN_NAME],
-    #                 exchange=self.exchange_name(),
-    #                 holder=self.account_holder,
-    #                 transaction_type=transaction_type.value,
-    #                 spot_price=Keyword.UNKNOWN.value,
-    #                 crypto_in=str(amount),
-    #                 crypto_fee=None,
-    #                 fiat_in_no_fee=None,
-    #                 fiat_in_with_fee=None,
-    #                 fiat_fee=None,
-    #                 notes=notes,
-    #             )
-    #         )
-    #     else:
-    #         amount = RP2Decimal(transaction[_AMOUNT])
-    #         notes = f"{notes + '; ' if notes else ''}{transaction[_EN_INFO]}" # TODO - Generify this variable
-
-    #         # not CCXT standard
-    #         in_transaction_list.append(
-    #             InTransaction(
-    #                 plugin=self.plugin_name(),
-    #                 unique_id=str(transaction[_ID]),
-    #                 raw_data=json.dumps(transaction),
-    #                 timestamp=self._rp2timestamp_from_ms_epoch(transaction[_DIV_TIME]), # TODO
-    #                 asset=transaction[_ASSET],
-    #                 exchange=self.exchange_name(),
-    #                 holder=self.account_holder,
-    #                 transaction_type=transaction_type.value,
-    #                 spot_price=Keyword.UNKNOWN.value,
-    #                 crypto_in=str(amount),
-    #                 crypto_fee=None,
-    #                 fiat_in_no_fee=None,
-    #                 fiat_in_with_fee=None,
-    #                 fiat_fee=None,
-    #                 notes=notes,
-    #             )
-    #         )
-
     def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+        self.__logger.debug("Sell: %s", json.dumps(transaction))
         out_transaction_list: List[OutTransaction] = []
         trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
@@ -905,6 +828,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return _ProcessAccountResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
 
     def _process_transfer(self, transaction: Any) -> _ProcessAccountResult:
+        self.__logger.debug("Transfer: %s", json.dumps(transaction))
         if transaction[_STATUS] == "failed":
             self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
         else:
@@ -951,29 +875,3 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
 
         return _ProcessAccountResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)
-
-    # def _process_withdrawal(self, transaction: Any, out_transaction_list: List[OutTransaction], notes: Optional[str] = None) -> None:
-
-    #     # not CCXT standard format
-    #     amount: RP2Decimal = RP2Decimal(transaction[_INDICATED_AMOUNT])
-    #     fee: RP2Decimal = RP2Decimal(transaction[_TOTALFEE])
-    #     notes = f"{notes + '; ' if notes else ''}{'Fiat Withdrawal of '}; {transaction[_FIAT_CURRENCY]}"
-    #     out_transaction_list.append(
-    #         OutTransaction(
-    #             plugin=self.plugin_name(),
-    #             unique_id=transaction[_ORDER_NO],
-    #             raw_data=json.dumps(transaction),
-    #             timestamp=self._rp2timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
-    #             asset=transaction[_FIAT_CURRENCY],
-    #             exchange=self.exchange_name(),
-    #             holder=self.account_holder,
-    #             transaction_type=Keyword.SELL.value,
-    #             spot_price="1",
-    #             crypto_out_no_fee=str(amount),
-    #             crypto_fee=str(fee),
-    #             fiat_out_no_fee=None,
-    #             fiat_fee=None,
-    #             fiat_ticker=transaction[_FIAT_CURRENCY],
-    #             notes=notes,
-    #         )
-    #     )

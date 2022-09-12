@@ -639,7 +639,115 @@ class InputPlugin(AbstractCcxtInputPlugin):
         out_transactions: List[OutTransaction],
         intra_transactions: List[IntraTransaction],
     ) -> None:
-        pass
+
+        # We need milliseconds for Binance
+        now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
+
+        processing_result_list: List[Optional[_ProcessAccountResult]] = []
+
+        # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
+        # No limit on the date range
+        # fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
+        fiat_payments = self.client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self.start_time_ms, _END_TIME: now_time}))  # type: ignore
+        # {
+        #   "code": "000000",
+        #   "message": "success",
+        #   "data": [
+        #   {
+        #      "orderNo": "353fca443f06466db0c4dc89f94f027a",
+        #      "sourceAmount": "20.0",  // Fiat trade amount
+        #      "fiatCurrency": "EUR",   // Fiat token
+        #      "obtainAmount": "4.462", // Crypto trade amount
+        #      "cryptoCurrency": "LUNA",  // Crypto token
+        #      "totalFee": "0.2",    // Trade fee
+        #      "price": "4.437472",
+        #      "status": "Failed",  // Processing, Completed, Failed, Refunded
+        #      "createTime": 1624529919000,
+        #      "updateTime": 1624529919000
+        #   }
+        #   ],
+        #   "total": 1,
+        #   "success": true
+        # }
+        if _DATA in fiat_payments:
+            with ThreadPool(self.thread_count) as pool:
+                processing_result_list = pool.map(self._process_fiat_payment, fiat_payments[_DATA])
+
+            for processing_result in processing_result_list:
+                if processing_result is None:
+                    continue
+                if processing_result.in_transactions:
+                    in_transactions.extend(processing_result.in_transactions)
+                if processing_result.out_transactions:
+                    out_transactions.extend(processing_result.out_transactions)
+
+        # Process actual fiat deposits (no limit on the date range)
+        # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
+        # Using the underlying api endpoint is faster for Binance.
+        # Note that this is the same endpoint as withdrawls, but with _TRANSACTION_TYPE set to 0 (for deposits)
+        fiat_deposits = self.client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self.start_time_ms, _END_TIME: now_time}))  # type: ignore
+        #    {
+        #      "code": "000000",
+        #      "message": "success",
+        #      "data": [
+        #        {
+        #          "orderNo": "25ced37075c1470ba8939d0df2316e23",
+        #          "fiatCurrency": "EUR",
+        #          "indicatedAmount": "15.00",
+        #          "amount": "15.00",
+        #          "totalFee": "0.00",
+        #          "method": "card",
+        #          "status": "Failed",
+        #          "createTime": 1627501026000,
+        #          "updateTime": 1627501027000
+        #        }
+        #      ],
+        #      "total": 1,
+        #      "success": True
+        #    }
+        if _DATA in fiat_deposits:
+            with ThreadPool(self.thread_count) as pool:
+                processing_result_list = pool.map(self._process_fiat_deposit_order, fiat_deposits[_DATA])
+
+            for processing_result in processing_result_list:
+                if processing_result is None:
+                    continue
+                if processing_result.in_transactions:
+                    in_transactions.extend(processing_result.in_transactions)
+
+        # Process actual fiat withdrawls (no limit on the date range)
+        # Fiat deposits can also be pulled via CCXT fetch_withdrawls by cycling through legal_money
+        # Using the underlying api endpoint is faster for Binance.
+        # Note that this is the same endpoint as deposits, but with _TRANSACTION_TYPE set to 1 (for withdrawls)
+        fiat_withdrawals = self.client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _START_TIME: self.start_time_ms, _END_TIME: now_time}))  # type: ignore
+        #    {
+        #      "code": "000000",
+        #      "message": "success",
+        #      "data": [
+        #        {
+        #          "orderNo": "25ced37075c1470ba8939d0df2316e23",
+        #          "fiatCurrency": "EUR",
+        #          "indicatedAmount": "15.00",
+        #          "amount": "15.00",
+        #          "totalFee": "0.00",
+        #          "method": "card",
+        #          "status": "Failed",
+        #          "createTime": 1627501026000,
+        #          "updateTime": 1627501027000
+        #        }
+        #      ],
+        #      "total": 1,
+        #      "success": True
+        #    }
+        if _DATA in fiat_withdrawals:
+            with ThreadPool(self.thread_count) as pool:
+                processing_result_list = pool.map(self._process_fiat_withdrawal_order, fiat_withdrawals[_DATA])
+
+            for processing_result in processing_result_list:
+                if processing_result is None:
+                    continue
+                if processing_result.out_transactions:
+                    out_transactions.extend(processing_result.out_transactions)
 
     def _process_dividend(self, dividend: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
         self.logger.debug("Dividend: %s", json.dumps(dividend))
@@ -653,7 +761,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         return _ProcessAccountResult(in_transactions=[], out_transactions=[], intra_transactions=[])
 
     def _process_gain(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> _ProcessAccountResult:
-
+        self.logger.debug("Gain: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
 
         if transaction_type == Keyword.MINING:
@@ -703,3 +811,129 @@ class InputPlugin(AbstractCcxtInputPlugin):
             )
 
         return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
+
+    def _process_fiat_deposit_order(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+        return self._process_fiat_order(transaction, Keyword.BUY, notes)
+
+    def _process_fiat_withdrawal_order(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+        return self._process_fiat_order(transaction, Keyword.SELL, notes)
+
+    def _process_fiat_order(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> _ProcessAccountResult:
+        self.logger.debug("Fiat Order (%s): %s", transaction_type.value, json.dumps(transaction))
+        in_transaction_list: List[InTransaction] = []
+        out_transaction_list: List[OutTransaction] = []
+        if transaction[_STATUS] == "Completed":
+            amount: RP2Decimal = RP2Decimal(transaction[_INDICATED_AMOUNT])
+            fee: RP2Decimal = RP2Decimal(transaction[_TOTAL_FEE])
+            notes = f"{notes + '; ' if notes else ''}Fiat {transaction_type.value} of {transaction[_FIAT_CURRENCY]}"
+            if transaction_type == Keyword.BUY:
+                in_transaction_list.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_FIAT_CURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=transaction_type.value,
+                        spot_price="1",
+                        crypto_in=str(amount),
+                        crypto_fee=str(fee),
+                        fiat_in_no_fee=None,
+                        fiat_in_with_fee=None,
+                        fiat_fee=None,
+                        fiat_ticker=transaction[_FIAT_CURRENCY],
+                        notes=notes,
+                    )
+                )
+            elif transaction_type == Keyword.SELL:
+                out_transaction_list.append(
+                    OutTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_FIAT_CURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.SELL.value,
+                        spot_price="1",
+                        crypto_out_no_fee=str(amount),
+                        crypto_fee=str(fee),
+                        fiat_out_no_fee=None,
+                        fiat_fee=None,
+                        fiat_ticker=transaction[_FIAT_CURRENCY],
+                        notes=notes,
+                    )
+                )
+        return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+
+    def _process_fiat_payment(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+        self.logger.debug("Fiat Payment: %s", json.dumps(transaction))
+        in_transaction_list: List[InTransaction] = []
+        out_transaction_list: List[OutTransaction] = []
+
+        if transaction[_STATUS] == "Completed":
+            if transaction[_FIAT_CURRENCY] == self.native_fiat:
+                in_transaction_list.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_CRYPTOCURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.BUY.value,
+                        spot_price=str(RP2Decimal(transaction[_PRICE])),
+                        crypto_in=transaction[_OBTAIN_AMOUNT],
+                        crypto_fee=None,
+                        fiat_in_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        fiat_in_with_fee=str(transaction[_SOURCE_AMOUNT]),
+                        fiat_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
+                        fiat_ticker=transaction[_FIAT_CURRENCY],
+                        notes=(f"{notes + '; ' if notes else ''}Buy transaction for fiat payment orderNo - {transaction[_ORDER_NO]}"),
+                    )
+                )
+            else:
+                in_transaction_list.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_CRYPTOCURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.BUY.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_in=transaction[_OBTAIN_AMOUNT],
+                        crypto_fee=None,
+                        fiat_in_no_fee=None,
+                        fiat_in_with_fee=None,
+                        fiat_fee=None,
+                        notes=(f"{notes + '; ' if notes else ''}Buy transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
+                    )
+                )
+                out_transaction_list.append(
+                    OutTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_FIAT_CURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.SELL.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                        crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        fiat_out_no_fee=None,
+                        fiat_fee=None,
+                        notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
+                    )
+                )
+
+        return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
