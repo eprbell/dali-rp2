@@ -76,17 +76,17 @@ class _PaginationDetails(NamedTuple):
     params: Optional[Dict[str, Union[int, str, None]]]
 
 
-class _ProcessAccountResult(NamedTuple):
-    in_transactions: List[InTransaction]
-    out_transactions: List[OutTransaction]
-    intra_transactions: List[IntraTransaction]
-
-
-class _Trade(NamedTuple):
+class Trade(NamedTuple):
     base_asset: str
     quote_asset: str
     base_info: str
     quote_info: str
+
+
+class ProcessAccountResult(NamedTuple):
+    in_transactions: List[InTransaction]
+    out_transactions: List[OutTransaction]
+    intra_transactions: List[IntraTransaction]
 
 
 class AbstractPaginationDetailSet:
@@ -394,9 +394,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
     @staticmethod
-    def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> _Trade:
+    def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> Trade:
         assets = market_pair.split("/")
-        return _Trade(
+        return Trade(
             base_asset=assets[0],
             quote_asset=assets[1],
             base_info=f"{base_amount} {assets[0]}",
@@ -480,7 +480,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(deposits)
 
                 with ThreadPool(self.__thread_count) as pool:
-                    processing_result_list: List[Optional[_ProcessAccountResult]] = pool.map(self._process_transfer, deposits)
+                    processing_result_list: List[Optional[ProcessAccountResult]] = pool.map(self._process_transfer, deposits)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -513,6 +513,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transactions: List[OutTransaction],
     ) -> None:
 
+        processing_result_list: List[Optional[ProcessAccountResult]] = []
         pagination_detail_set: AbstractPaginationDetailSet = self.get_process_trades_pagination_detail_set()
         pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
         try:
@@ -553,7 +554,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(trades)
 
                 with ThreadPool(self.__thread_count) as pool:
-                    processing_result_list: List[Optional[_ProcessAccountResult]] = pool.map(self._process_buy_and_sell, trades)  # type: ignore
+                    processing_result_list = pool.map(self._process_buy_and_sell, trades)  # type: ignore
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -620,7 +621,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(withdrawals)
 
                 with ThreadPool(self.__thread_count) as pool:
-                    processing_result_list: List[Optional[_ProcessAccountResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
+                    processing_result_list: List[Optional[ProcessAccountResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -634,20 +635,20 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     ### Single Transaction Processing
 
-    def _process_buy_and_sell(self, transaction: Any) -> _ProcessAccountResult:
-        results: _ProcessAccountResult = self._process_buy(transaction)
-        results.out_transactions.extend(self._process_sell(transaction).out_transactions)
+    def _process_buy_and_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
+        results: ProcessAccountResult = self._process_buy(transaction, notes)
+        results.out_transactions.extend(self._process_sell(transaction, notes).out_transactions)
 
         return results
 
-    def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+    def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
         self.__logger.debug("Buy: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
 
-        trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
         if transaction[_SIDE] == _BUY:
             out_asset = trade.quote_asset
             in_asset = trade.base_asset
@@ -745,12 +746,12 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 )
             )
 
-        return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
 
-    def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+    def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
         self.__logger.debug("Sell: %s", json.dumps(transaction))
         out_transaction_list: List[OutTransaction] = []
-        trade: _Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
         # For some reason CCXT outputs amounts in float
         if transaction[_SIDE] == _BUY:
@@ -825,9 +826,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 )
             )
 
-        return _ProcessAccountResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
+        return ProcessAccountResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
 
-    def _process_transfer(self, transaction: Any) -> _ProcessAccountResult:
+    def _process_transfer(self, transaction: Any) -> ProcessAccountResult:
         self.__logger.debug("Transfer: %s", json.dumps(transaction))
         if transaction[_STATUS] == "failed":
             self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
@@ -874,4 +875,4 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             else:
                 self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
 
-        return _ProcessAccountResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)
+        return ProcessAccountResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)

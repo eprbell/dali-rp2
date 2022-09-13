@@ -26,7 +26,7 @@ import json
 import re
 from datetime import datetime
 from multiprocessing.pool import ThreadPool
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from ccxt import binance
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -35,6 +35,8 @@ from dali.abstract_ccxt_input_plugin import (
     AbstractCcxtInputPlugin,
     AbstractPaginationDetailSet,
     DateBasedPaginationDetailSet,
+    ProcessAccountResult,
+    Trade,
 )
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
@@ -141,19 +143,6 @@ _INTEREST_LIST = [_FLEXIBLE_SAVINGS, _LOCKED_SAVINGS]
 _STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING]
 
 
-class _ProcessAccountResult(NamedTuple):
-    in_transactions: List[InTransaction]
-    out_transactions: List[OutTransaction]
-    intra_transactions: List[IntraTransaction]
-
-
-class _Trade(NamedTuple):
-    base_asset: str
-    quote_asset: str
-    base_info: str
-    quote_info: str
-
-
 class InputPlugin(AbstractCcxtInputPlugin):
 
     __EXCHANGE_NAME: str = "Binance.com"
@@ -242,7 +231,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # We need milliseconds for Binance
         current_start = self.start_time_ms
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
-        processing_result_list: List[Optional[_ProcessAccountResult]] = []
+        processing_result_list: List[Optional[ProcessAccountResult]] = []
 
         # The exact moment when Binance switched to unified dividends is unknown/unpublished.
         # This allows us an educated guess.
@@ -643,7 +632,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # We need milliseconds for Binance
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
-        processing_result_list: List[Optional[_ProcessAccountResult]] = []
+        processing_result_list: List[Optional[ProcessAccountResult]] = []
 
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
         # No limit on the date range
@@ -749,7 +738,61 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 if processing_result.out_transactions:
                     out_transactions.extend(processing_result.out_transactions)
 
-    def _process_dividend(self, dividend: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+        ### Dust Trades
+
+        # We need milliseconds for Binance
+        current_start = self.start_time_ms
+
+        # We will pull in 30 day periods
+        # If the user has more than 100 dust trades in a 30 day period this will break.
+        # Maybe we can set a smaller window in the .ini file?
+        current_end = current_start + _THIRTY_DAYS_IN_MS
+        while current_start < now_time:
+            dust_trades = self.client.fetch_my_dust_trades(params=({_START_TIME: current_start, _END_TIME: current_end}))
+            # CCXT returns the same json as .fetch_trades()
+
+            # Binance only returns 100 dust trades per call. If we hit the limit we will have to crawl
+            # over each 'dribblet'. Each dribblet can have multiple assets converted into BNB at the same time.
+            # If the user converts more than 100 assets at one time, we can not retrieve accurate records.
+            if len(dust_trades) == _DUST_TRADE_RECORD_LIMIT:
+
+                first_dribblet = [x for x in dust_trades if x[_DIV_TIME] == dust_trades[0][_DIV_TIME]]
+                if len(first_dribblet) == _DUST_TRADE_RECORD_LIMIT:
+                    raise Exception(
+                        f"Internal error: too many assets dusted at the same time: " f"{self._rp2_timestamp_from_ms_epoch(str(dust_trades[0][_DIV_TIME]))}"
+                    )
+
+                with ThreadPool(self.__thread_count) as pool:
+                    processing_result_list = pool.map(self._process_dust_trade, first_dribblet)
+
+                for processing_result in processing_result_list:
+                    if processing_result is None:
+                        continue
+                    if processing_result.in_transactions:
+                        in_transactions.extend(processing_result.in_transactions)
+                    if processing_result.out_transactions:
+                        out_transactions.extend(processing_result.out_transactions)
+
+                # Shift the call window forward past this dribblet
+                current_start = first_dribblet[len(first_dribblet) - 1][_DIV_TIME] + 1
+                current_end = current_start + _THIRTY_DAYS_IN_MS
+                break
+
+            with ThreadPool(self.thread_count) as pool:
+                processing_result_list = pool.map(self._process_dust_trade, dust_trades)
+
+            for processing_result in processing_result_list:
+                if processing_result is None:
+                    continue
+                if processing_result.in_transactions:
+                    in_transactions.extend(processing_result.in_transactions)
+                if processing_result.out_transactions:
+                    out_transactions.extend(processing_result.out_transactions)
+
+            current_start = current_end + 1
+            current_end = current_start + _THIRTY_DAYS_IN_MS
+
+    def _process_dividend(self, dividend: Any, notes: Optional[str] = None) -> ProcessAccountResult:
         self.logger.debug("Dividend: %s", json.dumps(dividend))
         if dividend[_EN_INFO] in _STAKING_LIST or re.search("[dD]istribution", dividend[_EN_INFO]) or re.search("staking", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.STAKING, notes)
@@ -758,9 +801,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
         if dividend[_EN_INFO] in _AIRDROP_LIST or re.search("[aA]irdrop", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.AIRDROP, notes)
         self.logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_EN_INFO], self.ISSUES_URL)
-        return _ProcessAccountResult(in_transactions=[], out_transactions=[], intra_transactions=[])
+        return ProcessAccountResult(in_transactions=[], out_transactions=[], intra_transactions=[])
 
-    def _process_gain(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> _ProcessAccountResult:
+    def _process_dust_trade(self, dust: Any, notes: Optional[str] = None) -> ProcessAccountResult:
+        self.logger.debug("Dust: %s", json.dumps(dust))
+        # dust trades have a null id, and if multiple assets are dusted at the same time, all are assigned same ID
+        dust_trade: Trade = self._to_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
+        dust[_ID] = f"{dust[_ORDER]}{dust_trade.base_asset}"
+        return self._process_buy_and_sell(dust, notes)
+
+    def _process_gain(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessAccountResult:
         self.logger.debug("Gain: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
 
@@ -810,15 +860,15 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 )
             )
 
-        return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
+        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
 
-    def _process_fiat_deposit_order(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+    def _process_fiat_deposit_order(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
         return self._process_fiat_order(transaction, Keyword.BUY, notes)
 
-    def _process_fiat_withdrawal_order(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+    def _process_fiat_withdrawal_order(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
         return self._process_fiat_order(transaction, Keyword.SELL, notes)
 
-    def _process_fiat_order(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> _ProcessAccountResult:
+    def _process_fiat_order(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessAccountResult:
         self.logger.debug("Fiat Order (%s): %s", transaction_type.value, json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
@@ -867,9 +917,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         notes=notes,
                     )
                 )
-        return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
 
-    def _process_fiat_payment(self, transaction: Any, notes: Optional[str] = None) -> _ProcessAccountResult:
+    def _process_fiat_payment(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
         self.logger.debug("Fiat Payment: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
@@ -936,4 +986,4 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     )
                 )
 
-        return _ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])

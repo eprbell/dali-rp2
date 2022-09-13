@@ -693,7 +693,7 @@ class TestBinance:
             return result
 
         mocker.patch.object(client, "sapiGetFiatOrders").side_effect = fiat_deposit_withdrawal
-
+        mocker.patch.object(client, "fetch_my_dust_trades").return_value = []
         mocker.patch.object(plugin, "_process_trades").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
