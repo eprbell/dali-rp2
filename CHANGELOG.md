@@ -16,6 +16,7 @@
 
 ## 0.6.0
 * As of RP2 1.3.0, RP2 configuration files are no longer expressed in JSON format: they now use the INI format. So DaLI has been updated to generates INI-format configuration files instead of JSON. Any old JSON-format configuration file can be converted to the new INI format with the following command: rp2_config <json_config>
+* added Pionex CSV data loader plugin
 
 ## 0.5.2
 * added Binance.com REST data loader plugin
