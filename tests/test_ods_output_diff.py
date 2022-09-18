@@ -75,7 +75,7 @@ class TestODSOutputDiff(unittest.TestCase):
                 str(output_dir),
                 "-p",
                 f"{test_name}_",
-                str(output_dir / Path(f"{test_name}_crypto_data.config")),
+                str(output_dir / Path(f"{test_name}_crypto_data.ini")),
                 str(output_dir / Path(f"{test_name}_crypto_data.ods")),
             ]
             run(arguments, check=True)
