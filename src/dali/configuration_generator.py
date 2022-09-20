@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+from configparser import ConfigParser
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
@@ -27,7 +27,7 @@ _EXCHANGES: str = "exchanges"
 _HOLDERS: str = "holders"
 
 
-def generate_config_file(
+def generate_configuration_file(
     output_dir_path: str,
     output_file_prefix: str,
     output_file_name: str,
@@ -48,14 +48,7 @@ def generate_config_file(
     if Path(output_file_path).exists():
         output_file_path.unlink()
 
-    json_config: Dict[str, Any] = {
-        Keyword.IN_HEADER.value: {},
-        Keyword.OUT_HEADER.value: {},
-        Keyword.INTRA_HEADER.value: {},
-        _ASSETS: [],
-        _EXCHANGES: [],
-        _HOLDERS: [],
-    }
+    ini_object = ConfigParser()
 
     assets: Set[str] = set()
     holders: Set[str] = set()
@@ -78,18 +71,21 @@ def generate_config_file(
             raise Exception(f"Internal error: transaction is not a subclass of AbstractTransaction: {transaction}")
         assets.add(transaction.asset)
 
-    for section_name in [Keyword.IN_HEADER, Keyword.OUT_HEADER, Keyword.INTRA_HEADER]:
-        json_config[section_name.value] = global_configuration[section_name.value]
-
     if Keyword.UNKNOWN.value in assets:
         assets.remove(Keyword.UNKNOWN.value)
     if Keyword.UNKNOWN.value in holders:
         holders.remove(Keyword.UNKNOWN.value)
     if Keyword.UNKNOWN.value in exchanges:
         exchanges.remove(Keyword.UNKNOWN.value)
-    json_config[_ASSETS] = list(assets)
-    json_config[_HOLDERS] = list(holders)
-    json_config[_EXCHANGES] = list(exchanges)
+
+    ini_object["general"] = {
+        _ASSETS: ", ".join(assets),
+        _HOLDERS: ", ".join(holders),
+        _EXCHANGES: ", ".join(exchanges),
+    }
+
+    for section_name in [Keyword.IN_HEADER, Keyword.OUT_HEADER, Keyword.INTRA_HEADER]:
+        ini_object[section_name.value] = global_configuration[section_name.value]
 
     with open(str(output_file_path), "w", encoding="utf-8") as output_file:
-        json.dump(json_config, output_file, indent=4)
+        ini_object.write(output_file)
