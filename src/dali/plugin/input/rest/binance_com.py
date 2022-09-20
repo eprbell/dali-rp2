@@ -33,10 +33,12 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_ccxt_input_plugin import (
     AbstractCcxtInputPlugin,
+    ProcessOperationResult,
+    Trade,
+)
+from dali.ccxt_pagination import (
     AbstractPaginationDetailSet,
     DateBasedPaginationDetailSet,
-    ProcessAccountResult,
-    Trade,
 )
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
@@ -147,7 +149,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     __EXCHANGE_NAME: str = "Binance.com"
     __PLUGIN_NAME: str = "Binance.com_REST"
-    __DEFAULT_THREAD_COUNT: int = 3
+    __DEFAULT_THREAD_COUNT: int = 1
 
     def __init__(
         self,
@@ -161,6 +163,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         self.__api_key = api_key
         self.__api_secret = api_secret
+        # We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
         super().__init__(account_holder, datetime(2017, 7, 13, 0, 0, 0, 0), native_fiat, thread_count)
         self.__username = username
 
@@ -176,7 +179,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def plugin_name(self) -> str:
         return self.__PLUGIN_NAME
 
-    def initialize_client(self) -> binance:
+    def _initialize_client(self) -> binance:
         return binance(
             {
                 "apiKey": self.__api_key,
@@ -185,37 +188,36 @@ class InputPlugin(AbstractCcxtInputPlugin):
             }
         )
 
-    @property
-    def algos(self) -> List[str]:
+    def _get_algos(self) -> List[str]:
         if self.__algos:
             return self.__algos
         if self.__username:
-            binance_algos = self.client.sapiGetMiningPubAlgoList()  # type: ignore
+            binance_algos = self._client.sapiGetMiningPubAlgoList()  # type: ignore
             for algo in binance_algos[_DATA]:
-                self.logger.debug("Algo: %s", json.dumps(algo))
+                self._logger.debug("Algo: %s", json.dumps(algo))
                 self.__algos.append(algo[_ALGO_NAME])
             return self.__algos
         return []
 
-    def get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         return DateBasedPaginationDetailSet(
             limit=_DEPOSIT_RECORD_LIMIT,
-            exchange_start_time=self.start_time_ms,
+            exchange_start_time=self._start_time_ms,
             window=_NINETY_DAYS_IN_MS,
         )
 
-    def get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         return DateBasedPaginationDetailSet(
             limit=_WITHDRAWAL_RECORD_LIMIT,
-            exchange_start_time=self.start_time_ms,
+            exchange_start_time=self._start_time_ms,
             window=_NINETY_DAYS_IN_MS,
         )
 
-    def get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         return DateBasedPaginationDetailSet(
             limit=_TRADE_RECORD_LIMIT,
-            exchange_start_time=self.start_time_ms,
-            markets=self.markets,
+            exchange_start_time=self._start_time_ms,
+            markets=self._get_markets(),
         )
 
     ### Multiple transaction processing
@@ -229,9 +231,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
         ### Regular Dividends from Staking (including Eth staking) and Savings (Lending) after around May 8th, 2021 01:00 UTC.
 
         # We need milliseconds for Binance
-        current_start = self.start_time_ms
+        current_start = self._start_time_ms
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
-        processing_result_list: List[Optional[ProcessAccountResult]] = []
+        processing_result_list: List[Optional[ProcessOperationResult]] = []
 
         # The exact moment when Binance switched to unified dividends is unknown/unpublished.
         # This allows us an educated guess.
@@ -241,10 +243,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
         while current_start < now_time:
-            self.logger.debug("Pulling dividends/subscriptions/redemptions from %s to %s", current_start, current_end)
+            self._logger.debug("Pulling dividends/subscriptions/redemptions from %s to %s", current_start, current_end)
 
             # CCXT doesn't have a standard way to pull income, we must use the underlying API endpoint
-            dividends = self.client.sapiGetAssetAssetDividend(  # type: ignore
+            dividends = self._client.sapiGetAssetAssetDividend(  # type: ignore
                 params=({_START_TIME: current_start, _END_TIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT})
             )
             # {
@@ -268,7 +270,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             #     ],
             #     "total":2
             # }
-            with ThreadPool(self.thread_count) as pool:
+            with ThreadPool(self._thread_count) as pool:
                 processing_result_list = pool.map(self._process_dividend, dividends[_ROWS])
 
             for processing_result in processing_result_list:
@@ -298,7 +300,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         old_savings: bool = False
 
         # Reset window
-        current_start = self.start_time_ms
+        current_start = self._start_time_ms
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
         # The cummulative interest from a positionID
@@ -313,9 +315,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # We will step backward in time from the switch over
         while current_start < now_time:
 
-            self.logger.debug("Pulling locked staking from older api system from %s to %s", current_start, current_end)
+            self._logger.debug("Pulling locked staking from older api system from %s to %s", current_start, current_end)
 
-            locked_staking = self.client.sapi_get_staking_stakingrecord(  # type: ignore
+            locked_staking = self._client.sapi_get_staking_stakingrecord(  # type: ignore
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _INTEREST_PARAMETER, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -338,7 +340,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             processing_result_list = []
             for stake_dividend in locked_staking:
                 if int(stake_dividend[_TIME]) < earliest_record_epoch:
-                    (self.logger).debug("Locked Staking (OLD): %s", json.dumps(stake_dividend))
+                    (self._logger).debug("Locked Staking (OLD): %s", json.dumps(stake_dividend))
                     stake_dividend[_EN_INFO] = "Locked Staking/Savings (OLD)"
                     stake_dividend[_ID] = Keyword.UNKNOWN.value
                     stake_dividend[_DIV_TIME] = stake_dividend[_TIME]
@@ -356,7 +358,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 if processing_result.in_transactions:
                     in_transactions.extend(processing_result.in_transactions)
 
-            locked_subscriptions = self.client.sapi_get_staking_stakingrecord(  # type: ignore
+            locked_subscriptions = self._client.sapi_get_staking_stakingrecord(  # type: ignore
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _SUBSCRIPTION, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -387,7 +389,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 else:
                     current_subscriptions[subscription[_ASSET]] = {f"{RP2Decimal(subscription[_AMOUNT]):.13f}": subscription}
 
-            locked_redemptions = self.client.sapi_get_staking_stakingrecord(  # type: ignore
+            locked_redemptions = self._client.sapi_get_staking_stakingrecord(  # type: ignore
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _REDEMPTION, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -464,7 +466,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
                 elif redemption[_ASSET] in current_subscriptions and redemption_amount in current_subscriptions[redemption[_ASSET]]:
 
-                    self.logger.debug("Locked Savings positionId %s redeemed successfully.", redemption[_POSITION_ID])
+                    self._logger.debug("Locked Savings positionId %s redeemed successfully.", redemption[_POSITION_ID])
 
                 else:
                     raise Exception(f"Internal Error: Orphaned Redemption. Please open an issue at {self.ISSUES_URL}.")
@@ -480,15 +482,15 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Old system Flexible Savings
 
         # Reset window
-        current_start = self.start_time_ms
+        current_start = self._start_time_ms
         current_end = current_start + _THIRTY_DAYS_IN_MS
 
         # We will step backward in time from the switch over
         while current_start < earliest_record_epoch:
 
-            self.logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
+            self._logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
 
-            flexible_saving = self.client.sapi_get_lending_union_interesthistory(  # type: ignore
+            flexible_saving = self._client.sapi_get_lending_union_interesthistory(  # type: ignore
                 params=({_START_TIME: current_start, _END_TIME: current_end, _LENDING_TYPE: _DAILY, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -509,7 +511,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             # ]
             processing_result_list = []
             for saving in flexible_saving:
-                self.logger.debug("Flexible Saving: %s", json.dumps(saving))
+                self._logger.debug("Flexible Saving: %s", json.dumps(saving))
                 saving[_EN_INFO] = "Flexible Savings (OLD)"
                 saving[_ID] = Keyword.UNKNOWN.value
                 saving[_DIV_TIME] = saving[_TIME]
@@ -535,18 +537,18 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         if old_savings:
             # Since we are making a guess at the cut off, there might be errors.
-            self.logger.warning(
+            self._logger.warning(
                 "Pre-May 8th, 2021 savings detected. Please be aware that there may be duplicate or missing savings records around May 8th, 2021."
             )
 
         ### Mining Income
 
         # username is only required when pulling mining data
-        for algo in self.algos:
+        for algo in self._get_algos():
             # Binance uses pages for mining payments
             current_page = 1
             while True:
-                results = self.client.sapiGetMiningPaymentList(  # type: ignore
+                results = self._client.sapiGetMiningPaymentList(  # type: ignore
                     params=({_ALGO: algo, _USERNAME: self.__username, _PAGE_INDEX: current_page, _PAGE_SIZE: _MINING_PAGE_LIMIT})
                 )
                 # {
@@ -595,14 +597,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     profits: List[Dict[str, Union[int, str]]] = results[_DATA][_ACCOUNT_PROFITS]
                     processing_result_list = []
                     for result in profits:
-                        self.logger.debug("Mining profit: %s", json.dumps(result))
+                        self._logger.debug("Mining profit: %s", json.dumps(result))
 
                         # Currently the plugin only supports standard mining deposits
                         # Payment must also be made (status=2) in order to be counted
                         if result[_TYPE] == "0" and result[_STATUS] == "2":
                             processing_result_list.append(self._process_gain(result, Keyword.MINING))
                         else:
-                            self.logger.error(
+                            self._logger.error(
                                 "WARNING: Unsupported Mining Transaction Type: %s.\nFull Details: %s\nPlease open an issue at %s.",
                                 result[_TYPE],
                                 json.dumps(result),
@@ -622,7 +624,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 else:
                     break
 
-    def _process_implicit_api(
+    def _process_implicit_api(  # pylint: disable=unused-argument
         self,
         in_transactions: List[InTransaction],
         out_transactions: List[OutTransaction],
@@ -632,12 +634,12 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # We need milliseconds for Binance
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
-        processing_result_list: List[Optional[ProcessAccountResult]] = []
+        processing_result_list: List[Optional[ProcessOperationResult]] = []
 
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
         # No limit on the date range
         # fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
-        fiat_payments = self.client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self.start_time_ms, _END_TIME: now_time}))  # type: ignore
+        fiat_payments = self._client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))  # type: ignore
         # {
         #   "code": "000000",
         #   "message": "success",
@@ -659,7 +661,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #   "success": true
         # }
         if _DATA in fiat_payments:
-            with ThreadPool(self.thread_count) as pool:
+            with ThreadPool(self._thread_count) as pool:
                 processing_result_list = pool.map(self._process_fiat_payment, fiat_payments[_DATA])
 
             for processing_result in processing_result_list:
@@ -674,7 +676,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as withdrawls, but with _TRANSACTION_TYPE set to 0 (for deposits)
-        fiat_deposits = self.client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self.start_time_ms, _END_TIME: now_time}))  # type: ignore
+        fiat_deposits = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self._start_time_ms, _END_TIME: now_time}))  # type: ignore
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -695,7 +697,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #      "success": True
         #    }
         if _DATA in fiat_deposits:
-            with ThreadPool(self.thread_count) as pool:
+            with ThreadPool(self._thread_count) as pool:
                 processing_result_list = pool.map(self._process_fiat_deposit_order, fiat_deposits[_DATA])
 
             for processing_result in processing_result_list:
@@ -708,7 +710,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_withdrawls by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as deposits, but with _TRANSACTION_TYPE set to 1 (for withdrawls)
-        fiat_withdrawals = self.client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _START_TIME: self.start_time_ms, _END_TIME: now_time}))  # type: ignore
+        fiat_withdrawals = self._client.sapiGetFiatOrders(  # type: ignore
+            params=({_TRANSACTION_TYPE: 1, _START_TIME: self._start_time_ms, _END_TIME: now_time})
+        )
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -729,7 +733,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #      "success": True
         #    }
         if _DATA in fiat_withdrawals:
-            with ThreadPool(self.thread_count) as pool:
+            with ThreadPool(self._thread_count) as pool:
                 processing_result_list = pool.map(self._process_fiat_withdrawal_order, fiat_withdrawals[_DATA])
 
             for processing_result in processing_result_list:
@@ -741,14 +745,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
         ### Dust Trades
 
         # We need milliseconds for Binance
-        current_start = self.start_time_ms
+        current_start = self._start_time_ms
 
         # We will pull in 30 day periods
         # If the user has more than 100 dust trades in a 30 day period this will break.
         # Maybe we can set a smaller window in the .ini file?
         current_end = current_start + _THIRTY_DAYS_IN_MS
         while current_start < now_time:
-            dust_trades = self.client.fetch_my_dust_trades(params=({_START_TIME: current_start, _END_TIME: current_end}))
+            dust_trades = self._client.fetch_my_dust_trades(params=({_START_TIME: current_start, _END_TIME: current_end}))
             # CCXT returns the same json as .fetch_trades()
 
             # Binance only returns 100 dust trades per call. If we hit the limit we will have to crawl
@@ -762,7 +766,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         f"Internal error: too many assets dusted at the same time: " f"{self._rp2_timestamp_from_ms_epoch(str(dust_trades[0][_DIV_TIME]))}"
                     )
 
-                with ThreadPool(self.__thread_count) as pool:
+                with ThreadPool(self._thread_count) as pool:
                     processing_result_list = pool.map(self._process_dust_trade, first_dribblet)
 
                 for processing_result in processing_result_list:
@@ -778,7 +782,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 current_end = current_start + _THIRTY_DAYS_IN_MS
                 break
 
-            with ThreadPool(self.thread_count) as pool:
+            with ThreadPool(self._thread_count) as pool:
                 processing_result_list = pool.map(self._process_dust_trade, dust_trades)
 
             for processing_result in processing_result_list:
@@ -792,26 +796,26 @@ class InputPlugin(AbstractCcxtInputPlugin):
             current_start = current_end + 1
             current_end = current_start + _THIRTY_DAYS_IN_MS
 
-    def _process_dividend(self, dividend: Any, notes: Optional[str] = None) -> ProcessAccountResult:
-        self.logger.debug("Dividend: %s", json.dumps(dividend))
+    def _process_dividend(self, dividend: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Dividend: %s", json.dumps(dividend))
         if dividend[_EN_INFO] in _STAKING_LIST or re.search("[dD]istribution", dividend[_EN_INFO]) or re.search("staking", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.STAKING, notes)
         if dividend[_EN_INFO] in _INTEREST_LIST:
             return self._process_gain(dividend, Keyword.INTEREST, notes)
         if dividend[_EN_INFO] in _AIRDROP_LIST or re.search("[aA]irdrop", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.AIRDROP, notes)
-        self.logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_EN_INFO], self.ISSUES_URL)
-        return ProcessAccountResult(in_transactions=[], out_transactions=[], intra_transactions=[])
+        self._logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_EN_INFO], self.ISSUES_URL)
+        return ProcessOperationResult(in_transactions=[], out_transactions=[], intra_transactions=[])
 
-    def _process_dust_trade(self, dust: Any, notes: Optional[str] = None) -> ProcessAccountResult:
-        self.logger.debug("Dust: %s", json.dumps(dust))
+    def _process_dust_trade(self, dust: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Dust: %s", json.dumps(dust))
         # dust trades have a null id, and if multiple assets are dusted at the same time, all are assigned same ID
         dust_trade: Trade = self._to_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
         dust[_ID] = f"{dust[_ORDER]}{dust_trade.base_asset}"
         return self._process_buy_and_sell(dust, notes)
 
-    def _process_gain(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessAccountResult:
-        self.logger.debug("Gain: %s", json.dumps(transaction))
+    def _process_gain(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Gain: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
 
         if transaction_type == Keyword.MINING:
@@ -860,16 +864,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 )
             )
 
-        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
+        return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
 
-    def _process_fiat_deposit_order(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
+    def _process_fiat_deposit_order(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         return self._process_fiat_order(transaction, Keyword.BUY, notes)
 
-    def _process_fiat_withdrawal_order(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
+    def _process_fiat_withdrawal_order(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         return self._process_fiat_order(transaction, Keyword.SELL, notes)
 
-    def _process_fiat_order(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessAccountResult:
-        self.logger.debug("Fiat Order (%s): %s", transaction_type.value, json.dumps(transaction))
+    def _process_fiat_order(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Fiat Order (%s): %s", transaction_type.value, json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
         if transaction[_STATUS] == "Completed":
@@ -917,15 +921,15 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         notes=notes,
                     )
                 )
-        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+        return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
 
-    def _process_fiat_payment(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
-        self.logger.debug("Fiat Payment: %s", json.dumps(transaction))
+    def _process_fiat_payment(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Fiat Payment: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
 
         if transaction[_STATUS] == "Completed":
-            if transaction[_FIAT_CURRENCY] == self.native_fiat:
+            if self.is_native_fiat(transaction[_FIAT_CURRENCY]):
                 in_transaction_list.append(
                     InTransaction(
                         plugin=self.__PLUGIN_NAME,
@@ -986,4 +990,4 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     )
                 )
 
-        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+        return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])

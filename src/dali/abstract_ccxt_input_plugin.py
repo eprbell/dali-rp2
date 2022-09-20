@@ -19,12 +19,8 @@
 
 import json
 import logging
-
-# import re
 from datetime import datetime, timezone
 from multiprocessing.pool import ThreadPool
-
-# from time import sleep
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
 from ccxt import Exchange
@@ -33,6 +29,11 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
+from dali.ccxt_pagination import (
+    AbstractPaginationDetailSet,
+    AbstractPaginationDetailsIterator,
+    PaginationDetails,
+)
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
@@ -47,9 +48,6 @@ _DATE_TIME: str = "datetime"
 _DEPOSIT: str = "deposit"
 _FEE: str = "fee"
 _ID: str = "id"
-_INDICATED_AMOUNT: str = "indicatedAmount"
-_IS_FIATPAYMENT: str = "is_fiat_payment"
-_ORDER: str = "order"
 _PRICE: str = "price"
 _SELL: str = "sell"
 _SIDE: str = "side"
@@ -60,20 +58,7 @@ _TYPE: str = "type"
 _TX_ID: str = "txid"  # CCXT doesn't capitalize I
 _WITHDRAWAL: str = "withdrawal"
 
-# Time period constants
-_NINETY_DAYS_IN_MS: int = 7776000000
-_THIRTY_DAYS_IN_MS: int = 2592000000
-_ONE_DAY_IN_MS: int = 86400000
 _MS_IN_SECOND: int = 1000
-
-_DEFAULT_WINDOW: int = _THIRTY_DAYS_IN_MS
-
-
-class _PaginationDetails(NamedTuple):
-    symbol: Optional[str]
-    since: Optional[int]
-    limit: Optional[int]
-    params: Optional[Dict[str, Union[int, str, None]]]
 
 
 class Trade(NamedTuple):
@@ -83,255 +68,35 @@ class Trade(NamedTuple):
     quote_info: str
 
 
-class ProcessAccountResult(NamedTuple):
+class ProcessOperationResult(NamedTuple):
     in_transactions: List[InTransaction]
     out_transactions: List[OutTransaction]
     intra_transactions: List[IntraTransaction]
 
 
-class AbstractPaginationDetailSet:
-    def __iter__(self) -> "AbstractPaginationDetailsIterator":
-        raise NotImplementedError("Abstract method")
-
-
-class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
-    def __init__(
-        self,
-        exchange_start_time: int,
-        limit: Optional[int] = None,
-        markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
-        window: Optional[int] = None,
-    ) -> None:
-
-        super().__init__()
-        self.__exchange_start_time: int = exchange_start_time
-        self.__limit: Optional[int] = limit
-        self.__markets: Optional[List[str]] = markets
-        self.__params: Optional[Dict[str, Union[int, str, None]]] = params
-        self.__window: Optional[int] = window
-
-    def __iter__(self) -> "DateBasedPaginationDetailsIterator":
-        return DateBasedPaginationDetailsIterator(
-            self.__exchange_start_time,
-            self.__limit,
-            self.__markets,
-            self.__params,
-            self.__window,
-        )
-
-    @property
-    def window(self) -> int:
-        if self.__window:
-            return self.__window
-        return _DEFAULT_WINDOW
-
-
-class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
-    def __init__(
-        self,
-        exchange_start_time: int,
-        start_time_key: str,
-        end_time_key: str,
-        window: int,
-        limit: Optional[int] = None,
-        markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
-    ) -> None:
-
-        super().__init__(exchange_start_time, limit, markets, params, window)
-        self.__start_time_key: str = start_time_key
-        self.__end_time_key: str = end_time_key
-
-    def __iter__(self) -> "CustomDateBasedPaginationDetailsIterator":
-        return CustomDateBasedPaginationDetailsIterator(
-            self.__exchange_start_time,
-            self.__start_time_key,
-            self.__end_time_key,
-            self.window,
-            self.__limit,
-            self.__markets,
-            self.__params,
-        )
-
-
-class AbstractPaginationDetailsIterator:
-    def __init__(self, limit: Optional[int], markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None) -> None:
-        self.__limit: Optional[int] = limit
-        self.__markets: Optional[List[str]] = markets
-        self.__market_count: int = 0
-        self.__params: Optional[Dict[str, Union[int, str, None]]] = params
-
-    def get_market(self) -> Optional[str]:
-        if self.__markets:
-            return self.__markets[self.__market_count]
-        return None
-
-    def has_more_markets(self) -> bool:
-        if self.__markets:
-            return self.__market_count + 1 < len(self.__markets)
-        return False
-
-    def next_market(self) -> None:
-        self.__market_count += 1
-
-    def update_fetched_elements(self, current_results: Any) -> None:
-        raise NotImplementedError("Abstract method")
-
-    @property
-    def limit(self) -> Optional[int]:
-        return self.__limit
-
-    @property
-    def since(self) -> Optional[int]:
-        return None
-
-    @property
-    def params(self) -> Optional[Dict[str, Union[int, str, None]]]:
-        return self.__params
-
-    def __next__(self) -> _PaginationDetails:
-        raise NotImplementedError("Abstract method")
-
-
-class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
-    def __init__(
-        self,
-        exchange_start_time: int,
-        limit: Optional[int] = None,
-        markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
-        window: Optional[int] = None,
-    ) -> None:
-
-        super().__init__(limit, markets, params)
-        self.__end_of_data = False
-        self.__since: Optional[int] = exchange_start_time
-        self.__exchange_start_time: int = exchange_start_time
-        self.__now: int = int(datetime.now().timestamp()) * _MS_IN_SECOND
-        self.__window: Optional[int] = window
-
-    def update_fetched_elements(self, current_results: Any) -> None:
-
-        end_of_market: bool = False
-
-        # Update Since if needed otherwise end_of_market
-        if self.__since is not None:
-            if len(current_results):
-                # All times are inclusive
-                self.__since = current_results[len(current_results) - 1][_TIMESTAMP] + 1
-            elif self.__window:
-                self.__since += self.__window
-
-            if self.__since > self.__now:  # type: ignore
-                end_of_market = True
-        else:
-            end_of_market = True
-
-        if end_of_market and self.has_more_markets():
-            # we have reached the end of one market, now let's move on to the next
-            self.__since = self.__exchange_start_time
-            self.next_market()
-        else:
-            self.__end_of_data = True
-
-    def __next__(self) -> _PaginationDetails:
-        while not self.__end_of_data:
-            return _PaginationDetails(
-                symbol=self.get_market(),
-                since=self.__since,
-                limit=self.limit,
-                params=self.params,
-            )
-        raise StopIteration(self)
-
-    @property
-    def window(self) -> int:
-        if self.__window:
-            return self.__window
-        return _DEFAULT_WINDOW
-
-
-class CustomDateBasedPaginationDetailsIterator(DateBasedPaginationDetailsIterator):
-    def __init__(
-        self,
-        exchange_start_time: int,
-        start_time_key: str,
-        end_time_key: str,
-        window: int,
-        limit: Optional[int] = None,
-        markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
-    ) -> None:
-
-        super().__init__(exchange_start_time, limit, markets, params, window)
-        self.__start_time_key: str = start_time_key
-        self.__end_time_key: str = end_time_key
-
-    def __next__(self) -> _PaginationDetails:
-
-        while not self.__end_of_data:
-            base_details: _PaginationDetails = super().__next__()
-            end_of_window: int = self.since + self.window
-            if base_details.params:
-                base_details.params[self.__start_time_key] = self.since
-                base_details.params[self.__end_time_key] = end_of_window
-            else:
-                base_details._replace(params={self.__start_time_key: self.since, self.__end_time_key: end_of_window})
-            return base_details
-        raise StopIteration(self)
-
-    @property
-    def exchange_start_time(self) -> int:
-        return self.__exchange_start_time
-
-    @property
-    def since(self) -> int:
-        if self.__since:
-            return self.__since
-        return self.exchange_start_time
-
-    @since.setter
-    def since(self, value: int) -> None:
-        if value < self.__exchange_start_time:
-            raise ValueError("Since time is before exchange start time")
-        self.__since = value
-
-
-# class IdBasedPaginationDetails(AbstractPaginationDetails):
-#     ...
-
-# class PageNumberBasedPaginationDetails(AbstractPaginationDetails):
-#     ...
-
-
 class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
-    __DEFAULT_THREAD_COUNT: int = 3
+    __DEFAULT_THREAD_COUNT: int = 1
 
     def __init__(
         self,
         account_holder: str,
         exchange_start_time: datetime,
-        native_fiat: Optional[str],
+        native_fiat: str,
         thread_count: Optional[int],
     ) -> None:
 
         super().__init__(account_holder, native_fiat)
-        self.__logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
+        self._logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
         self.__cache_key: str = f"{str(self.exchange_name).lower()}-{account_holder}"
-        self.__client: Exchange = self.initialize_client()
-        if native_fiat:
-            self.__native_fiat: str = native_fiat
-        else:
-            self.__native_fiat = "USD"
+        self._client: Exchange = self._initialize_client()
         if thread_count:
-            self.__thread_count: int = thread_count
+            self._thread_count: int = thread_count
         else:
-            self.__thread_count = self.__DEFAULT_THREAD_COUNT
+            self._thread_count = self.__DEFAULT_THREAD_COUNT
         self.__markets: List[str] = []
         self.__start_time: datetime = exchange_start_time
-        self.__start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
+        self._start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
 
     def plugin_name(self) -> str:
         raise NotImplementedError("Abstract method")
@@ -339,53 +104,32 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
 
-    def initialize_client(self) -> Exchange:
+    def _initialize_client(self) -> Exchange:
         raise NotImplementedError("Abstract method")
 
     def exchange_name(self) -> str:
         raise NotImplementedError("Abstract method")
 
-    def get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         raise NotImplementedError("Abstract method")
 
-    def get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         raise NotImplementedError("Abstract method")
 
     # Some exchanges require you to loop through all markets for trades
-    def get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
         raise NotImplementedError("Abstract method")
 
-    @property
-    def client(self) -> Exchange:
-        return self.__client
-
-    @property
-    def logger(self) -> logging.Logger:
-        return self.__logger
-
-    @property
-    def markets(self) -> List[str]:
+    def _get_markets(self) -> List[str]:
 
         if self.__markets:
             return self.__markets
 
-        ccxt_markets: Any = self.__client.fetch_markets()
+        ccxt_markets: Any = self._client.fetch_markets()
         for market in ccxt_markets:
-            self.__logger.debug("Market: %s", json.dumps(market))
+            self._logger.debug("Market: %s", json.dumps(market))
             self.__markets.append(market[_ID])
         return self.__markets
-
-    @property
-    def native_fiat(self) -> str:
-        return self.__native_fiat
-
-    @property
-    def start_time_ms(self) -> int:
-        return self.__start_time_ms
-
-    @property
-    def thread_count(self) -> int:
-        return self.__thread_count
 
     @staticmethod
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
@@ -428,12 +172,12 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
-        pagination_detail_set: AbstractPaginationDetailSet = self.get_process_deposits_pagination_detail_set()
+        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_deposits_pagination_detail_set()
         pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
         try:
             while True:
-                pagination_details: _PaginationDetails = next(pagination_detail_iterator)
-                deposits = self.__client.fetch_deposits(
+                pagination_details: PaginationDetails = next(pagination_detail_iterator)
+                deposits = self._client.fetch_deposits(
                     code=pagination_details.symbol,
                     since=pagination_details.since,
                     limit=pagination_details.limit,
@@ -479,8 +223,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
                 pagination_detail_iterator.update_fetched_elements(deposits)
 
-                with ThreadPool(self.__thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessAccountResult]] = pool.map(self._process_transfer, deposits)
+                with ThreadPool(self._thread_count) as pool:
+                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, deposits)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -513,13 +257,13 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transactions: List[OutTransaction],
     ) -> None:
 
-        processing_result_list: List[Optional[ProcessAccountResult]] = []
-        pagination_detail_set: AbstractPaginationDetailSet = self.get_process_trades_pagination_detail_set()
+        processing_result_list: List[Optional[ProcessOperationResult]] = []
+        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_trades_pagination_detail_set()
         pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
         try:
             while True:
-                pagination_details: _PaginationDetails = next(pagination_detail_iterator)
-                trades: Optional[List[Dict[str, Union[str, float]]]] = self.__client.fetch_my_trades(
+                pagination_details: PaginationDetails = next(pagination_detail_iterator)
+                trades: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_my_trades(
                     symbol=pagination_details.symbol,
                     since=pagination_details.since,
                     limit=pagination_details.limit,
@@ -553,7 +297,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
                 pagination_detail_iterator.update_fetched_elements(trades)
 
-                with ThreadPool(self.__thread_count) as pool:
+                with ThreadPool(self._thread_count) as pool:
                     processing_result_list = pool.map(self._process_buy_and_sell, trades)  # type: ignore
 
                 for processing_result in processing_result_list:
@@ -573,12 +317,12 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
-        pagination_detail_set: AbstractPaginationDetailSet = self.get_process_withdrawals_pagination_detail_set()
+        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_withdrawals_pagination_detail_set()
         pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
         try:
             while True:
-                pagination_details: _PaginationDetails = next(pagination_detail_iterator)
-                withdrawals: Optional[List[Dict[str, Union[str, float]]]] = self.__client.fetch_withdrawals(
+                pagination_details: PaginationDetails = next(pagination_detail_iterator)
+                withdrawals: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_withdrawals(
                     code=pagination_details.symbol,
                     since=pagination_details.since,
                     limit=pagination_details.limit,
@@ -620,8 +364,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 # }
                 pagination_detail_iterator.update_fetched_elements(withdrawals)
 
-                with ThreadPool(self.__thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessAccountResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
+                with ThreadPool(self._thread_count) as pool:
+                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -635,14 +379,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     ### Single Transaction Processing
 
-    def _process_buy_and_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
-        results: ProcessAccountResult = self._process_buy(transaction, notes)
+    def _process_buy_and_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        results: ProcessOperationResult = self._process_buy(transaction, notes)
         results.out_transactions.extend(self._process_sell(transaction, notes).out_transactions)
 
         return results
 
-    def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
-        self.__logger.debug("Buy: %s", json.dumps(transaction))
+    def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Buy: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
         crypto_in: RP2Decimal
@@ -691,7 +435,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 )
 
         # Is this a plain buy or a conversion?
-        if trade.quote_asset == self.__native_fiat:
+        if self.is_native_fiat(trade.quote_asset):
             fiat_in_with_fee = RP2Decimal(str(transaction[_COST]))
             fiat_fee = RP2Decimal(crypto_fee)
             spot_price = RP2Decimal(str(transaction[_PRICE]))
@@ -746,10 +490,10 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 )
             )
 
-        return ProcessAccountResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+        return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
 
-    def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessAccountResult:
-        self.__logger.debug("Sell: %s", json.dumps(transaction))
+    def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Sell: %s", json.dumps(transaction))
         out_transaction_list: List[OutTransaction] = []
         trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
@@ -774,7 +518,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         crypto_out_with_fee: RP2Decimal = crypto_out_no_fee + crypto_fee
 
         # Is this a plain buy or a conversion?
-        if trade.quote_asset == self.__native_fiat:
+        if self.is_native_fiat(trade.quote_asset):
             fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
             fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
             spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
@@ -826,12 +570,12 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 )
             )
 
-        return ProcessAccountResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
+        return ProcessOperationResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
 
-    def _process_transfer(self, transaction: Any) -> ProcessAccountResult:
-        self.__logger.debug("Transfer: %s", json.dumps(transaction))
+    def _process_transfer(self, transaction: Any) -> ProcessOperationResult:
+        self._logger.debug("Transfer: %s", json.dumps(transaction))
         if transaction[_STATUS] == "failed":
-            self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
+            self._logger.info("Skipping failed transfer %s", json.dumps(transaction))
         else:
             intra_transaction_list: List[IntraTransaction] = []
 
@@ -873,6 +617,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                     )
                 )
             else:
-                self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
+                self._logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
 
-        return ProcessAccountResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)
+        return ProcessOperationResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)

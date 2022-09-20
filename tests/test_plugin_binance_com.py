@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=protected-access
+
 import datetime
 from itertools import chain, repeat
 from typing import Any, Dict, List, Union
@@ -23,8 +25,6 @@ from rp2.rp2_decimal import RP2Decimal
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
-
-# from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 from dali.plugin.input.rest.binance_com import InputPlugin
 
@@ -45,10 +45,10 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        client: Exchange = plugin.client
+        client: Exchange = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_deposits").return_value = [
             {
                 "info": {
@@ -113,7 +113,7 @@ class TestBinance:
             native_fiat="GBP",
         )
 
-        client: Exchange = plugin.client
+        client: Exchange = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
         # itertools.chain / repeat allows us to return one value once, and empty values after that
@@ -385,11 +385,11 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        client: Exchange = plugin.client
+        client: Exchange = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
         mocker.patch.object(client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
-        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "sapiGetAssetAssetDividend").return_value = {
             "rows": [
                 {"id": 1637366104, "amount": "0.00001600", "asset": "BETH", "divTime": 1563189166000, "enInfo": "ETH 2.0 Staking", "tranId": 2968885920},
@@ -572,10 +572,10 @@ class TestBinance:
             native_fiat="GBP",
         )
 
-        client = plugin.client
+        client = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
             "message": "success",
@@ -782,10 +782,10 @@ class TestBinance:
             native_fiat="USD",
         )
 
-        client = plugin.client
+        client = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_withdrawals").return_value = [
             {
                 "info": {
