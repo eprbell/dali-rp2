@@ -29,7 +29,7 @@ from rp2.logger import LOG_FILE
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import AbstractTransaction, DirectionTypeAndNotes
-from dali.config_generator import generate_config_file
+from dali.configuration_generator import generate_configuration_file
 from dali.configuration import (
     DEFAULT_CONFIGURATION,
     DIRECTION_2_TRANSACTION_TYPE_SET,
@@ -53,7 +53,7 @@ from dali.plugin.pair_converter.historic_crypto import (
 )
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.5.2"
+_VERSION: str = "0.6.0"
 
 
 class _InputPluginHelperArgs(NamedTuple):
@@ -168,7 +168,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
         resolved_transactions: List[AbstractTransaction] = resolve_transactions(transactions, dali_configuration, args.read_spot_price_from_web)
 
         LOGGER.info("Generating config file in %s", args.output_dir)
-        generate_config_file(args.output_dir, args.prefix, "crypto_data.config", resolved_transactions, dali_configuration)
+        generate_configuration_file(args.output_dir, args.prefix, "crypto_data.ini", resolved_transactions, dali_configuration)
 
         LOGGER.info("Generating input file in %s", args.output_dir)
         generate_input_file(args.output_dir, args.prefix, "crypto_data.ods", resolved_transactions, dali_configuration)
