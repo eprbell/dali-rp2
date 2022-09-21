@@ -47,6 +47,9 @@ _CURRENCY: str = "currency"
 _DATE_TIME: str = "datetime"
 _DEPOSIT: str = "deposit"
 _FEE: str = "fee"
+_FETCH_DEPOSITS: str = "fetchDeposits"
+_FETCH_MY_TRADES: str = "fetchMyTrades"
+_FETCH_WITHDRAWALS: str = "fetchWithdrawals"
 _ID: str = "id"
 _PRICE: str = "price"
 _SELL: str = "sell"
@@ -153,10 +156,13 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transactions: List[OutTransaction] = []
         intra_transactions: List[IntraTransaction] = []
 
-        self._process_deposits(intra_transactions)
+        if self._client.has[_FETCH_DEPOSITS]:
+            self._process_deposits(intra_transactions)
         self._process_gains(in_transactions, out_transactions)
-        self._process_trades(in_transactions, out_transactions)
-        self._process_withdrawals(intra_transactions)
+        if self._client.has[_FETCH_MY_TRADES]:
+            self._process_trades(in_transactions, out_transactions)
+        if self._client.has[_FETCH_WITHDRAWALS]:
+            self._process_withdrawals(intra_transactions)
         self._process_implicit_api(in_transactions, out_transactions, intra_transactions)
 
         result.extend(in_transactions)
