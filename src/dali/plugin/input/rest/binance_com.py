@@ -20,8 +20,6 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
-# pylint: disable=fixme
-
 import json
 import re
 from datetime import datetime
