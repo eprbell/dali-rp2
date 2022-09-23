@@ -75,7 +75,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 jst_timezone = PytzTimezone("Asia/Tokyo")
                 jst_datetime: datetime = jst_timezone.localize(datetime.strptime(line[self.__TIMESTAMP_INDEX], "%Y/%m/%d %H:%M:%S"))
-                utc_timestamp: str = jst_datetime.astimezone(DatetimeTimezone.utc).strftime("%Y-%m-%d %H:%M:%S%z")  # .replace(microsecond=0, second=0)
+                utc_timestamp: str = jst_datetime.astimezone(DatetimeTimezone.utc).strftime("%Y-%m-%d %H:%M:%S%z")
 
                 result.append(
                     IntraTransaction(
