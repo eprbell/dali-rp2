@@ -34,7 +34,7 @@ class TestCoincheck:
 
         btc_buy_in: InTransaction = result[0]  # type: ignore
 
-        assert btc_buy_in.asset == "XLM"
+        assert btc_buy_in.asset == "BTC"
         assert btc_buy_in.timestamp == "2022-04-20 16:20:00+0000"
         assert btc_buy_in.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(str(btc_buy_in.spot_price)) == RP2Decimal("2000000")
