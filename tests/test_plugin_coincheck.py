@@ -40,6 +40,6 @@ class TestCoincheck:
         assert RP2Decimal(str(btc_buy_in.spot_price)) == RP2Decimal("2000000")
         assert RP2Decimal(btc_buy_in.crypto_in) == RP2Decimal("0.005")
         assert btc_buy_in.crypto_fee == None
-        assert RP2Decimal(str(btc_buy_in.fiat_in_no_fee)) = RP2Decimal("10000")
-        assert RP2Decimal(str(btc_buy_in.fiat_in_with_fee)) = RP2Decimal("10000")
+        assert RP2Decimal(str(btc_buy_in.fiat_in_no_fee)) == RP2Decimal("10000")
+        assert RP2Decimal(str(btc_buy_in.fiat_in_with_fee)) == RP2Decimal("10000")
         assert btc_buy_in.fiat_fee is None
