@@ -76,13 +76,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
             }
         )
 
-    def _get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
-        pass
+    def _get_process_deposits_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
+        return None
 
-    def _get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
-        pass
+    def _get_process_withdrawals_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
+        return None
 
-    def _get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_trades_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         return DateBasedPaginationDetailSet(
             limit=_TRADE_RECORD_LIMIT,
             exchange_start_time=self._start_time_ms,
