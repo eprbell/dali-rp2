@@ -197,21 +197,21 @@ class InputPlugin(AbstractCcxtInputPlugin):
             return self.__algos
         return []
 
-    def _get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_deposits_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         return DateBasedPaginationDetailSet(
             limit=_DEPOSIT_RECORD_LIMIT,
             exchange_start_time=self._start_time_ms,
             window=_NINETY_DAYS_IN_MS,
         )
 
-    def _get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_withdrawals_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         return DateBasedPaginationDetailSet(
             limit=_WITHDRAWAL_RECORD_LIMIT,
             exchange_start_time=self._start_time_ms,
             window=_NINETY_DAYS_IN_MS,
         )
 
-    def _get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_trades_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         return DateBasedPaginationDetailSet(
             limit=_TRADE_RECORD_LIMIT,
             exchange_start_time=self._start_time_ms,
@@ -808,7 +808,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _process_dust_trade(self, dust: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         self._logger.debug("Dust: %s", json.dumps(dust))
         # dust trades have a null id, and if multiple assets are dusted at the same time, all are assigned same ID
-        dust_trade: Trade = self._to_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
+        dust_trade: Trade = self._get_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
         dust[_ID] = f"{dust[_ORDER]}{dust_trade.base_asset}"
         return self._process_buy_and_sell(dust, notes)
 

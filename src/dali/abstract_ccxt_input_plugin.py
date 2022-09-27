@@ -93,10 +93,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         self._logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
         self.__cache_key: str = f"{str(self.exchange_name).lower()}-{account_holder}"
         self._client: Exchange = self._initialize_client()
-        if thread_count:
-            self._thread_count: int = thread_count
-        else:
-            self._thread_count = self.__DEFAULT_THREAD_COUNT
+        self._thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         self.__markets: List[str] = []
         self.__start_time: datetime = exchange_start_time
         self._start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
@@ -113,14 +110,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def exchange_name(self) -> str:
         raise NotImplementedError("Abstract method")
 
-    def _get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_deposits_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         raise NotImplementedError("Abstract method")
 
-    def _get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_withdrawals_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         raise NotImplementedError("Abstract method")
 
     # Some exchanges require you to loop through all markets for trades
-    def _get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_trades_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         raise NotImplementedError("Abstract method")
 
     def _get_markets(self) -> List[str]:
@@ -129,9 +126,13 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             return self.__markets
 
         ccxt_markets: Any = self._client.fetch_markets()
+        market_list: List[str] = []
         for market in ccxt_markets:
             self._logger.debug("Market: %s", json.dumps(market))
-            self.__markets.append(market[_ID])
+            market_list.append(market[_ID])
+
+        self.__markets = market_list
+
         return self.__markets
 
     @staticmethod
@@ -140,8 +141,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
+    # Parses the symbol (eg. 'BTC/USD') into base and quote assets, and formats notes for the transactions
     @staticmethod
-    def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> Trade:
+    def _get_trade(market_pair: str, base_amount: str, quote_amount: str) -> Trade:
         assets = market_pair.split("/")
         return Trade(
             base_asset=assets[0],
@@ -397,8 +399,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transaction_list: List[OutTransaction] = []
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
+        fee_asset: str = transaction[_FEE][_CURRENCY]
 
-        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+        trade: Trade = self._get_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
         if transaction[_SIDE] == _BUY:
             out_asset = trade.quote_asset
             in_asset = trade.base_asset
@@ -412,14 +415,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         else:
             raise Exception(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
 
-        if transaction[_FEE][_CURRENCY] == in_asset:
+        if fee_asset == in_asset:
             crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
         else:
             crypto_fee = ZERO
-            transaction_fee = transaction[_FEE][_COST]
+            transaction_fee = RP2Decimal(transaction[_FEE][_COST])
 
             # Users can use other crypto assets to pay for trades
-            if transaction[_FEE][_CURRENCY] != out_asset and float(transaction_fee) > 0:
+            if fee_asset != out_asset and RP2Decimal(transaction_fee) > ZERO:
                 out_transaction_list.append(
                     OutTransaction(
                         plugin=self.plugin_name(),
@@ -434,8 +437,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                         crypto_out_no_fee="0",
                         crypto_fee=str(transaction_fee),
                         crypto_out_with_fee=str(transaction_fee),
-                        fiat_out_no_fee=None,
-                        fiat_fee=None,
+                        fiat_out_no_fee=str(transaction_fee) if self.is_native_fiat(fee_asset) else None,
+                        fiat_fee=str(transaction_fee) if self.is_native_fiat(fee_asset) else None,
                         notes=(f"{notes + '; ' if notes else ''} Fee for conversion from " f"{conversion_info}"),
                     )
                 )
@@ -464,10 +467,10 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                     transaction_type=Keyword.BUY.value,
                     spot_price=str(spot_price),
                     crypto_in=str(crypto_in),
-                    crypto_fee=str(crypto_fee),
+                    crypto_fee=None if self.is_native_fiat(in_asset) else str(crypto_fee),
                     fiat_in_no_fee=str(fiat_in_no_fee),
                     fiat_in_with_fee=str(fiat_in_with_fee),
-                    fiat_fee=None,
+                    fiat_fee=str(fiat_fee) if self.is_native_fiat(in_asset) else None,
                     fiat_ticker=trade.quote_asset,
                     notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
                 )
@@ -501,7 +504,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         self._logger.debug("Sell: %s", json.dumps(transaction))
         out_transaction_list: List[OutTransaction] = []
-        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+        trade: Trade = self._get_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
         # For some reason CCXT outputs amounts in float
         if transaction[_SIDE] == _BUY:
