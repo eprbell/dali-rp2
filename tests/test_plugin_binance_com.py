@@ -370,10 +370,10 @@ class TestBinance:
         assert sell_fiat_order_in.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(sell_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(sell_fiat_order_in.crypto_in) == RP2Decimal("23000.01")
-        assert RP2Decimal(str(sell_fiat_order_in.crypto_fee)) == RP2Decimal("40")
+        assert sell_fiat_order_in.crypto_fee is None
         assert RP2Decimal(str(sell_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("22960.01")
         assert RP2Decimal(str(sell_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("23000.01")
-        assert sell_fiat_order_in.fiat_fee is None
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_fee)) == RP2Decimal("40")
         assert sell_fiat_order_in.fiat_ticker == "GBP"
 
     def test_gains(self, mocker: Any) -> None:

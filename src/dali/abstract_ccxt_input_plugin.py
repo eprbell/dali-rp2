@@ -180,69 +180,73 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
-        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_deposits_pagination_detail_set()
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
-        try:
-            while True:
-                pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                deposits = self._client.fetch_deposits(
-                    code=pagination_details.symbol,
-                    since=pagination_details.since,
-                    limit=pagination_details.limit,
-                    params=pagination_details.params,
-                )
-                # CCXT returns a standardized response from fetch_deposits. 'info' is the exchange-specific information
-                # in this case from Binance.com
+        pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_deposits_pagination_detail_set()
+        if not pagination_detail_set:
+            self._logger.error("No Pagination Details for Deposits")
+        else:
+            pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
 
-                # {
-                #   'info': {
-                #       'amount': '0.00999800',
-                #       'coin': 'PAXG',
-                #       'network': 'ETH',
-                #       'status': '1',
-                #       'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
-                #       'addressTag': '',
-                #       'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
-                #       'insertTime': '1599621997000',
-                #       'transferType': '0',
-                #       'confirmTimes': '12/12',
-                #       'unlockConfirm': '12/12',
-                #       'walletType': '0'
-                #   },
-                #   'id': None,
-                #   'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
-                #   'timestamp': 1599621997000,
-                #   'datetime': '2020-09-09T03:26:37.000Z',
-                #   'network': 'ETH',
-                #   'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
-                #   'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
-                #   'addressFrom': None,
-                #   'tag': None,
-                #   'tagTo': None,
-                #   'tagFrom': None,
-                #   'type': 'deposit',
-                #   'amount': 0.00999800,
-                #   'currency': 'PAXG',
-                #   'status': 'ok',
-                #   'updated': None,
-                #   'internal': False,
-                #   'fee': None
-                # }
+            try:
+                while True:
+                    pagination_details: PaginationDetails = next(pagination_detail_iterator)
+                    deposits = self._client.fetch_deposits(
+                        code=pagination_details.symbol,
+                        since=pagination_details.since,
+                        limit=pagination_details.limit,
+                        params=pagination_details.params,
+                    )
+                    # CCXT returns a standardized response from fetch_deposits. 'info' is the exchange-specific information
+                    # in this case from Binance.com
 
-                pagination_detail_iterator.update_fetched_elements(deposits)
+                    # {
+                    #   'info': {
+                    #       'amount': '0.00999800',
+                    #       'coin': 'PAXG',
+                    #       'network': 'ETH',
+                    #       'status': '1',
+                    #       'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                    #       'addressTag': '',
+                    #       'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                    #       'insertTime': '1599621997000',
+                    #       'transferType': '0',
+                    #       'confirmTimes': '12/12',
+                    #       'unlockConfirm': '12/12',
+                    #       'walletType': '0'
+                    #   },
+                    #   'id': None,
+                    #   'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                    #   'timestamp': 1599621997000,
+                    #   'datetime': '2020-09-09T03:26:37.000Z',
+                    #   'network': 'ETH',
+                    #   'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                    #   'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                    #   'addressFrom': None,
+                    #   'tag': None,
+                    #   'tagTo': None,
+                    #   'tagFrom': None,
+                    #   'type': 'deposit',
+                    #   'amount': 0.00999800,
+                    #   'currency': 'PAXG',
+                    #   'status': 'ok',
+                    #   'updated': None,
+                    #   'internal': False,
+                    #   'fee': None
+                    # }
 
-                with ThreadPool(self._thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, deposits)
+                    pagination_detail_iterator.update_fetched_elements(deposits)
 
-                for processing_result in processing_result_list:
-                    if processing_result is None:
-                        continue
-                    if processing_result.intra_transactions:
-                        intra_transactions.extend(processing_result.intra_transactions)
+                    with ThreadPool(self._thread_count) as pool:
+                        processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, deposits)
 
-        except StopIteration:
-            # End of pagination details
-            pass
+                    for processing_result in processing_result_list:
+                        if processing_result is None:
+                            continue
+                        if processing_result.intra_transactions:
+                            intra_transactions.extend(processing_result.intra_transactions)
+
+            except StopIteration:
+                # End of pagination details
+                pass
 
     def _process_gains(
         self,
@@ -266,124 +270,130 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     ) -> None:
 
         processing_result_list: List[Optional[ProcessOperationResult]] = []
-        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_trades_pagination_detail_set()
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
-        try:
-            while True:
-                pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                trades: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_my_trades(
-                    symbol=pagination_details.symbol,
-                    since=pagination_details.since,
-                    limit=pagination_details.limit,
-                    params=pagination_details.params,
-                )
-                #   {
-                #       'info':         { ... },                    // the original decoded JSON as is
-                #       'id':           '12345-67890:09876/54321',  // string trade id
-                #       'timestamp':    1502962946216,              // Unix timestamp in milliseconds
-                #       'datetime':     '2017-08-17 12:42:48.000',  // ISO8601 datetime with milliseconds
-                #       'symbol':       'ETH/BTC',                  // symbol
-                #       'order':        '12345-67890:09876/54321',  // string order id or undefined/None/null
-                #       'type':         'limit',                    // order type, 'market', 'limit' or undefined/None/null
-                #       'side':         'buy',                      // direction of the trade, 'buy' or 'sell'
-                #       'takerOrMaker': 'taker',                    // string, 'taker' or 'maker'
-                #       'price':        0.06917684,                 // float price in quote currency
-                #       'amount':       1.5,                        // amount of base currency
-                #       'cost':         0.10376526,                 // total cost, `price * amount`,
-                #       'fee':          {                           // provided by exchange or calculated by ccxt
-                #           'cost':  0.0015,                        // float
-                #           'currency': 'ETH',                      // usually base currency for buys, quote currency for sells
-                #           'rate': 0.002,                          // the fee rate (if available)
-                #       },
-                #   }
+        pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_trades_pagination_detail_set()
+        if not pagination_detail_set:
+            self._logger.error("No Pagination Details for Trades")
+        else:
+            pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+            try:
+                while True:
+                    pagination_details: PaginationDetails = next(pagination_detail_iterator)
+                    trades: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_my_trades(
+                        symbol=pagination_details.symbol,
+                        since=pagination_details.since,
+                        limit=pagination_details.limit,
+                        params=pagination_details.params,
+                    )
+                    #   {
+                    #       'info':         { ... },                    // the original decoded JSON as is
+                    #       'id':           '12345-67890:09876/54321',  // string trade id
+                    #       'timestamp':    1502962946216,              // Unix timestamp in milliseconds
+                    #       'datetime':     '2017-08-17 12:42:48.000',  // ISO8601 datetime with milliseconds
+                    #       'symbol':       'ETH/BTC',                  // symbol
+                    #       'order':        '12345-67890:09876/54321',  // string order id or undefined/None/null
+                    #       'type':         'limit',                    // order type, 'market', 'limit' or undefined/None/null
+                    #       'side':         'buy',                      // direction of the trade, 'buy' or 'sell'
+                    #       'takerOrMaker': 'taker',                    // string, 'taker' or 'maker'
+                    #       'price':        0.06917684,                 // float price in quote currency
+                    #       'amount':       1.5,                        // amount of base currency
+                    #       'cost':         0.10376526,                 // total cost, `price * amount`,
+                    #       'fee':          {                           // provided by exchange or calculated by ccxt
+                    #           'cost':  0.0015,                        // float
+                    #           'currency': 'ETH',                      // usually base currency for buys, quote currency for sells
+                    #           'rate': 0.002,                          // the fee rate (if available)
+                    #       },
+                    #   }
 
-                # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
-                # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
-                # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas `amount` is the *base* volume).
-                # * The cost field itself is there mostly for convenience and can be deduced from other fields.
-                # * The ``cost`` of the trade is a *"gross"* value. That is the value pre-fee, and the fee has to be applied afterwards.
+                    # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
+                    # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
+                    # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas `amount` is the *base* volume).
+                    # * The cost field itself is there mostly for convenience and can be deduced from other fields.
+                    # * The ``cost`` of the trade is a *"gross"* value. That is the value pre-fee, and the fee has to be applied afterwards.
 
-                pagination_detail_iterator.update_fetched_elements(trades)
+                    pagination_detail_iterator.update_fetched_elements(trades)
 
-                with ThreadPool(self._thread_count) as pool:
-                    processing_result_list = pool.map(self._process_buy_and_sell, trades)  # type: ignore
+                    with ThreadPool(self._thread_count) as pool:
+                        processing_result_list = pool.map(self._process_buy_and_sell, trades)  # type: ignore
 
-                for processing_result in processing_result_list:
-                    if processing_result is None:
-                        continue
-                    if processing_result.in_transactions:
-                        in_transactions.extend(processing_result.in_transactions)
-                    if processing_result.out_transactions:
-                        out_transactions.extend(processing_result.out_transactions)
+                    for processing_result in processing_result_list:
+                        if processing_result is None:
+                            continue
+                        if processing_result.in_transactions:
+                            in_transactions.extend(processing_result.in_transactions)
+                        if processing_result.out_transactions:
+                            out_transactions.extend(processing_result.out_transactions)
 
-        except StopIteration:
-            # End of pagination details
-            pass
+            except StopIteration:
+                # End of pagination details
+                pass
 
     def _process_withdrawals(
         self,
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
-        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_withdrawals_pagination_detail_set()
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
-        try:
-            while True:
-                pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                withdrawals: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_withdrawals(
-                    code=pagination_details.symbol,
-                    since=pagination_details.since,
-                    limit=pagination_details.limit,
-                    params=pagination_details.params,
-                )
-                # {
-                #   'info': {
-                #       'amount': '0.00999800',
-                #       'coin': 'PAXG',
-                #       'network': 'ETH',
-                #       'status': '1',
-                #       'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
-                #       'addressTag': '',
-                #       'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
-                #       'insertTime': '1599621997000',
-                #       'transferType': '0',
-                #       'confirmTimes': '12/12',
-                #       'unlockConfirm': '12/12',
-                #       'walletType': '0'
-                #   },
-                #   'id': None,
-                #   'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
-                #   'timestamp': 1599621997000,
-                #   'datetime': '2020-09-09T03:26:37.000Z',
-                #   'network': 'ETH',
-                #   'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
-                #   'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
-                #   'addressFrom': None,
-                #   'tag': None,
-                #   'tagTo': None,
-                #   'tagFrom': None,
-                #   'type': 'withdrawal',
-                #   'amount': 0.00999800,
-                #   'currency': 'PAXG',
-                #   'status': 'ok',
-                #   'updated': None,
-                #   'internal': False,
-                #   'fee': None
-                # }
-                pagination_detail_iterator.update_fetched_elements(withdrawals)
+        pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
+        if not pagination_detail_set:
+            self._logger.error("No Pagination Details for Withdrawals")
+        else:
+            pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+            try:
+                while True:
+                    pagination_details: PaginationDetails = next(pagination_detail_iterator)
+                    withdrawals: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_withdrawals(
+                        code=pagination_details.symbol,
+                        since=pagination_details.since,
+                        limit=pagination_details.limit,
+                        params=pagination_details.params,
+                    )
+                    # {
+                    #   'info': {
+                    #       'amount': '0.00999800',
+                    #       'coin': 'PAXG',
+                    #       'network': 'ETH',
+                    #       'status': '1',
+                    #       'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                    #       'addressTag': '',
+                    #       'txId': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                    #       'insertTime': '1599621997000',
+                    #       'transferType': '0',
+                    #       'confirmTimes': '12/12',
+                    #       'unlockConfirm': '12/12',
+                    #       'walletType': '0'
+                    #   },
+                    #   'id': None,
+                    #   'txid': '0xaad4654a3234aa6118af9b4b335f5ae81c360b2394721c019b5d1e75328b09f3',
+                    #   'timestamp': 1599621997000,
+                    #   'datetime': '2020-09-09T03:26:37.000Z',
+                    #   'network': 'ETH',
+                    #   'address': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                    #   'addressTo': '0x788cabe9236ce061e5a892e1a59395a81fc8d62c',
+                    #   'addressFrom': None,
+                    #   'tag': None,
+                    #   'tagTo': None,
+                    #   'tagFrom': None,
+                    #   'type': 'withdrawal',
+                    #   'amount': 0.00999800,
+                    #   'currency': 'PAXG',
+                    #   'status': 'ok',
+                    #   'updated': None,
+                    #   'internal': False,
+                    #   'fee': None
+                    # }
+                    pagination_detail_iterator.update_fetched_elements(withdrawals)
 
-                with ThreadPool(self._thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
+                    with ThreadPool(self._thread_count) as pool:
+                        processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
 
-                for processing_result in processing_result_list:
-                    if processing_result is None:
-                        continue
-                    if processing_result.intra_transactions:
-                        intra_transactions.extend(processing_result.intra_transactions)
+                    for processing_result in processing_result_list:
+                        if processing_result is None:
+                            continue
+                        if processing_result.intra_transactions:
+                            intra_transactions.extend(processing_result.intra_transactions)
 
-        except StopIteration:
-            # End of pagination details
-            pass
+            except StopIteration:
+                # End of pagination details
+                pass
 
     ### Single Transaction Processing
 
