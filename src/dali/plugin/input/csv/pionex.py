@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Autoinvest CSV Format: timestamp UTC, base asset symbol, quote asset amount + symbol, trading fee (in quote asset),
-#    base asset amount + symbol, source of funds
-# Note: file comes as .xlsx, and then needs to be saved as CSV.
+# This plugin uses the sheet found under the "for-cointracker" because of its simpler format.
+# Trades CSV Format: timestamp UTC, received quantity, received currency, sent quantity,
+#    sent currency, fee amount, fee currency, tag
 
-# Betheth CSV format: timestamp UTC, quote asset symbol (ETH), base asset symbol (BETH), amount, status
+# The transfers CSV can be found under the "depositwithdrawal" tab
+# transfer CSV format: timestamp UTC, transaction type, amount, coin (prefixed with the network used), network, txid, fee
 
 import logging
 from csv import reader
