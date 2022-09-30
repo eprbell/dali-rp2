@@ -249,7 +249,7 @@ All other data loader plugins are subclasses of [AbstractInputPlugin](src/dali/a
 
 If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`. The `unique_id` requires special attention, because the transaction resolver uses it to match and join incomplete transactions: the plugin must ensure to [populate it with the correct value](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field). See the [transaction resolver](#the-transaction-resolver) section for more details on `unique_id`.
 
-For an example of a CCXT-based data loader look at the [Binance](src/dali/plugin/input/rest/binance.py) plugin, for an example of a REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin, for an example of a CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin.
+For an example of a CCXT-based data loader look at the [Binance](src/dali/plugin/input/rest/binance_com.py) plugin, for an example of a REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin, for an example of a CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin.
 
 ### Pair Converter Plugin Development
 Pair converter plugins live in the following directory:
