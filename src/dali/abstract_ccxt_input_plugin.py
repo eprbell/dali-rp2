@@ -143,7 +143,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     # Parses the symbol (eg. 'BTC/USD') into base and quote assets, and formats notes for the transactions
     @staticmethod
-    def _get_trade(market_pair: str, base_amount: str, quote_amount: str) -> Trade:
+    def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> Trade:
         assets = market_pair.split("/")
         return Trade(
             base_asset=assets[0],
@@ -181,10 +181,13 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     ) -> None:
 
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_deposits_pagination_detail_set()
+        # Strip optionality
         if not pagination_detail_set:
             self._logger.error("No Pagination Details for Deposits")
+        else:
+            has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
 
         try:
             while True:
@@ -271,10 +274,13 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         processing_result_list: List[Optional[ProcessOperationResult]] = []
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_trades_pagination_detail_set()
+        # Strip optionality
         if not pagination_detail_set:
             self._logger.error("No Pagination Details for Trades")
+        else:
+            has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
@@ -333,10 +339,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     ) -> None:
 
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
+        # Strip optionality
         if not pagination_detail_set:
             self._logger.error("No Pagination Details for Withdrawals")
+        else:
+            has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
+
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
@@ -411,7 +421,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         crypto_fee: RP2Decimal
         fee_asset: str = transaction[_FEE][_CURRENCY]
 
-        trade: Trade = self._get_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
         if transaction[_SIDE] == _BUY:
             out_asset = trade.quote_asset
             in_asset = trade.base_asset
@@ -514,7 +524,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         self._logger.debug("Sell: %s", json.dumps(transaction))
         out_transaction_list: List[OutTransaction] = []
-        trade: Trade = self._get_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
         # For some reason CCXT outputs amounts in float
         if transaction[_SIDE] == _BUY:

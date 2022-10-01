@@ -808,7 +808,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _process_dust_trade(self, dust: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         self._logger.debug("Dust: %s", json.dumps(dust))
         # dust trades have a null id, and if multiple assets are dusted at the same time, all are assigned same ID
-        dust_trade: Trade = self._get_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
+        dust_trade: Trade = self._to_trade(dust[_SYMBOL], str(dust[_AMOUNT]), str(dust[_COST]))
         dust[_ID] = f"{dust[_ORDER]}{dust_trade.base_asset}"
         return self._process_buy_and_sell(dust, notes)
 
