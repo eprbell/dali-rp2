@@ -183,9 +183,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_deposits_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            self._logger.error("No Pagination Details for Deposits")
-        else:
-            has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
+            raise Exception("No Pagination Details for Deposits")
+
+        has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
         pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
 
@@ -276,9 +276,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_trades_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            self._logger.error("No Pagination Details for Trades")
-        else:
-            has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
+            raise Exception("No Pagination Details for Deposits")
+
+        has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
         pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
         try:
@@ -341,9 +341,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            self._logger.error("No Pagination Details for Withdrawals")
-        else:
-            has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
+            raise Exception("No Pagination Details for Deposits")
+
+        has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
         pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
 
@@ -439,7 +439,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
         else:
             crypto_fee = ZERO
-            transaction_fee = RP2Decimal(transaction[_FEE][_COST])
+            transaction_fee = RP2Decimal(str(transaction[_FEE][_COST]))
 
             # Users can use other crypto assets to pay for trades
             if fee_asset != out_asset and RP2Decimal(transaction_fee) > ZERO:
@@ -549,7 +549,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         # Is this a plain buy or a conversion?
         if self.is_native_fiat(trade.quote_asset):
             fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
-            fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
+            fiat_fee: RP2Decimal = crypto_fee
             spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
 
             out_transaction_list.append(
