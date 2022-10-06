@@ -292,7 +292,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_trades_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            raise Exception("No Pagination Details for Deposits")
+            raise Exception("No pagination details for trades.")
 
         has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
@@ -356,7 +356,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            raise Exception("No Pagination Details for Deposits")
+            raise Exception("No pagination details for withdrawals.")
 
         has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
