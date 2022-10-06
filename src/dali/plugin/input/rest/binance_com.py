@@ -26,7 +26,7 @@ from datetime import datetime
 from multiprocessing.pool import ThreadPool
 from typing import Any, Dict, List, Optional, Union
 
-from ccxt import binance
+from ccxt import Exchange, binance
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_ccxt_input_plugin import (
@@ -186,11 +186,18 @@ class InputPlugin(AbstractCcxtInputPlugin):
             }
         )
 
+    @property
+    def _client(self) -> binance:
+        super_client: Exchange = super()._client
+        if not isinstance(super_client, binance):
+            raise Exception("Exchange is not instance of class binance.")
+        return super_client
+
     def _get_algos(self) -> List[str]:
         if self.__algos:
             return self.__algos
         if self.__username:
-            binance_algos = self._client.sapiGetMiningPubAlgoList()  # type: ignore
+            binance_algos = self._client.sapiGetMiningPubAlgoList()
             for algo in binance_algos[_DATA]:
                 self._logger.debug("Algo: %s", json.dumps(algo))
                 self.__algos.append(algo[_ALGO_NAME])
@@ -244,9 +251,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             self._logger.debug("Pulling dividends/subscriptions/redemptions from %s to %s", current_start, current_end)
 
             # CCXT doesn't have a standard way to pull income, we must use the underlying API endpoint
-            dividends = self._client.sapiGetAssetAssetDividend(  # type: ignore
-                params=({_START_TIME: current_start, _END_TIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT})
-            )
+            dividends = self._client.sapiGetAssetAssetDividend(params=({_START_TIME: current_start, _END_TIME: current_end, _LIMIT: _DIVIDEND_RECORD_LIMIT}))
             # {
             #     "rows":[
             #         {
@@ -315,7 +320,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             self._logger.debug("Pulling locked staking from older api system from %s to %s", current_start, current_end)
 
-            locked_staking = self._client.sapi_get_staking_stakingrecord(  # type: ignore
+            locked_staking = self._client.sapi_get_staking_stakingrecord(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _INTEREST_PARAMETER, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -356,7 +361,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 if processing_result.in_transactions:
                     in_transactions.extend(processing_result.in_transactions)
 
-            locked_subscriptions = self._client.sapi_get_staking_stakingrecord(  # type: ignore
+            locked_subscriptions = self._client.sapi_get_staking_stakingrecord(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _SUBSCRIPTION, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -387,7 +392,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 else:
                     current_subscriptions[subscription[_ASSET]] = {f"{RP2Decimal(subscription[_AMOUNT]):.13f}": subscription}
 
-            locked_redemptions = self._client.sapi_get_staking_stakingrecord(  # type: ignore
+            locked_redemptions = self._client.sapi_get_staking_stakingrecord(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _PRODUCT: _STAKING, _TXN_TYPE: _REDEMPTION, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -488,7 +493,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             self._logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
 
-            flexible_saving = self._client.sapi_get_lending_union_interesthistory(  # type: ignore
+            flexible_saving = self._client.sapi_get_lending_union_interesthistory(
                 params=({_START_TIME: current_start, _END_TIME: current_end, _LENDING_TYPE: _DAILY, _SIZE: _INTEREST_SIZE_LIMIT})
             )
             # [
@@ -546,7 +551,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             # Binance uses pages for mining payments
             current_page = 1
             while True:
-                results = self._client.sapiGetMiningPaymentList(  # type: ignore
+                results = self._client.sapiGetMiningPaymentList(
                     params=({_ALGO: algo, _USERNAME: self.__username, _PAGE_INDEX: current_page, _PAGE_SIZE: _MINING_PAGE_LIMIT})
                 )
                 # {
@@ -637,7 +642,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
         # No limit on the date range
         # fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
-        fiat_payments = self._client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))  # type: ignore
+        fiat_payments = self._client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))
         # {
         #   "code": "000000",
         #   "message": "success",
@@ -674,7 +679,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as withdrawls, but with _TRANSACTION_TYPE set to 0 (for deposits)
-        fiat_deposits = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self._start_time_ms, _END_TIME: now_time}))  # type: ignore
+        fiat_deposits = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self._start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -708,9 +713,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_withdrawls by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as deposits, but with _TRANSACTION_TYPE set to 1 (for withdrawls)
-        fiat_withdrawals = self._client.sapiGetFiatOrders(  # type: ignore
-            params=({_TRANSACTION_TYPE: 1, _START_TIME: self._start_time_ms, _END_TIME: now_time})
-        )
+        fiat_withdrawals = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _START_TIME: self._start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",

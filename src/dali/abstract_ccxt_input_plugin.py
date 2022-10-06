@@ -85,18 +85,18 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         self,
         account_holder: str,
         exchange_start_time: datetime,
-        native_fiat: str,
+        native_fiat: Optional[str],
         thread_count: Optional[int],
     ) -> None:
 
         super().__init__(account_holder, native_fiat)
-        self._logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
+        self.__logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
         self.__cache_key: str = f"{str(self.exchange_name).lower()}-{account_holder}"
-        self._client: Exchange = self._initialize_client()
-        self._thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
+        self.__client: Exchange = self._initialize_client()
+        self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         self.__markets: List[str] = []
         self.__start_time: datetime = exchange_start_time
-        self._start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
+        self.__start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
 
     def plugin_name(self) -> str:
         raise NotImplementedError("Abstract method")
@@ -151,6 +151,22 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             base_info=f"{base_amount} {assets[0]}",
             quote_info=f"{quote_amount} {assets[1]}",
         )
+
+    @property
+    def _client(self) -> Exchange:
+        return self.__client
+
+    @property
+    def _logger(self) -> logging.Logger:
+        return self.__logger
+
+    @property
+    def _start_time_ms(self) -> int:
+        return self.__start_time_ms
+
+    @property
+    def _thread_count(self) -> int:
+        return self.__thread_count
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
@@ -310,7 +326,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 #       },
                 #   }
 
-                # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
                 # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
                 # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas `amount` is the *base* volume).
                 # * The cost field itself is there mostly for convenience and can be deduced from other fields.

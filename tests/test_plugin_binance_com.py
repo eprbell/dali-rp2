@@ -48,7 +48,7 @@ class TestBinance:
         client: Exchange = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_deposits").return_value = [
             {
                 "info": {
@@ -389,7 +389,7 @@ class TestBinance:
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
         mocker.patch.object(client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "sapiGetAssetAssetDividend").return_value = {
             "rows": [
                 {"id": 1637366104, "amount": "0.00001600", "asset": "BETH", "divTime": 1563189166000, "enInfo": "ETH 2.0 Staking", "tranId": 2968885920},
@@ -575,7 +575,7 @@ class TestBinance:
         client = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
             "message": "success",
@@ -785,7 +785,7 @@ class TestBinance:
         client = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_withdrawals").return_value = [
             {
                 "info": {
