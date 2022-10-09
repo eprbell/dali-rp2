@@ -23,7 +23,9 @@
   * [Coinbase Pro Section (REST)](#coinbase-pro-section-rest)
   * [Binance.com Supplemental Section (CSV)](#binance.com-supplemental-section-csv)
   * [Bitbank Supplemental Section (CSV)](#bitbank-supplemental-section-csv)
+  * [Coincheck Supplemental Section (CSV)](#coincheck-supplemental-section-csv)
   * [Ledger Section (CSV)](#ledger-section-csv)
+  * [Pionex Section (CSV)](#pionex-section-csv)
   * [Trezor Section (CSV)](#trezor-section-csv)
   * [Trezor Old Section (CSV)](#trezor-old-section-csv)
   * [Manual Section (CSV)](#manual-section-csv)
@@ -91,6 +93,7 @@ Notes:
 * On May 8th, 2021, Binance.com implemented a new unified dividend endpoint. This endpoint returns the time when interest affected a user's wallet. However, the endpoint used to retrieve interest payments previously returns the time when the interest was delivered (but hadn't yet affected the user's wallet). [See this post for more details](https://dev.binance.vision/t/time-difference-between-sapi-v1-asset-assetdividend-and-sapi-v1-staking-stakingrecord/12346/2).
 * Due to this discrepency, there may be duplicate locked savings/staked and flexible savings dividends around May 8th, 2021. Please review your payments around this time before processing your transactions with RP2.
 * [Currently only dust 'dribblets' of 100 or less crypto assets can be retrieved at once](https://dev.binance.vision/t/pagination-for-dustlog-asset-dividend-record-swap-history-bswap/4963). If you dust more than 100 crypto assets at one time the REST API will not be able to process the transactions successfully.
+<<<<<<< Updated upstream
 * Due to the information not being available via REST, autoinvest trades and ETH to BETH conversions can not be processed with this plugin. Please download the CSV for these transactions and use the [Binance.com Supplemental CSV plugin](#binance.com-supplemental-section-csv). Note that some files are only available as .xlsx will need to be converted to the CSV format to be processed. BETH/ETH trades are not affected by this limitation and will be read via the REST plugin.
 
 ### Bitbank Section (REST)
@@ -115,6 +118,9 @@ Note: the `thread_count` parameter is optional and is currently not implemented.
 
 Notes:
 * At this time, the Bitbank REST API only supports trades. To process deposits and withdrawals please use the [Bitbank Supplemental CSV plugin](#bitbank-supplemental-section-csv).
+=======
+* Due to the information not being available via REST, autoinvest trades and ETH to BETH conversions can not be processed with this plugin. Please download the CSV for these transactions and use the Binance.com Supplemental CSV plugin. Note that some files are only available as .xlsx will need to be converted to the CSV format to be processed.
+>>>>>>> Stashed changes
 
 ### Coinbase Section (REST)
 This plugin is REST-based and requires setting up API Keys in your Coinbase account settings (click on the API link).
