@@ -55,6 +55,7 @@ class InputPlugin(AbstractInputPlugin):
 
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__withdrawals_csv_file: str = withdrawals_csv_file
+        # Code of the asset being withdrawn since it is NOT included in the CSV file.
         self.__withdrawals_code: str = withdrawals_code
         self.__logger: logging.Logger = create_logger(f"{self.__BITBANK_PLUGIN}/{self.account_holder}")
 
