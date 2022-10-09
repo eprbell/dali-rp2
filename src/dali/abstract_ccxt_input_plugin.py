@@ -85,21 +85,18 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         self,
         account_holder: str,
         exchange_start_time: datetime,
-        native_fiat: str,
+        native_fiat: Optional[str],
         thread_count: Optional[int],
     ) -> None:
 
         super().__init__(account_holder, native_fiat)
-        self._logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
+        self.__logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
         self.__cache_key: str = f"{str(self.exchange_name).lower()}-{account_holder}"
-        self._client: Exchange = self._initialize_client()
-        if thread_count:
-            self._thread_count: int = thread_count
-        else:
-            self._thread_count = self.__DEFAULT_THREAD_COUNT
+        self.__client: Exchange = self._initialize_client()
+        self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         self.__markets: List[str] = []
         self.__start_time: datetime = exchange_start_time
-        self._start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
+        self.__start_time_ms: int = int(self.__start_time.timestamp()) * _MS_IN_SECOND
 
     def plugin_name(self) -> str:
         raise NotImplementedError("Abstract method")
@@ -113,14 +110,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def exchange_name(self) -> str:
         raise NotImplementedError("Abstract method")
 
-    def _get_process_deposits_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_deposits_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         raise NotImplementedError("Abstract method")
 
-    def _get_process_withdrawals_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_withdrawals_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         raise NotImplementedError("Abstract method")
 
     # Some exchanges require you to loop through all markets for trades
-    def _get_process_trades_pagination_detail_set(self) -> AbstractPaginationDetailSet:
+    def _get_process_trades_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         raise NotImplementedError("Abstract method")
 
     def _get_markets(self) -> List[str]:
@@ -129,9 +126,13 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             return self.__markets
 
         ccxt_markets: Any = self._client.fetch_markets()
+        market_list: List[str] = []
         for market in ccxt_markets:
             self._logger.debug("Market: %s", json.dumps(market))
-            self.__markets.append(market[_ID])
+            market_list.append(market[_ID])
+
+        self.__markets = market_list
+
         return self.__markets
 
     @staticmethod
@@ -140,6 +141,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
+    # Parses the symbol (eg. 'BTC/USD') into base and quote assets, and formats notes for the transactions
     @staticmethod
     def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> Trade:
         assets = market_pair.split("/")
@@ -149,6 +151,22 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             base_info=f"{base_amount} {assets[0]}",
             quote_info=f"{quote_amount} {assets[1]}",
         )
+
+    @property
+    def _client(self) -> Exchange:
+        return self.__client
+
+    @property
+    def _logger(self) -> logging.Logger:
+        return self.__logger
+
+    @property
+    def _start_time_ms(self) -> int:
+        return self.__start_time_ms
+
+    @property
+    def _thread_count(self) -> int:
+        return self.__thread_count
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
@@ -178,8 +196,15 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
-        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_deposits_pagination_detail_set()
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_deposits_pagination_detail_set()
+        # Strip optionality
+        if not pagination_detail_set:
+            raise Exception("No Pagination Details for Deposits")
+
+        has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
+
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
+
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
@@ -264,8 +289,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     ) -> None:
 
         processing_result_list: List[Optional[ProcessOperationResult]] = []
-        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_trades_pagination_detail_set()
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_trades_pagination_detail_set()
+        # Strip optionality
+        if not pagination_detail_set:
+            raise Exception("No pagination details for trades.")
+
+        has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
+
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
@@ -295,7 +326,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 #       },
                 #   }
 
-                # * The work on ``'fee'`` info is still in progress, fee info may be missing partially or entirely, depending on the exchange capabilities.
                 # * The ``fee`` currency may be different from both traded currencies (for example, an ETH/BTC order with fees in USD).
                 # * The ``cost`` of the trade means ``amount * price``. It is the total *quote* volume of the trade (whereas `amount` is the *base* volume).
                 # * The cost field itself is there mostly for convenience and can be deduced from other fields.
@@ -323,8 +353,15 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
-        pagination_detail_set: AbstractPaginationDetailSet = self._get_process_withdrawals_pagination_detail_set()
-        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(pagination_detail_set)
+        pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
+        # Strip optionality
+        if not pagination_detail_set:
+            raise Exception("No pagination details for withdrawals.")
+
+        has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
+
+        pagination_detail_iterator: AbstractPaginationDetailsIterator = iter(has_pagination_detail_set)
+
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
@@ -397,6 +434,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transaction_list: List[OutTransaction] = []
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
+        fee_asset: str = transaction[_FEE][_CURRENCY]
 
         trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
         if transaction[_SIDE] == _BUY:
@@ -412,14 +450,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         else:
             raise Exception(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
 
-        if transaction[_FEE][_CURRENCY] == in_asset:
+        if fee_asset == in_asset:
             crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
         else:
             crypto_fee = ZERO
-            transaction_fee = transaction[_FEE][_COST]
+            transaction_fee = RP2Decimal(str(transaction[_FEE][_COST]))
 
             # Users can use other crypto assets to pay for trades
-            if transaction[_FEE][_CURRENCY] != out_asset and float(transaction_fee) > 0:
+            if fee_asset != out_asset and RP2Decimal(transaction_fee) > ZERO:
                 out_transaction_list.append(
                     OutTransaction(
                         plugin=self.plugin_name(),
@@ -434,8 +472,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                         crypto_out_no_fee="0",
                         crypto_fee=str(transaction_fee),
                         crypto_out_with_fee=str(transaction_fee),
-                        fiat_out_no_fee=None,
-                        fiat_fee=None,
+                        fiat_out_no_fee=str(transaction_fee) if self.is_native_fiat(fee_asset) else None,
+                        fiat_fee=str(transaction_fee) if self.is_native_fiat(fee_asset) else None,
                         notes=(f"{notes + '; ' if notes else ''} Fee for conversion from " f"{conversion_info}"),
                     )
                 )
@@ -464,10 +502,10 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                     transaction_type=Keyword.BUY.value,
                     spot_price=str(spot_price),
                     crypto_in=str(crypto_in),
-                    crypto_fee=str(crypto_fee),
+                    crypto_fee=None if self.is_native_fiat(in_asset) else str(crypto_fee),
                     fiat_in_no_fee=str(fiat_in_no_fee),
                     fiat_in_with_fee=str(fiat_in_with_fee),
-                    fiat_fee=None,
+                    fiat_fee=str(fiat_fee) if self.is_native_fiat(in_asset) else None,
                     fiat_ticker=trade.quote_asset,
                     notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
                 )
@@ -526,7 +564,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         # Is this a plain buy or a conversion?
         if self.is_native_fiat(trade.quote_asset):
             fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
-            fiat_fee: RP2Decimal = RP2Decimal(crypto_fee)
+            fiat_fee: RP2Decimal = crypto_fee
             spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
 
             out_transaction_list.append(

@@ -48,7 +48,7 @@ class TestBinance:
         client: Exchange = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_deposits").return_value = [
             {
                 "info": {
@@ -370,10 +370,10 @@ class TestBinance:
         assert sell_fiat_order_in.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(sell_fiat_order_in.spot_price) == RP2Decimal("23000.01")
         assert RP2Decimal(sell_fiat_order_in.crypto_in) == RP2Decimal("23000.01")
-        assert RP2Decimal(str(sell_fiat_order_in.crypto_fee)) == RP2Decimal("40")
+        assert sell_fiat_order_in.crypto_fee is None
         assert RP2Decimal(str(sell_fiat_order_in.fiat_in_no_fee)) == RP2Decimal("22960.01")
         assert RP2Decimal(str(sell_fiat_order_in.fiat_in_with_fee)) == RP2Decimal("23000.01")
-        assert sell_fiat_order_in.fiat_fee is None
+        assert RP2Decimal(str(sell_fiat_order_in.fiat_fee)) == RP2Decimal("40")
         assert sell_fiat_order_in.fiat_ticker == "GBP"
 
     def test_gains(self, mocker: Any) -> None:
@@ -389,7 +389,7 @@ class TestBinance:
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
         mocker.patch.object(client, "sapiGetMiningPubAlgoList").return_value = {"data": [{"algoName": "sha256"}]}
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "sapiGetAssetAssetDividend").return_value = {
             "rows": [
                 {"id": 1637366104, "amount": "0.00001600", "asset": "BETH", "divTime": 1563189166000, "enInfo": "ETH 2.0 Staking", "tranId": 2968885920},
@@ -575,7 +575,7 @@ class TestBinance:
         client = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
             "message": "success",
@@ -785,7 +785,7 @@ class TestBinance:
         client = plugin._client
 
         mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
-        mocker.patch.object(plugin, "_start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
+        mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_withdrawals").return_value = [
             {
                 "info": {
