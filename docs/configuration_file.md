@@ -296,7 +296,7 @@ The `in_csv_file` contains transactions describing crypto being acquired. Line 1
 * `holder`: exchange account or wallet owner;
 * `transaction_type`: AIRDROP, BUY, DONATE, GIFT, HARDFORK, INCOME, INTEREST, MINING, STAKING or WAGES;
 * `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
-* `crypto_in`: how much of the given cryptocurrency was acquired with the transaction;
+* `crypto_in`: how much of the given cryptocurrency was acquired with the transaction (without fee);
 * `crypto_fee` (optional): transaction fee (if it was paid in crypto). This is mutually exclusive with `fiat_fee`;
 * `fiat_in_no_fee` (optional): fiat value of the transaction without fee;
 * `fiat_in_with_fee` (optional): fiat value of the transaction with fee;
