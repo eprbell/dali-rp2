@@ -70,7 +70,7 @@ class InputPlugin(AbstractInputPlugin):
                 self.__logger.debug("Transaction: %s", raw_data)
 
                 unformatted_timestamp: str = line[self.__TIMESTAMP_INDEX]
-                timestamp: str = unformatted_timestamp[: -len(" UTC")] if unformatted_timestamp.endswith(" UTC") else unformatted_timestamp
+                timestamp: str = unformatted_timestamp[: -len(" UTC")]
 
                 result.append(
                     InTransaction(
