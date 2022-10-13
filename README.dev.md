@@ -232,16 +232,28 @@ Data loader plugins live in one of the following directories, depending on their
 * `src/dali/plugin/input/csv/`;
 * `src/dali/plugin/input/rest/`.
 
-If at all possible [prefer implementing a REST plugin over a CSV](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#should-i-implement-a-csv-or-a-rest-data-loader-plugin) one, because CSV sources are often incomplete.
+If at all possible [prefer implementing a REST plugin over a CSV](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#should-i-implement-a-csv-or-a-rest-data-loader-plugin) one, because CSV sources are often incomplete. Furthermore, if the exchange is [compatible with CCXT](https://github.com/ccxt/ccxt#certified-cryptocurrency-exchanges), a CCXT-based REST plugin is the most preferred.
 
-All data loader plugins are subclasses of [AbstractInputPlugin](src/dali/abstract_input_plugin.py).
+CCXT-based data loader plugins are subclasses of [AbstractCcxtInputPlugin](src/dali/abstract_ccxt_input_plugin.py).
+* define their own constructor with any custom parameters;
+* invoke the superclass constructor in their own constructor;
+* implement the `exchange_name()` and `plugin_name()` methods that return the name of the exchange and the name of the plugin without spaces as a `str`.
+* implement the `_initialize_client()` method that returns an initialized instance of the subclass of `Exchange` that handles the plugin's exchange. The initialization of a CCXT exchange instance is described [here](https://docs.ccxt.com/en/latest/manual.html#instantiation).
+* implement the `_get_process_deposits_pagination_detail_set()`, `_get_process_trades_pagination_detail_set()` and `_get_process_withdrawals_pagination_detail_set()` methods that return a [AbstractPaginationDetailSet](src/dali/ccxt_pagination.py) instance. If an exchange does not support one of these unified functions, return `None`.
+* implement the `_process_gains()` method, which reads data for gains received using [the implicit API of CCXT](https://docs.ccxt.com/en/latest/manual.html#implicit-api), accepts a list of [InTransaction](src/dali/in_transaction.py) instances, and [OutTransaction](src/dali/out_transaction.py) instances. If the exchange doesn't support gains, the plugin can use `pass` in the method.
+* implement the `_process_implicit_api()` method, which reads any data not covered by `_process_gains()` using [the implicit api of CCXT](https://docs.ccxt.com/en/latest/manual.html#implicit-api) and accepts a list of [InTransaction](src/dali/in_transaction.py) instances, [OutTransaction](src/dali/out_transaction.py) instances, and [IntraTransaction](src/dali/intra_transaction.py). If the the implicit API is not needed, the plugin can use `pass` in the method.
+* the protected property `_client` can be used in the subclasses to access the exchange instance to make calls to the implicit api in the subclass.
+* the protected property `_logger` can be used for logging.
+* implementing the `load()` method is not required for CCXT-based data loader plugins.
+
+All other data loader plugins are subclasses of [AbstractInputPlugin](src/dali/abstract_input_plugin.py).
 * define their own constructor with any custom parameters;
 * invoke the superclass constructor in their own constructor;
 * implement the `load()` method, which reads data from the native source and returns a list of [AbstractTransaction](src/dali/abstract_transaction.py) instances, which can be of any of the following classes: [InTransaction](src/dali/in_transaction.py) (acquired crypto), [OutTransaction](src/dali/out_transaction.py) (disposed-of crypto) or [IntraTransaction](src/dali/intra_transaction.py) (crypto transferred across accounts controlled by the same person or by people filing together). The fields of transaction classes are described [here](docs/configuration_file.md#manual-section-csv).
 
 If a field is unknown the plugin can fill it with `Keyword.UNKNOWN`, unless it's an optional field (check its type hints in the Python code), in which case it can be `None`. The `unique_id` requires special attention, because the transaction resolver uses it to match and join incomplete transactions: the plugin must ensure to [populate it with the correct value](https://github.com/eprbell/dali-rp2/blob/main/docs/developer_faq.md#how-to-fill-the-unique-id-field). See the [transaction resolver](#the-transaction-resolver) section for more details on `unique_id`.
 
-For an example of REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin, for an example of CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin.
+For an example of a CCXT-based data loader look at the [Binance](src/dali/plugin/input/rest/binance_com.py) plugin, for an example of a REST-based data loader look at the [Coinbase](src/dali/plugin/input/rest/coinbase.py) plugin, for an example of a CSV-based data loader look at the [Trezor](src/dali/plugin/input/csv/trezor.py) plugin.
 
 ### Pair Converter Plugin Development
 Pair converter plugins live in the following directory:
