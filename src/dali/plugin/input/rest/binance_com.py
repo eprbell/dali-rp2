@@ -131,15 +131,17 @@ _WITHDRAWAL_RECORD_LIMIT: int = 1000
 # Types of Binance Dividends
 _BNB_VAULT = "BNB Vault"
 _ETH_STAKING = "ETH 2.0 Staking"
+_FLEXIBLE = "Flexible"
 _FLEXIBLE_SAVINGS = "Flexible Savings"
 _LAUNCH_POOL = "Launchpool"
+_LOCKED = "Locked"
 _LOCKED_SAVINGS = "Locked Savings"
 _LOCKED_STAKING = "Locked Staking"
 _SOLO_AIRDROP = "SOLO airdrop"
 _GENERAL_STAKING = "STAKING"
 
 _AIRDROP_LIST = [_SOLO_AIRDROP]
-_INTEREST_LIST = [_FLEXIBLE_SAVINGS, _LOCKED_SAVINGS]
+_INTEREST_LIST = [_FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS]
 _STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING]
 
 
@@ -170,9 +172,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def exchange_name(self) -> str:
         return self.__EXCHANGE_NAME
-
-    def cache_key(self) -> Optional[str]:
-        return self.__cache_key
 
     def plugin_name(self) -> str:
         return self.__PLUGIN_NAME
