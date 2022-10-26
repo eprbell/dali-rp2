@@ -93,7 +93,7 @@ class AssetPairAndHistoricalPrice(NamedTuple):
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
     # TO BE IMPLEMENTED - main_exchange that refers to the main exchange to be used, ignoring the exchange listed in the transaction
-    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None, default_exchange: str = _DEFAULT_EXCHANGE) -> None:
+    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None, default_exchange: Optional[str] = _DEFAULT_EXCHANGE) -> None:
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
