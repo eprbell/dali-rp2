@@ -16,6 +16,7 @@
 # https://docs.ccxt.com/en/latest/index.html
 
 # pylint: disable=fixme
+# pylint: disable=dangerous-default-value
 
 from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional, Union
