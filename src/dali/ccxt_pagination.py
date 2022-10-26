@@ -49,7 +49,7 @@ class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
         exchange_start_time: int,
         limit: Optional[int] = None,
         markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = {},
         window: Optional[int] = None,
     ) -> None:
 
@@ -96,7 +96,7 @@ class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
         window: int,
         limit: Optional[int] = None,
         markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = {},
     ) -> None:
 
         super().__init__(exchange_start_time, limit, markets, params, window)
@@ -153,7 +153,7 @@ class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
         exchange_start_time: int,
         limit: Optional[int] = None,
         markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = {},
         window: Optional[int] = None,
     ) -> None:
 
@@ -214,7 +214,7 @@ class CustomDateBasedPaginationDetailsIterator(DateBasedPaginationDetailsIterato
         window: int,
         limit: Optional[int] = None,
         markets: Optional[List[str]] = None,
-        params: Optional[Dict[str, Union[int, str, None]]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = {},
     ) -> None:
 
         super().__init__(exchange_start_time, limit, markets, params, window)
