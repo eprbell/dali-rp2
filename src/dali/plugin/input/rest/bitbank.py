@@ -20,25 +20,39 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
+import json
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ccxt import bitbank
 
-from dali.abstract_ccxt_input_plugin import AbstractCcxtInputPlugin
+from dali.abstract_ccxt_input_plugin import (
+    AbstractCcxtInputPlugin, 
+    ProcessOperationResult,
+)
 from dali.ccxt_pagination import (
     AbstractPaginationDetailSet,
     DateBasedPaginationDetailSet,
 )
+from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
+
+from rp2.rp2_decimal import ZERO, RP2Decimal
 
 # Time period constants
 _MS_IN_SECOND: int = 1000
 
 # Record limits
 _TRADE_RECORD_LIMIT: int = 1000
+
+# Transaction keywords
+_COST: str = "cost"
+_CURRENCY: str = "currency"
+_FEE: str = "fee"
+_ID: str = "id"
+_TIMESTAMP: str = "timestamp"
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
@@ -103,3 +117,34 @@ class InputPlugin(AbstractCcxtInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
         pass
+
+    # Override the handling of trades since Bitbank has negative maker fees
+    def _process_buy_and_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        fee_income: Optional[InTransaction] = None
+        if RP2Decimal(str(transaction[_FEE][_COST])) < ZERO:
+            fee_income = InTransaction(
+                    plugin=self.plugin_name(),
+                    unique_id=f"FI{transaction[_ID]}",
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    asset=transaction[_FEE][_CURRENCY],
+                    exchange=self.exchange_name(),
+                    holder=self.account_holder,
+                    transaction_type=Keyword.INCOME.value,
+                    spot_price=Keyword.UNKNOWN.value,
+                    crypto_in=str(-transaction[_FEE][_COST]),
+                    crypto_fee=None,
+                    fiat_in_no_fee=None,
+                    fiat_in_with_fee=None,
+                    fiat_fee=None,
+                    notes=(f"{notes + '; ' if notes else ''} Fee income for transaction #{transaction[_ID]}"),
+                )
+
+            # Zero out the fee so it is not added as a negative fee
+            transaction[_FEE][_COST] = 0.0
+
+        results: ProcessOperationResult = super()._process_buy_and_sell(transaction, notes)
+        if fee_income:
+            results.in_transactions.append(fee_income)
+
+        return results
