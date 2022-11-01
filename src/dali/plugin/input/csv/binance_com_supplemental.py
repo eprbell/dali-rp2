@@ -121,7 +121,7 @@ class InputPlugin(AbstractInputPlugin):
                     )
                 )
 
-            return result
+        return result
 
     def parse_betheth_file(self, file_path: str) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
