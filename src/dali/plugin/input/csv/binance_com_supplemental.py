@@ -64,10 +64,12 @@ class InputPlugin(AbstractInputPlugin):
         result: List[AbstractTransaction] = []
 
         if self.__autoinvest_csv_file:
-            result += self.parse_autoinvest_file(self.__autoinvest_csv_file)
+            result.extend(self.parse_autoinvest_file(self.__autoinvest_csv_file))
 
         if self.__betheth_csv_file:
-            result += self.parse_betheth_file(self.__betheth_csv_file)
+            result.extend(self.parse_betheth_file(self.__betheth_csv_file))
+
+        self.__logger.debug(f"Binance_CSV results {result}")
 
         return result
 

@@ -303,7 +303,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                self.__logger.debug(f"Fetching trades for %s, since - %s", pagination_details.symbol, pagination_details.since)
 
                 trades: Optional[List[Dict[str, Union[str, float]]]] = self.__safe_api_call(
                     self._client.fetch_my_trades,
@@ -447,7 +446,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         while request_count < 9:
             try:
 
-                if params.get("code"):
+                if "code" in params:
                     results = function(
                         code=params["code"],
                         since=params["since"],
