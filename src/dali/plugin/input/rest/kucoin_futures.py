@@ -212,7 +212,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     #   "currency": "USDT"
                     # }
 
-                    # To do: need to replace tranaction type from GIFT to GAIN
+                    # To do: need to replace transaction type from INCOME to GAIN
                     # GAIN currently not implemented in rp2
                     in_transactions.append(
                         InTransaction(
@@ -223,14 +223,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             asset=currency,
                             exchange=self.exchange_name(),
                             holder=self.account_holder,
-                            transaction_type=Keyword.GIFT.name,
+                            transaction_type=Keyword.INCOME.value,
                             spot_price=Keyword.UNKNOWN.value,
                             crypto_in=str(amount_value),
                             crypto_fee=None,
                             fiat_in_no_fee=None,
                             fiat_in_with_fee=None,
                             fiat_fee=None,
-                            notes=None,
+                            notes="Futures gain"
                         )
                     )
 
@@ -249,7 +249,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     #   "currency": "USDT"
                     # }
 
-                    # To do: need to replace tranaction type from FEE to LOSS
+                    # To do: need to replace transaction type from SELL to LOSS
                     # LOSS currently not implemented in rp2
                     out_transactions.append(
                         OutTransaction(
@@ -260,14 +260,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             asset=currency,
                             exchange=self.exchange_name(),
                             holder=self.account_holder,
-                            transaction_type=Keyword.FEE.value,
-                            spot_price=Keyword.UNKNOWN.value,
-                            crypto_out_no_fee="0",
-                            crypto_fee=str(-amount_value),
+                            transaction_type=Keyword.SELL.value,
+                            spot_price="0",
+                            crypto_out_no_fee=str(-amount_value),
+                            crypto_fee="0",
                             crypto_out_with_fee=str(-amount_value),
                             fiat_out_no_fee=None,
                             fiat_fee=None,
-                            notes=None,
+                            notes="Futures loss",
                         )
                     )
 
