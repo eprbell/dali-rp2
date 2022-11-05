@@ -190,7 +190,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             if transaction_type in {_DEPOSIT, _WITHDRAWAL}:
                 pass
 
-            elif transaction_type == _REALIZED_PNL:
+            elif transaction_type == _REALISED_PNL:
                 amount_value = Decimal(amount)
 
                 # no internal txn id provided by kucoin futures
