@@ -69,7 +69,7 @@ class InputPlugin(AbstractInputPlugin):
         if self.__betheth_csv_file:
             result.extend(self.parse_betheth_file(self.__betheth_csv_file))
 
-        self.__logger.debug(f"Binance_CSV results {result}")
+        self.__logger.debug("Binance_CSV results %s", result)
 
         return result
 

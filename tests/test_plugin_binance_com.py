@@ -727,7 +727,7 @@ class TestBinance:
         assert int(parser.parse(fiat_sell_transaction.timestamp).timestamp()) * 1000 == 1624529919000
         assert fiat_sell_transaction.transaction_type == Keyword.SELL.value.capitalize()
         assert fiat_sell_transaction.spot_price == Keyword.UNKNOWN.value
-        assert RP2Decimal(fiat_sell_transaction.crypto_out_no_fee) == RP2Decimal("20.0")
+        assert RP2Decimal(fiat_sell_transaction.crypto_out_no_fee) == RP2Decimal("19.8")
         assert RP2Decimal(fiat_sell_transaction.crypto_fee) == RP2Decimal("0.2")
         assert fiat_sell_transaction.fiat_out_no_fee is None
         assert fiat_sell_transaction.fiat_fee is None

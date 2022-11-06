@@ -101,6 +101,11 @@ class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
         self.__start_time_key: str = start_time_key
         self.__end_time_key: str = end_time_key
 
+    def _get_window(self) -> int:
+        if self.__window:
+            return self.__window
+        raise Exception("No window defined for iterator.")
+
     def __iter__(self) -> "CustomDateBasedPaginationDetailsIterator":
         return CustomDateBasedPaginationDetailsIterator(
             self._get_exchange_start_time(),
@@ -117,7 +122,7 @@ class AbstractPaginationDetailsIterator:
     def __init__(self, limit: Optional[int], markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None) -> None:
         params = {} if params is None else params
         self.__limit: Optional[int] = limit
-        self.__markets: Optional[List[str]] =  markets
+        self.__markets: Optional[List[str]] = markets
         self.__market_count: int = 0
         self.__params: Optional[Dict[str, Union[int, str, None]]] = params
 
@@ -161,14 +166,14 @@ class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
         self.__since: int = exchange_start_time
         self.__exchange_start_time: int = exchange_start_time
         self.__now: int = int(datetime.now().timestamp()) * _MS_IN_SECOND
-        self.__window: int = window
+        self.__window: Optional[int] = window
 
     def update_fetched_elements(self, current_results: Any) -> None:
 
         end_of_market: bool = False
 
         # Update Since if needed otherwise end_of_market
-        if len(current_results) == self._get_limit:
+        if len(current_results) == self._get_limit():
             # All times are inclusive
             self.__since = current_results[len(current_results) - 1][_TIMESTAMP] + 1
         elif self.__window:
@@ -195,8 +200,7 @@ class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
     def _get_end_of_window(self) -> int:
         if self.__window:
             return self.__since + self.__window
-        else:
-            raise Exception("No window defined for iterator.")
+        raise Exception("No window defined for iterator.")
 
     def __next__(self) -> PaginationDetails:
         while not self._is_end_of_data():

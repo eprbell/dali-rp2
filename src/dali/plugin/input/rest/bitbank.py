@@ -25,9 +25,10 @@ from datetime import datetime
 from typing import Any, List, Optional
 
 from ccxt import bitbank
+from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_ccxt_input_plugin import (
-    AbstractCcxtInputPlugin, 
+    AbstractCcxtInputPlugin,
     ProcessOperationResult,
 )
 from dali.ccxt_pagination import (
@@ -38,8 +39,6 @@ from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-
-from rp2.rp2_decimal import ZERO, RP2Decimal
 
 # Time period constants
 _MS_IN_SECOND: int = 1000
@@ -123,22 +122,22 @@ class InputPlugin(AbstractCcxtInputPlugin):
         fee_income: Optional[InTransaction] = None
         if RP2Decimal(str(transaction[_FEE][_COST])) < ZERO:
             fee_income = InTransaction(
-                    plugin=self.plugin_name(),
-                    unique_id=f"FI{transaction[_ID]}",
-                    raw_data=json.dumps(transaction),
-                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
-                    asset=transaction[_FEE][_CURRENCY],
-                    exchange=self.exchange_name(),
-                    holder=self.account_holder,
-                    transaction_type=Keyword.INCOME.value,
-                    spot_price=Keyword.UNKNOWN.value,
-                    crypto_in=str(-transaction[_FEE][_COST]),
-                    crypto_fee=None,
-                    fiat_in_no_fee=None,
-                    fiat_in_with_fee=None,
-                    fiat_fee=None,
-                    notes=(f"{notes + '; ' if notes else ''} Fee income for transaction #{transaction[_ID]}"),
-                )
+                plugin=self.plugin_name(),
+                unique_id=f"{transaction[_ID]}",
+                raw_data=json.dumps(transaction),
+                timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                asset=transaction[_FEE][_CURRENCY],
+                exchange=self.exchange_name(),
+                holder=self.account_holder,
+                transaction_type=Keyword.INCOME.value,
+                spot_price=Keyword.UNKNOWN.value,
+                crypto_in=str(-transaction[_FEE][_COST]),
+                crypto_fee=None,
+                fiat_in_no_fee=None,
+                fiat_in_with_fee=None,
+                fiat_fee=None,
+                notes=(f"{notes + '; ' if notes else ''} Fee income for transaction #{transaction[_ID]}"),
+            )
 
             # Zero out the fee so it is not added as a negative fee
             transaction[_FEE][_COST] = 0.0

@@ -21,9 +21,17 @@ import json
 import logging
 from datetime import datetime, timezone
 from multiprocessing.pool import ThreadPool
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, Union
+from time import sleep
+from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Union
 
-from ccxt import DDoSProtection, Exchange, ExchangeError, ExchangeNotAvailable, NetworkError, RequestTimeout
+from ccxt import (
+    DDoSProtection,
+    Exchange,
+    ExchangeError,
+    ExchangeNotAvailable,
+    NetworkError,
+    RequestTimeout,
+)
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -195,7 +203,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         self,
         intra_transactions: List[IntraTransaction],
     ) -> None:
-
+        processing_result_list: List[Optional[ProcessOperationResult]] = []
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_deposits_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
@@ -208,14 +216,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                deposits: Optional[List[Dict[str, Union[str, float]]]] = self.__safe_api_call(
+                deposits = self.__safe_api_call(
                     self._client.fetch_deposits,
                     {
                         "code": pagination_details.symbol,
                         "since": pagination_details.since,
                         "limit": pagination_details.limit,
                         "params": pagination_details.params,
-                    }
+                    },
                 )
                 # CCXT returns a standardized response from fetch_deposits. 'info' is the exchange-specific information
                 # in this case from Binance.com
@@ -258,7 +266,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(deposits)
 
                 with ThreadPool(self._thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, deposits)
+                    processing_result_list = pool.map(self._process_transfer, deposits)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -304,14 +312,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
 
-                trades: Optional[List[Dict[str, Union[str, float]]]] = self.__safe_api_call(
+                trades: Iterable[Dict[str, Union[str, float]]] = self.__safe_api_call(
                     self._client.fetch_my_trades,
                     {
                         "symbol": pagination_details.symbol,
                         "since": pagination_details.since,
                         "limit": pagination_details.limit,
                         "params": pagination_details.params,
-                    }
+                    },
                 )
                 #   {
                 #       'info':         { ... },                    // the original decoded JSON as is
@@ -341,7 +349,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(trades)
 
                 with ThreadPool(self._thread_count) as pool:
-                    processing_result_list = pool.map(self._process_buy_and_sell, trades)  # type: ignore
+                    processing_result_list = pool.map(self._process_buy_and_sell, trades)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -360,6 +368,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
+        processing_result_list: List[Optional[ProcessOperationResult]] = []
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
@@ -372,14 +381,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                withdrawals: Optional[List[Dict[str, Union[str, float]]]] = self.__safe_api_call(
+                withdrawals: Iterable[Dict[str, Union[str, float]]] = self.__safe_api_call(
                     self._client.fetch_withdrawals,
                     {
                         "code": pagination_details.symbol,
                         "since": pagination_details.since,
                         "limit": pagination_details.limit,
                         "params": pagination_details.params,
-                    }
+                    },
                 )
                 # {
                 #   'info': {
@@ -418,7 +427,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(withdrawals)
 
                 with ThreadPool(self._thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
+                    processing_result_list = pool.map(self._process_transfer, withdrawals)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -431,21 +440,17 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             pass
 
     def __safe_api_call(
-        self, 
-        function: Callable[
-            [str, int, int, Dict[str, Union[int, str, None]]],
-            Optional[List[Dict[str, Union[str, float]]]]
-        ], 
-        params: Dict[str, Union[str, int, Dict[str, Union[int, str, None]]]]
-    ) -> Optional[List[Dict[str, Union[str, float]]]]:
+        self,
+        function: Callable[..., Iterable[Dict[str, Union[str, float]]]],
+        params: Dict[str, Any],
+    ) -> Iterable[Dict[str, Union[str, float]]]:
 
-        results: Optional[List[Dict[str, Union[str, float]]]]
+        results: Iterable[Dict[str, Union[str, float]]]
         request_count: int = 0
-        
+
         # Most exceptions are caused by request limits of the underlying APIs
         while request_count < 9:
             try:
-
                 if "code" in params:
                     results = function(
                         code=params["code"],
@@ -462,9 +467,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                     )
                 break
             except (DDoSProtection, ExchangeError) as exc:
-                self.__logger.debug(
-                    "Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc
-                )
+                self.__logger.debug("Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc)
                 sleep(0.1)
                 request_count += 3
             except (ExchangeNotAvailable, NetworkError, RequestTimeout) as exc_na:
@@ -476,7 +479,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
                 sleep(10)
 
-        return results        
+        return results
 
     ### Single Transaction Processing
 
