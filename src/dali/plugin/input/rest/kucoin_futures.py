@@ -12,14 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Kucoin Futures REST plugin links:
+# REST API: https://docs.kucoin.com/futures/#general
+# Authentication: https://docs.kucoin.com/futures/#authentication
+# Endpoint: https://api-futures.kucoin.com
+
 import json
 import time
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from ccxt import Exchange, RateLimitExceeded, kucoinfutures
-from dateutil import tz
+from ccxt import DDoSProtection, Exchange, ExchangeError, ExchangeNotAvailable, NetworkError, RateLimitExceeded, RequestTimeout, kucoinfutures
 
 from dali.abstract_ccxt_input_plugin import AbstractCcxtInputPlugin
 from dali.ccxt_pagination import AbstractPaginationDetailSet
@@ -41,7 +45,7 @@ _START_AT: str = "startAt"
 _TIME: str = "time"
 _TRANSFER_IN: str = "TransferIn"
 _TRANSFER_OUT: str = "TransferOut"
-_TS_INCREMENT: int = 86400000
+_ONE_DAY_IN_MS: int = 86400000
 _TYPE: str = "type"
 _WITHDRAWAL: str = "Withdrawal"
 
@@ -107,63 +111,56 @@ class InputPlugin(AbstractCcxtInputPlugin):
         end_at: int,
     ) -> List[Dict[str, Any]]:
 
-        offset: int = 1
+        offset: Optional[int] = None
         retries: int = 0
-        has_more: bool = False
+        has_more: bool = True
 
         ledger_transactions: Dict[str, Any] = {}
         items: List[Dict[str, Any]] = []
 
-        while (start_at <= end_at) and retries < 4:
-            try:
-                ledger_transactions = self._client.futuresPrivateGetTransactionHistory({_START_AT: start_at, _END_AT: start_at + _TS_INCREMENT})
-                data_list = ledger_transactions[_DATA][_DATA_LIST]
-                has_more = ledger_transactions[_DATA][_HAS_MORE]
-
-                for item in data_list:
-                    items.append(item)
-                    offset = item[_OFFSET]
-
-                # https://github.com/ccxt/ccxt/issues/10273
-                # enableRateLimit is not working for kucoin
-                time.sleep(0.15)
-                retries = 0
-
-                while has_more and (retries < 4):
-                    try:
+        while start_at <= end_at:
+            while has_more and retries < 4:
+                try:
+                    if offset is None:
+                        ledger_transactions = self._client.futuresPrivateGetTransactionHistory({_START_AT: start_at, _END_AT: start_at + _ONE_DAY_IN_MS})
+                    else:
                         ledger_transactions = self._client.futuresPrivateGetTransactionHistory(
-                            {_START_AT: start_at, _END_AT: start_at + _TS_INCREMENT, _OFFSET: offset}
+                            {_START_AT: start_at, _END_AT: start_at + _ONE_DAY_IN_MS, _OFFSET: offset}
                         )
-                        data_list = ledger_transactions[_DATA][_DATA_LIST]
-                        has_more = ledger_transactions[_DATA][_HAS_MORE]
+                    data_list = ledger_transactions[_DATA][_DATA_LIST]
+                    has_more = ledger_transactions[_DATA][_HAS_MORE]
 
-                        for item in data_list:
-                            items.append(item)
-                            offset = item[_OFFSET]
+                    for item in data_list:
+                        items.append(item)
+                        offset = item[_OFFSET]
 
-                        time.sleep(0.15)
+                    # https://github.com/ccxt/ccxt/issues/10273
+                    # enableRateLimit is not working for kucoin
+                    self._client.sleep(150)
 
-                    except RateLimitExceeded:
-                        self._client.sleep(13000)
-                        retries += 1
+                except RateLimitExceeded:
+                    # sleep for 13 seconds
+                    self._client.sleep(13000)
+                    retries += 1
+                except (DDoSProtection, ExchangeError) as exc:
+                    self.__logger.debug(
+                        "Exception from server, most likely too many requests. Making another attempt after 13 second delay. Exception - %s", exc
+                    )
 
-                if retries >= 4:
-                    raise Exception("Failed to fetch ledger transactions after 4 retries")
+                    self._client.sleep(13000)
+                    retries += 1
 
-                start_at += _TS_INCREMENT
-                offset = 1
-                has_more = False
-                retries = 0
+                except (ExchangeNotAvailable, NetworkError, RequestTimeout) as exc_na:
+                    retries += 1
+                    self.__logger.debug("Server not available. Making attempt #%s of 4 after a 13 second delay. Exception - %s", retries, exc_na)
+                    self._client.sleep(13000)
 
-            except RateLimitExceeded:
-                self._client.sleep(13000)
-                retries += 1
-
-            except Exception as exception:
-                raise exception
-
-        if retries >= 4:
-            raise Exception("Failed to fetch ledger transactions after 4 retries")
+            if retries >= 4:
+                raise Exception("Failed to fetch ledger transactions after 4 retries")
+            start_at += _ONE_DAY_IN_MS
+            offset = None
+            has_more = True
+            retries = 0
 
         return items
 
@@ -175,8 +172,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # intra_transactions: List[IntraTransaction],
     ) -> None:
         for item in items:
-            timestamp_value: int = item[_TIME]
-            timestamp: str = datetime.fromtimestamp(float(timestamp_value) / 1000.0, tz.tzutc()).strftime("%Y-%m-%d %H:%M:%S.%f%z")
+            timestamp: str = self._rp2_timestamp_from_ms_epoch(str(item[_TIME]))
             transaction_type: str = item[_TYPE]
             amount: str = str(item[_AMOUNT])
             currency: str = item[_CURRENCY]
@@ -186,16 +182,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
             if transaction_type in {_TRANSFER_IN, _TRANSFER_OUT}:
                 continue
 
-            # To do: Currently Kucoin futures allows BTC and USDT deposits / withdrawals through blockchain wallets
+            # To do: implement deposit/withdrawal using ccxt fetchDeposits()/fetchWithdrawals()
             if transaction_type in {_DEPOSIT, _WITHDRAWAL}:
-                pass
+                continue
 
-            elif transaction_type == _REALISED_PNL:
+            if transaction_type == _REALISED_PNL:
                 amount_value = Decimal(amount)
 
                 # no internal txn id provided by kucoin futures
                 # unique id manually generated
-                unique_id = f"realized_pnl:{self.exchange_name}:{self.account_holder}:{timestamp}:{offset}"
+                unique_id = f"realized_pnl:{self.exchange_name()}:{self.account_holder}:{timestamp}:{offset}"
 
                 if amount_value > 0:
                     # Gain
@@ -279,8 +275,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
     ) -> None:
         in_transactions.clear()
         out_transactions.clear()
-        intra_transactions.clear()
-
         end_at: int = int(time.time() * 1000)
         start_at: int = self._start_time_ms
 
