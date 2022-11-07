@@ -273,8 +273,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
         out_transactions: List[OutTransaction],
         intra_transactions: List[IntraTransaction],
     ) -> None:
-        in_transactions.clear()
-        out_transactions.clear()
         end_at: int = int(time.time() * 1000)
         start_at: int = self._start_time_ms
 
