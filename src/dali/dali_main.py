@@ -162,9 +162,6 @@ def _dali_main_internal(country: AbstractCountry) -> None:
         with ThreadPool(args.thread_count) as pool:
             result_list = pool.map(_input_plugin_helper, input_plugin_args_list)
 
-        # prune None lists from the result_list
-        result_list = [[] if plugin_results is None else plugin_results for plugin_results in result_list]
-
         transactions: List[AbstractTransaction] = [transaction for result in result_list for transaction in result]
 
         LOGGER.info("Resolving transactions")

@@ -452,19 +452,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         while request_count < 9:
             try:
                 if "code" in params:
-                    results = function(
-                        code=params["code"],
-                        since=params["since"],
-                        limit=params["limit"],
-                        params=params["params"],
-                    )
+                    results = function(**params)
                 else:
-                    results = function(
-                        symbol=params["symbol"],
-                        since=params["since"],
-                        limit=params["limit"],
-                        params=params["params"],
-                    )
+                    results = function(**params)
                 break
             except (DDoSProtection, ExchangeError) as exc:
                 self.__logger.debug("Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc)
