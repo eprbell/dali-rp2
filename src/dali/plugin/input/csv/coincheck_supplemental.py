@@ -87,6 +87,7 @@ class InputPlugin(AbstractInputPlugin):
                         crypto_fee=None,
                         fiat_in_no_fee=line[self.__TOTAL_PRICE],
                         fiat_in_with_fee=line[self.__TOTAL_PRICE],
+                        fiat_ticker="JPY",
                         notes=None,
                     )
                 )

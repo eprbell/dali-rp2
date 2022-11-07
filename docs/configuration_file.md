@@ -184,7 +184,7 @@ native_fiat = <em>&lt;native_fiat&gt;</em>
 Notes:
 * `withdrawals_csv_file` can be retrieved by clicking [出金 (withdrawals)] -> [出金 button to the right of the asset] -> [CSVドウンロード (CSV download)]
 * `withdrawal_code` is the code of the crypto asset that was withdrawn. The csv does not include any information about what asset was withdrawn.
-* This plugin currently only supports withdrawals. If you need support 
+* This plugin currently only supports withdrawals. If you need support
 for deposits, please [open an issue](https://github.com/eprbell/dali-rp2/issues).
 
 ### Coincheck Supplemental Section (CSV)
@@ -199,7 +199,7 @@ native_fiat = <em>&lt;native_fiat&gt;</em>
 Notes:
 * `buys_csv_file` can be retrieved by clicking [Marketplace (Buy)] -> (Scroll down to the bottom) -> Click on the [🔻] to the right of [Coin purchase history] -> Select [Export to CSV]
 * Transfers are not exportable. They will have to be manually added to [transaction hints](https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md#transaction-hints-section)
-* This plugin currently only supports Marketplace Buys. If you need support 
+* This plugin currently only supports Marketplace Buys. If you need support
 for sells, please [open an issue](https://github.com/eprbell/dali-rp2/issues).
 * The Coincheck REST API only supports BTC trades, withdrawals, and deposits and there are currently no plans to implement it.
 

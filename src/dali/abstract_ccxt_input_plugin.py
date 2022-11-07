@@ -21,9 +21,17 @@ import json
 import logging
 from datetime import datetime, timezone
 from multiprocessing.pool import ThreadPool
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from time import sleep
+from typing import Any, Callable, Dict, Iterable, List, NamedTuple, Optional, Union
 
-from ccxt import Exchange
+from ccxt import (
+    DDoSProtection,
+    Exchange,
+    ExchangeError,
+    ExchangeNotAvailable,
+    NetworkError,
+    RequestTimeout,
+)
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -91,7 +99,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
         super().__init__(account_holder, native_fiat)
         self.__logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
-        self.__cache_key: str = f"{str(self.exchange_name).lower()}-{account_holder}"
+        self.__cache_key: str = f"{str(self.exchange_name()).lower()}-{account_holder}"
         self.__client: Exchange = self._initialize_client()
         self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         self.__markets: List[str] = []
@@ -128,7 +136,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         ccxt_markets: Any = self._client.fetch_markets()
         market_list: List[str] = []
         for market in ccxt_markets:
-            self._logger.debug("Market: %s", json.dumps(market))
+            self.__logger.debug("Market: %s", json.dumps(market))
             market_list.append(market[_ID])
 
         self.__markets = market_list
@@ -195,7 +203,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         self,
         intra_transactions: List[IntraTransaction],
     ) -> None:
-
+        processing_result_list: List[Optional[ProcessOperationResult]] = []
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_deposits_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
@@ -208,11 +216,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                deposits = self._client.fetch_deposits(
-                    code=pagination_details.symbol,
-                    since=pagination_details.since,
-                    limit=pagination_details.limit,
-                    params=pagination_details.params,
+                deposits = self.__safe_api_call(
+                    self._client.fetch_deposits,
+                    {
+                        "code": pagination_details.symbol,
+                        "since": pagination_details.since,
+                        "limit": pagination_details.limit,
+                        "params": pagination_details.params,
+                    },
                 )
                 # CCXT returns a standardized response from fetch_deposits. 'info' is the exchange-specific information
                 # in this case from Binance.com
@@ -255,7 +266,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(deposits)
 
                 with ThreadPool(self._thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, deposits)
+                    processing_result_list = pool.map(self._process_transfer, deposits)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -300,11 +311,15 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                trades: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_my_trades(
-                    symbol=pagination_details.symbol,
-                    since=pagination_details.since,
-                    limit=pagination_details.limit,
-                    params=pagination_details.params,
+
+                trades: Iterable[Dict[str, Union[str, float]]] = self.__safe_api_call(
+                    self._client.fetch_my_trades,
+                    {
+                        "symbol": pagination_details.symbol,
+                        "since": pagination_details.since,
+                        "limit": pagination_details.limit,
+                        "params": pagination_details.params,
+                    },
                 )
                 #   {
                 #       'info':         { ... },                    // the original decoded JSON as is
@@ -334,7 +349,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(trades)
 
                 with ThreadPool(self._thread_count) as pool:
-                    processing_result_list = pool.map(self._process_buy_and_sell, trades)  # type: ignore
+                    processing_result_list = pool.map(self._process_buy_and_sell, trades)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -353,6 +368,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         intra_transactions: List[IntraTransaction],
     ) -> None:
 
+        processing_result_list: List[Optional[ProcessOperationResult]] = []
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
@@ -365,11 +381,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                withdrawals: Optional[List[Dict[str, Union[str, float]]]] = self._client.fetch_withdrawals(
-                    code=pagination_details.symbol,
-                    since=pagination_details.since,
-                    limit=pagination_details.limit,
-                    params=pagination_details.params,
+                withdrawals: Iterable[Dict[str, Union[str, float]]] = self.__safe_api_call(
+                    self._client.fetch_withdrawals,
+                    {
+                        "code": pagination_details.symbol,
+                        "since": pagination_details.since,
+                        "limit": pagination_details.limit,
+                        "params": pagination_details.params,
+                    },
                 )
                 # {
                 #   'info': {
@@ -408,7 +427,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 pagination_detail_iterator.update_fetched_elements(withdrawals)
 
                 with ThreadPool(self._thread_count) as pool:
-                    processing_result_list: List[Optional[ProcessOperationResult]] = pool.map(self._process_transfer, withdrawals)  # type: ignore
+                    processing_result_list = pool.map(self._process_transfer, withdrawals)
 
                 for processing_result in processing_result_list:
                     if processing_result is None:
@@ -420,6 +439,38 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             # End of pagination details
             pass
 
+    def __safe_api_call(
+        self,
+        function: Callable[..., Iterable[Dict[str, Union[str, float]]]],
+        params: Dict[str, Any],
+    ) -> Iterable[Dict[str, Union[str, float]]]:
+
+        results: Iterable[Dict[str, Union[str, float]]]
+        request_count: int = 0
+
+        # Most exceptions are caused by request limits of the underlying APIs
+        while request_count < 9:
+            try:
+                if "code" in params:
+                    results = function(**params)
+                else:
+                    results = function(**params)
+                break
+            except (DDoSProtection, ExchangeError) as exc:
+                self.__logger.debug("Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc)
+                sleep(0.1)
+                request_count += 3
+            except (ExchangeNotAvailable, NetworkError, RequestTimeout) as exc_na:
+                request_count += 1
+                if request_count > 9:
+                    self.__logger.info("Maximum number of retries reached.")
+                    raise Exception("Server error") from exc_na
+
+                self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
+                sleep(10)
+
+        return results
+
     ### Single Transaction Processing
 
     def _process_buy_and_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
@@ -429,7 +480,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return results
 
     def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
-        self._logger.debug("Buy: %s", json.dumps(transaction))
+        self.__logger.debug("Buy: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
         crypto_in: RP2Decimal
@@ -537,7 +588,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
 
     def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
-        self._logger.debug("Sell: %s", json.dumps(transaction))
+        self.__logger.debug("Sell: %s", json.dumps(transaction))
         out_transaction_list: List[OutTransaction] = []
         trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
 
@@ -617,9 +668,9 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         return ProcessOperationResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
 
     def _process_transfer(self, transaction: Any) -> ProcessOperationResult:
-        self._logger.debug("Transfer: %s", json.dumps(transaction))
+        self.__logger.debug("Transfer: %s", json.dumps(transaction))
         if transaction[_STATUS] == "failed":
-            self._logger.info("Skipping failed transfer %s", json.dumps(transaction))
+            self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
         else:
             intra_transaction_list: List[IntraTransaction] = []
 
@@ -661,6 +712,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                     )
                 )
             else:
-                self._logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
+                self.__logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
 
         return ProcessOperationResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)

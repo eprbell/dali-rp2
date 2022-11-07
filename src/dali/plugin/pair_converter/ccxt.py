@@ -17,7 +17,19 @@ from datetime import datetime, timedelta
 from time import sleep, time
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
-from ccxt import DDoSProtection, Exchange, ExchangeError, ExchangeNotAvailable, NetworkError, RequestTimeout, binance, kraken, liquid, gateio
+from ccxt import (
+    DDoSProtection,
+    Exchange,
+    ExchangeError,
+    ExchangeNotAvailable,
+    NetworkError,
+    RequestTimeout,
+    binance,
+    ftx,
+    gateio,
+    kraken,
+    liquid,
+)
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
@@ -42,12 +54,13 @@ _TIME_GRANULARITY_IN_SECONDS: List[int] = [60, 300, 900, 3600, 14400, 86400]
 
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
+_FTX: str = "FTX"
 _GATE: str = "Gate"
 _KRAKEN: str = "Kraken"
 _LIQUID: str = "Liquid"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = "Binance.com"
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _KRAKEN: kraken, _LIQUID: liquid}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _FTX: ftx, _GATE: gateio, _KRAKEN: kraken, _LIQUID: liquid}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
 # Kraken states it has a limit of 1 call per second, but this doesn't seem to be correct.
@@ -58,23 +71,25 @@ _REQUEST_DELAYDICT: Dict[str, float] = {_KRAKEN: 5.1}
 
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {
-    "SOLOXRP": _LIQUID,
-    "USDTUSD": _KRAKEN,
-    "SGBUSD": _KRAKEN,
     "ATDUSDT": _GATE,
     "BSVUSDT": _GATE,
     "BOBAUSD": _GATE,
     "EDGUSDT": _GATE,
+    "ETHWUSD": _FTX,
+    "SGBUSD": _KRAKEN,
+    "SOLOXRP": _LIQUID,
+    "USDTUSD": _KRAKEN,
 }
 
 _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {
+    "ATD": "USDT",
+    "BOBA": "USD",
+    "BSV": "USDT",
+    "EDG": "USDT",
+    "ETHW": "USD",
+    "SGB": "USD",
     "SOLO": "XRP",
     "USDT": "USD",
-    "ATD": "USDT",
-    "BSV": "USDT",
-    "SGB": "USD",
-    "BOBA": "USD",
-    "EDG": "USDT",
 }
 
 # Time constants
@@ -93,7 +108,7 @@ class AssetPairAndHistoricalPrice(NamedTuple):
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
     # TO BE IMPLEMENTED - main_exchange that refers to the main exchange to be used, ignoring the exchange listed in the transaction
-    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None, default_exchange: str = _DEFAULT_EXCHANGE) -> None:
+    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None, default_exchange: Optional[str] = None) -> None:
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
@@ -105,7 +120,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         self.__transactions_processed: int = 0
-        self.__default_exchange: str = default_exchange
+        self.__default_exchange: str = default_exchange if default_exchange is not None else _DEFAULT_EXCHANGE
+        self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
 
     def name(self) -> str:
         return "CCXT-converter"
