@@ -20,10 +20,10 @@
 import json
 import time
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from ccxt import DDoSProtection, Exchange, ExchangeError, ExchangeNotAvailable, NetworkError, RateLimitExceeded, RequestTimeout, kucoinfutures
+from rp2.rp2_decimal import RP2Decimal
 
 from dali.abstract_ccxt_input_plugin import AbstractCcxtInputPlugin
 from dali.ccxt_pagination import AbstractPaginationDetailSet
@@ -39,13 +39,14 @@ _DATA_LIST: str = "dataList"
 _DEPOSIT: str = "Deposit"
 _END_AT: str = "endAt"
 _HAS_MORE: str = "hasMore"
+_MS_IN_SECOND: int = 1000
 _OFFSET: str = "offset"
+_ONE_DAY_IN_MS: int = 86400000
 _REALISED_PNL: str = "RealisedPNL"
 _START_AT: str = "startAt"
 _TIME: str = "time"
 _TRANSFER_IN: str = "TransferIn"
 _TRANSFER_OUT: str = "TransferOut"
-_ONE_DAY_IN_MS: int = 86400000
 _TYPE: str = "type"
 _WITHDRAWAL: str = "Withdrawal"
 
@@ -187,7 +188,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 continue
 
             if transaction_type == _REALISED_PNL:
-                amount_value = Decimal(amount)
+                amount_value = RP2Decimal(amount)
 
                 # no internal txn id provided by kucoin futures
                 # unique id manually generated
@@ -273,7 +274,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         out_transactions: List[OutTransaction],
         intra_transactions: List[IntraTransaction],
     ) -> None:
-        end_at: int = int(time.time() * 1000)
+        end_at: int = int(time.time() * _MS_IN_SECOND)
         start_at: int = self._start_time_ms
 
         items: List[Dict[str, Any]] = self._fetch_data(start_at, end_at)
