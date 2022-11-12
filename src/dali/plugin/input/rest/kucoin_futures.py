@@ -22,7 +22,16 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from ccxt import DDoSProtection, Exchange, ExchangeError, ExchangeNotAvailable, NetworkError, RateLimitExceeded, RequestTimeout, kucoinfutures
+from ccxt import (
+    DDoSProtection,
+    Exchange,
+    ExchangeError,
+    ExchangeNotAvailable,
+    NetworkError,
+    RateLimitExceeded,
+    RequestTimeout,
+    kucoinfutures,
+)
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.abstract_ccxt_input_plugin import AbstractCcxtInputPlugin
@@ -49,6 +58,7 @@ _TRANSFER_IN: str = "TransferIn"
 _TRANSFER_OUT: str = "TransferOut"
 _TYPE: str = "type"
 _WITHDRAWAL: str = "Withdrawal"
+
 
 class InputPlugin(AbstractCcxtInputPlugin):
 
@@ -170,7 +180,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
         items: List[Dict[str, Any]],
         in_transactions: List[InTransaction],
         out_transactions: List[OutTransaction],
-        # intra_transactions: List[IntraTransaction],
     ) -> None:
         for item in items:
             timestamp: str = self._rp2_timestamp_from_ms_epoch(str(item[_TIME]))
@@ -227,7 +236,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             fiat_in_no_fee=None,
                             fiat_in_with_fee=None,
                             fiat_fee=None,
-                            notes="Futures gain"
+                            notes="Futures gain",
                         )
                     )
 
