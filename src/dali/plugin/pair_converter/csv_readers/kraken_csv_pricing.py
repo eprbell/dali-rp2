@@ -17,7 +17,8 @@
 import logging
 from csv import reader
 from datetime import datetime, timedelta
-from io import TextIOWrapper
+from io import BytesIO, TextIOWrapper
+from json import JSONDecodeError, loads
 from typing import List, Optional
 from zipfile import ZipFile
 
@@ -28,12 +29,16 @@ from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.historical_bar import HistoricalBar
-from dali.plugin.pair_converter.ccxt import BaseQuotePair
 
 # Google Drive parameters
+_ACCESS_NOT_CONFIGURED: str = "accessNotConfigured"
+_ERROR: str = "error"
+_ERRORS: str = "errors"
 _GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
 _GOOGLE_APIS_URL: str = "https://www.googleapis.com/drive/v3/files"
 _KRAKEN_FOLDER_ID: str = "1aoA6SKgPbS_p3pYStXUXFvmjqShJ2jv9"
+_MESSAGE: str = "message"
+_REASON: str = "reason"
 
 # Google Drive URL Params
 _ALT: str = "alt"
@@ -45,10 +50,11 @@ _QUERY: str = "q"
 # JSON params
 _FILES: str = "files"
 _ID: str = "id"
+_ERROR: str = "error"
 
 class kraken_csv_pricing():
 
-	__KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
+    __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __TIMEOUT: int = 30
 
@@ -72,59 +78,92 @@ class kraken_csv_pricing():
         self.__session: Session = requests.Session()
 
     def get_historical_bars_for_pair(self, base_asset: str, quote_asset: str) -> List[HistoricalBar]:
-    	bars: List[HistoricalBar] = []
-    	base_file: str = f"{base_asset}_OHLCVT.zip"
-    	params: Dict[str, Any] = {
-    		_QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = {base_file}", 
-    		_API_KEY: self.__google_api_key,
-    	}  
-    	try:
-    		response: Response = self.__session.get(_GOOGLE_APIS_URL, params=params, timeout=self.__TIMEOUT)
-			# {
-			#  "kind": "drive#fileList",
-			#  "incompleteSearch": false,
-			#  "files": [
-			#   {
-			#    "kind": "drive#file",
-			#    "id": "1AAWkwfxJjOvZQKv3c5XOH1ZjoIQMblQt",
-			#    "name": "USDT_OHLCVT.zip",
-			#    "mimeType": "application/zip"
-			#   }
-			#  ]
-			# }
-    	
-    		data: Any = response.json()
+        bars: List[HistoricalBar] = []
+        base_file: str = f"{base_asset}_OHLCVT.zip"
+        params: Dict[str, Any] = {
+            _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = '{base_file}'", 
+            _API_KEY: self.__google_api_key,
+        }  
+        try:
+            response: Response = self.__session.get(_GOOGLE_APIS_URL, params=params, timeout=self.__TIMEOUT)
+            # {
+            #  "kind": "drive#fileList",
+            #  "incompleteSearch": false,
+            #  "files": [
+            #   {
+            #    "kind": "drive#file",
+            #    "id": "1AAWkwfxJjOvZQKv3c5XOH1ZjoIQMblQt",
+            #    "name": "USDT_OHLCVT.zip",
+            #    "mimeType": "application/zip"
+            #   }
+            #  ]
+            # }
 
-    		params = {
-    			_ALT : _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1 # Bypasses large file warning
-    		}
-    		file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=__TIMEOUT)
+            ## Error Response
+            # {
+            #  'error': {
+            #   'errors': [
+            #    {
+            #     'domain': 'usageLimits', 
+            #     'reason': 'accessNotConfigured', 
+            #     'message': 'Access Not Configured...', 
+            #     'extendedHelp': 'https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=728279122903'
+            #    }
+            #   ], 
+            #   'code': 403, 
+            #   'message': 'Access Not Configured...'
+            #  }
+            # }           
+            data: Any = response.json()
 
-    	with ZipFile(file_response) as zipped_OHLCVT:
-    		market_pairs: List[]
-    		all_timespans_for_pair: List[str] = [x for x in zipped_OHLCVT.namelist() if (
-    			x.startswith(f"{base_asset}{quote_asset}_")
-    		)]
+            error_json: Any = data.get(_ERROR)
 
-    		if len(all_timespans_for_pair) == 0:
+            if error_json is not None:
+                errors: Any = error_json[_ERRORS]
+                for error in errors:
+                    if error[_REASON] == _ACCESS_NOT_CONFIGURED:
+                        self.__logger.error("""
+                            Access not granted to Google Drive API. You must grant authorization to the Google 
+                            Drive API for your API key. Follow the link in the message for more details. Message:\n%s
+                        """, error[_MESSAGE])
+                        raise Exception("Google Drive not authorized")
+
+            self.__logger.debug("Retrieved %s from %s", data, response.url)
+
+            params = {
+                _ALT : _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1 # Bypasses large file warning
+            }
+            file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
+
+        except JSONDecodeError as exc:
+            self.__logger.debug("Fetching of kraken csv files failed. Try again later.")
+            raise Exception("JSON decode error") from exc
+
+        with ZipFile(BytesIO(file_response.content)) as zipped_OHLCVT:
+            all_timespans_for_pair: List[str] = [x for x in zipped_OHLCVT.namelist() if (
+                x.startswith(f"{base_asset}{quote_asset}_")
+            )]
+
+            if len(all_timespans_for_pair) == 0:
                 self.__logger.debug("Market not found in Kraken files. Skipping file read.")
                 return bars
 
             for file_name in all_timespans_for_pair:
-    			csv_file: str = zipped_OHLCVT.read(file_name).decode(encoding='utf-8')
-    			duration_in_minutes: str = file_name.split("_", 1)[1].strip(".csv")
+                self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
+                csv_file: str = zipped_OHLCVT.read(file_name).decode(encoding='utf-8')
+                duration_in_minutes: str = file_name.split("_", 1)[1].strip(".csv")
 
-    			lines = reader(csv_file)
-    			for line in lines:
-    				datetime.fromtimestamp()
-    				bars.append(HistoricalBar(
-    					duration=timedelta(minutes=int(duration_in_minutes)),
-    					timestamp=datetime.fromtimestamp(line[_TIMESTAMP_INDEX]),
-    					open=RP2Decimal(line[__OPEN]),
-    					high=RP2Decimal(line[__HIGH]),
-    					low=RP2Decimal(line[__LOW]),
-    					close=RP2Decimal(line[__CLOSE]),
-    					volume=RP2Decimal(line[__VOLUME]),
-    				))
+                lines = reader(csv_file.splitlines())
+                 
+                for line in lines:
+                    bars.append(HistoricalBar(
+                        duration=timedelta(minutes=int(duration_in_minutes)),
+                        timestamp=datetime.fromtimestamp(int(line[self.__TIMESTAMP_INDEX])),
+                        open=RP2Decimal(line[self.__OPEN]),
+                        high=RP2Decimal(line[self.__HIGH]),
+                        low=RP2Decimal(line[self.__LOW]),
+                        close=RP2Decimal(line[self.__CLOSE]),
+                        volume=RP2Decimal(line[self.__VOLUME]),
+                    ))
 
             return bars
