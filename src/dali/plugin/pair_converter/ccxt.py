@@ -22,7 +22,7 @@ from ccxt import DDoSProtection, Exchange, ExchangeError, ExchangeNotAvailable, 
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
-from dali.plugin.pair_converter.csv_readers.kraken_csv_pricing import kraken_csv_pricing
+from dali.plugin.pair_converter.csv_reader.kraken_csv_pricing import kraken_csv_pricing
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin, AssetPairAndTimestamp
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar

@@ -24,6 +24,7 @@ from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.ccxt import PairConverterPlugin
+from dali.plugin.pair_converter.csv_reader.kraken_csv_pricing import kraken_csv_pricing
 
 # Default exchange
 TEST_EXCHANGE: str = "Binance.com"
@@ -94,6 +95,7 @@ EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400)
 
 _MS_IN_SECOND: int = 1000
 
+_GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
 
 class TestCcxtPlugin:
     def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any) -> None:
@@ -109,7 +111,11 @@ class TestCcxtPlugin:
                 "secret": "secret",
             }
         )
+        kraken_csv = kraken_csv_pricing(google_api_key="whatever")
+
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
+        mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"kraken": kraken_csv})
         mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
@@ -196,7 +202,9 @@ class TestCcxtPlugin:
         # Load plugin cache and verify
         cache = load_from_cache(plugin.cache_key())
         key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
-        assert len(cache) == 1, str(cache)
+
+        # 3 cached prices - BTC/USDT, USDT/USD, BTC/USD
+        assert len(cache) == 3, str(cache)
         assert key in cache
         data = cache[key]
 

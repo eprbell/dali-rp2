@@ -17,8 +17,10 @@
 import logging
 from csv import reader
 from datetime import datetime, timedelta
+from itertools import repeat
 from io import BytesIO, TextIOWrapper
 from json import JSONDecodeError, loads
+from multiprocessing.pool import ThreadPool
 from typing import List, Optional
 from zipfile import ZipFile
 
@@ -57,6 +59,7 @@ class kraken_csv_pricing():
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __TIMEOUT: int = 30
+    __THREAD_COUNT: int = 6
 
     __TIMESTAMP_INDEX: int = 0
     __OPEN: int = 1
@@ -148,22 +151,29 @@ class kraken_csv_pricing():
                 self.__logger.debug("Market not found in Kraken files. Skipping file read.")
                 return bars
 
-            for file_name in all_timespans_for_pair:
-                self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
-                csv_file: str = zipped_OHLCVT.read(file_name).decode(encoding='utf-8')
-                duration_in_minutes: str = file_name.split("_", 1)[1].strip(".csv")
+            with ThreadPool(self.__THREAD_COUNT) as pool:
+                processing_result_list: List[HistoricalBar] = pool.starmap(self._process_file, zip(all_timespans_for_pair, repeat(zipped_OHLCVT)))
 
-                lines = reader(csv_file.splitlines())
-                 
-                for line in lines:
-                    bars.append(HistoricalBar(
-                        duration=timedelta(minutes=int(duration_in_minutes)),
-                        timestamp=datetime.fromtimestamp(int(line[self.__TIMESTAMP_INDEX])),
-                        open=RP2Decimal(line[self.__OPEN]),
-                        high=RP2Decimal(line[self.__HIGH]),
-                        low=RP2Decimal(line[self.__LOW]),
-                        close=RP2Decimal(line[self.__CLOSE]),
-                        volume=RP2Decimal(line[self.__VOLUME]),
-                    ))
+        bars = [bar for read_bars in processing_result_list for bar in read_bars]
+        return bars
 
-            return bars
+    def _process_file(self, file_name: str, zip_file: ZipFile) -> List[HistoricalBar]:
+        bars: List[HistoricalBar] = []
+        self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
+        csv_file: str = zip_file.read(file_name).decode(encoding='utf-8')
+        duration_in_minutes: str = file_name.split("_", 1)[1].strip(".csv")
+
+        lines = reader(csv_file.splitlines())
+         
+        for line in lines:
+            bars.append(HistoricalBar(
+                duration=timedelta(minutes=int(duration_in_minutes)),
+                timestamp=datetime.fromtimestamp(int(line[self.__TIMESTAMP_INDEX])),
+                open=RP2Decimal(line[self.__OPEN]),
+                high=RP2Decimal(line[self.__HIGH]),
+                low=RP2Decimal(line[self.__LOW]),
+                close=RP2Decimal(line[self.__CLOSE]),
+                volume=RP2Decimal(line[self.__VOLUME]),
+            ))
+
+        return bars
