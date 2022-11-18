@@ -16,12 +16,13 @@
 
 import logging
 from csv import reader
+from collections import ChainMap
 from datetime import datetime, timedelta
 from itertools import repeat
 from io import BytesIO, TextIOWrapper
 from json import JSONDecodeError, loads
 from multiprocessing.pool import ThreadPool
-from typing import List, Optional
+from typing import Dict, List, Optional
 from zipfile import ZipFile
 
 import requests
@@ -83,8 +84,39 @@ class kraken_csv_pricing():
     def get_historical_bars_for_pair(self, base_asset: str, quote_asset: str) -> List[HistoricalBar]:
         bars: List[HistoricalBar] = []
         base_file: str = f"{base_asset}_OHLCVT.zip"
+
+        self.__logger.debug(base_file)
+
+        with ZipFile(BytesIO(self._google_file_to_bytes(base_file))) as zipped_OHLCVT:
+            self.__logger.debug(zipped_OHLCVT.namelist())
+            all_timespans_for_pair: List[str] = [x for x in zipped_OHLCVT.namelist() if (
+                x.startswith(f"{base_asset}{quote_asset}_")
+            )]
+
+            if len(all_timespans_for_pair) == 0:
+                self.__logger.debug("Market not found in Kraken files. Skipping file read.")
+                return bars
+
+            with ThreadPool(self.__THREAD_COUNT) as pool:
+                processing_result_list: List[HistoricalBar] = pool.starmap(self._process_file, zip(all_timespans_for_pair, repeat(zipped_OHLCVT)))
+
+        # Sort the bars by duration, largest duration first
+        sorted_bars = reversed(sorted(processing_result_list, key= lambda x: int(list(x.keys())[0])))
+
+        timed_bars: Dict[int, HistoricalBar] = {}
+
+        # Start with longest duration and replace it with smaller durations
+        for duration_bars in sorted_bars:
+            bars_for_duration = list(duration_bars.values())[0]
+            for bar in bars_for_duration:
+                timed_bars[bar.timestamp] = bar
+
+        return timed_bars.values()
+
+    # isolated in order to be mocked
+    def _google_file_to_bytes(self, file_name: str) -> bytes:
         params: Dict[str, Any] = {
-            _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = '{base_file}'", 
+            _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = '{file_name}'", 
             _API_KEY: self.__google_api_key,
         }  
         try:
@@ -140,24 +172,11 @@ class kraken_csv_pricing():
 
         except JSONDecodeError as exc:
             self.__logger.debug("Fetching of kraken csv files failed. Try again later.")
-            raise Exception("JSON decode error") from exc
+            raise Exception("JSON decode error") from exc        
 
-        with ZipFile(BytesIO(file_response.content)) as zipped_OHLCVT:
-            all_timespans_for_pair: List[str] = [x for x in zipped_OHLCVT.namelist() if (
-                x.startswith(f"{base_asset}{quote_asset}_")
-            )]
+        return file_response.content
 
-            if len(all_timespans_for_pair) == 0:
-                self.__logger.debug("Market not found in Kraken files. Skipping file read.")
-                return bars
-
-            with ThreadPool(self.__THREAD_COUNT) as pool:
-                processing_result_list: List[HistoricalBar] = pool.starmap(self._process_file, zip(all_timespans_for_pair, repeat(zipped_OHLCVT)))
-
-        bars = [bar for read_bars in processing_result_list for bar in read_bars]
-        return bars
-
-    def _process_file(self, file_name: str, zip_file: ZipFile) -> List[HistoricalBar]:
+    def _process_file(self, file_name: str, zip_file: ZipFile) -> Dict[int, List[HistoricalBar]]:
         bars: List[HistoricalBar] = []
         self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
         csv_file: str = zip_file.read(file_name).decode(encoding='utf-8')
@@ -176,4 +195,4 @@ class kraken_csv_pricing():
                 volume=RP2Decimal(line[self.__VOLUME]),
             ))
 
-        return bars
+        return {duration_in_minutes: bars}

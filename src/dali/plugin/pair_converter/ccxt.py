@@ -359,6 +359,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     )
                 self.save_historical_price_cache()
                 self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
+                bar = self._get_bar_from_cache(key)
+                return bar
 
         while retry_count < len(_TIME_GRANULARITY):
 
