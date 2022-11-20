@@ -14,7 +14,7 @@
 
 import os
 from datetime import datetime, timedelta
-from typing import Any, BinaryIO, Dict, List, Union
+from typing import Any, Dict, List, Union
 
 from ccxt import binance, kraken
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -24,7 +24,7 @@ from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.ccxt import PairConverterPlugin
-from dali.plugin.pair_converter.csv_reader.kraken_csv_pricing import kraken_csv_pricing
+from dali.plugin.pair_converter.csv_reader.kraken_csv_pricing import KrakenCsvPricing
 
 # Default exchange
 TEST_EXCHANGE: str = "Binance.com"
@@ -105,6 +105,7 @@ _MS_IN_SECOND: int = 1000
 
 _GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
 
+
 class TestCcxtPlugin:
     def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any) -> None:
         exchange = binance(
@@ -119,7 +120,7 @@ class TestCcxtPlugin:
                 "secret": "secret",
             }
         )
-        kraken_csv = kraken_csv_pricing(google_api_key="whatever")
+        kraken_csv = KrakenCsvPricing(google_api_key="whatever")
 
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
         mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
@@ -149,30 +150,30 @@ class TestCcxtPlugin:
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
 
     # Creates a lot of logger spam, so it must go first.
-    # def test_market_graph_generation(self, mocker: Any) -> None:
-    #     plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-    #     exchange = binance(
-    #         {
-    #             "apiKey": "key",
-    #             "secret": "secret",
-    #         }
-    #     )
-    #     mocker.patch.object(exchange, "fetchOHLCV").return_value = [
-    #         [
-    #             2,  # UTC timestamp in milliseconds, integer
-    #             2,  # (O)pen price, float
-    #             2,  # (H)ighest price, float
-    #             2,  # (L)owest price, float
-    #             2,  # (C)losing price, float
-    #             2,  # (V)olume (in terms of the base currency), float
-    #         ],
-    #     ]
+    def test_market_graph_generation(self, mocker: Any) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+            [
+                2,  # UTC timestamp in milliseconds, integer
+                2,  # (O)pen price, float
+                2,  # (H)ighest price, float
+                2,  # (L)owest price, float
+                2,  # (C)losing price, float
+                2,  # (V)olume (in terms of the base currency), float
+            ],
+        ]
 
-    #     plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "JPY", TEST_EXCHANGE)
+        plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "JPY", TEST_EXCHANGE)
 
-    #     assert plugin.exchanges is not None
-    #     assert plugin.exchange_markets is not None
-    #     assert plugin.exchange_graphs is not None
+        assert plugin.exchanges is not None
+        assert plugin.exchange_markets is not None
+        assert plugin.exchange_graphs is not None
 
     def test_unknown_exchange(self) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
@@ -394,20 +395,19 @@ class TestCcxtPlugin:
         assert data.high == EUR_USD_RATE
         assert data.open == EUR_USD_RATE
         assert data.close == EUR_USD_RATE
-        assert data.volume == ZERO             
+        assert data.volume == ZERO
 
-    def test_kraken_CSV(self, mocker: Any) -> None:
+    def test_kraken_csv(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
- 
+
         cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
         if os.path.exists(cache_path):
             os.remove(cache_path)
 
-        kraken_csv = kraken_csv_pricing(google_api_key="whatever")
-        file: BinaryIO = open("input/test_kraken_CSV.zip", 'rb')
-        mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
-        file.close()
-        
+        kraken_csv = KrakenCsvPricing(google_api_key="whatever")
+        with open("input/test_kraken_CSV.zip", "rb") as file:
+            mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
+
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
         exchange = binance(
             {

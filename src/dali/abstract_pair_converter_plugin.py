@@ -77,10 +77,10 @@ class AbstractPairConverterPlugin:
     def cache_key(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
-    def _add_bar_to_cache(self, key: AssetPairAndTimestamp, bar: HistoricalBar) -> None: 
-        self.__cache[key] = bar
+    def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
+        self.__cache[key] = historical_bar
 
-    def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> HistoricalBar:
+    def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
         return self.__cache.get(key)
 
     @property
