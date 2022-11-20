@@ -160,7 +160,7 @@ class AbstractPairConverterPlugin:
                 response.raise_for_status()
 
         except JSONDecodeError as exc:
-            LOGGER.debug("Fetching of fiat symbols failed. The server might be down. Please try again later.")
+            LOGGER.info("Fetching of fiat symbols failed. The server might be down. Please try again later.")
             raise Exception("JSON decode error") from exc
 
     def _add_fiat_edges_to_graph(self, graph: Dict[str, Dict[str, None]], markets: Dict[str, List[str]]) -> None:

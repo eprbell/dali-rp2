@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import cProfile
-from multiprocessing.pool import ThreadPool
 import os
 import sys
 from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from configparser import ConfigParser
 from importlib import import_module
 from inspect import Signature, signature
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Set, Type, Union
 
@@ -29,7 +29,6 @@ from rp2.logger import LOG_FILE
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import AbstractTransaction, DirectionTypeAndNotes
-from dali.configuration_generator import generate_configuration_file
 from dali.configuration import (
     DEFAULT_CONFIGURATION,
     DIRECTION_2_TRANSACTION_TYPE_SET,
@@ -40,6 +39,7 @@ from dali.configuration import (
     is_transaction_type_valid,
     is_unknown,
 )
+from dali.configuration_generator import generate_configuration_file
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
@@ -179,6 +179,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
     LOGGER.info("Log file: %s", LOG_FILE)
     LOGGER.info("Generated output directory: %s", args.output_dir)
     LOGGER.info("Done")
+
 
 def _input_plugin_helper(args: _InputPluginHelperArgs) -> List[AbstractTransaction]:
     input_plugin: AbstractInputPlugin = args.input_plugin

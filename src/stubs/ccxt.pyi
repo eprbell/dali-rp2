@@ -56,6 +56,10 @@ class coinbasepro(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
+class ftx(Exchange):
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
+    options: Dict[str, str]
+
 class gateio(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]

@@ -131,15 +131,17 @@ _WITHDRAWAL_RECORD_LIMIT: int = 1000
 # Types of Binance Dividends
 _BNB_VAULT = "BNB Vault"
 _ETH_STAKING = "ETH 2.0 Staking"
+_FLEXIBLE = "Flexible"
 _FLEXIBLE_SAVINGS = "Flexible Savings"
 _LAUNCH_POOL = "Launchpool"
+_LOCKED = "Locked"
 _LOCKED_SAVINGS = "Locked Savings"
 _LOCKED_STAKING = "Locked Staking"
 _SOLO_AIRDROP = "SOLO airdrop"
 _GENERAL_STAKING = "STAKING"
 
 _AIRDROP_LIST = [_SOLO_AIRDROP]
-_INTEREST_LIST = [_FLEXIBLE_SAVINGS, _LOCKED_SAVINGS]
+_INTEREST_LIST = [_FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS]
 _STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING]
 
 
@@ -170,9 +172,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def exchange_name(self) -> str:
         return self.__EXCHANGE_NAME
-
-    def cache_key(self) -> Optional[str]:
-        return self.__cache_key
 
     def plugin_name(self) -> str:
         return self.__PLUGIN_NAME
@@ -982,9 +981,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         holder=self.account_holder,
                         transaction_type=Keyword.SELL.value,
                         spot_price=Keyword.UNKNOWN.value,
-                        crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                        crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
                         crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
-                        crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
                         fiat_out_no_fee=None,
                         fiat_fee=None,
                         notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
