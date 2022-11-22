@@ -16,7 +16,7 @@
 
 import logging
 from csv import reader
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from itertools import repeat
 from json import JSONDecodeError
@@ -51,6 +51,8 @@ _CONFIRM: str = "confirm"
 _MEDIA: str = "media"
 _QUERY: str = "q"
 
+_MS_IN_SECOND: int = 1000
+
 
 class KrakenCsvPricing:
 
@@ -78,15 +80,15 @@ class KrakenCsvPricing:
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
 
-    def get_historical_bars_for_pair(self, base_asset: str, quote_asset: str) -> List[HistoricalBar]:
-        bars: List[HistoricalBar] = []
+    def get_historical_bars_for_pair(self, base_asset: str, quote_asset: str) -> Dict[datetime, HistoricalBar]:
+        bars: Dict[datetime, HistoricalBar] = {}
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
         self.__logger.debug(base_file)
 
         with ZipFile(BytesIO(self._google_file_to_bytes(base_file))) as zipped_ohlcvt:
             self.__logger.debug(zipped_ohlcvt.namelist())
-            all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if (x.startswith(f"{base_asset}{quote_asset}_"))]
+            all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
 
             if len(all_timespans_for_pair) == 0:
                 self.__logger.debug("Market not found in Kraken files. Skipping file read.")
@@ -106,9 +108,14 @@ class KrakenCsvPricing:
         for duration_bars in sorted_bars:
             bars_for_duration = list(duration_bars.values())[0]
             for hbar in bars_for_duration:
-                timed_bars[hbar.timestamp] = hbar
+                # create keys for every minute starting with longest duration
+                start_epoch: int = int(hbar.timestamp.timestamp())
+                end_epoch: int = int((hbar.timestamp + timedelta(minutes=list(duration_bars.keys())[0])).timestamp())
+                while start_epoch < end_epoch:
+                    timed_bars[datetime.fromtimestamp(start_epoch, timezone.utc)] = hbar
+                    start_epoch += 60
 
-        return list(timed_bars.values())
+        return timed_bars
 
     # isolated in order to be mocked
     def _google_file_to_bytes(self, file_name: str) -> bytes:
@@ -156,7 +163,7 @@ class KrakenCsvPricing:
                     if error[_REASON] == _ACCESS_NOT_CONFIGURED:
                         self.__logger.error(
                             """
-                            Access not granted to Google Drive API. You must grant authorization to the Google 
+                            Access not granted to Google Drive API. You must grant authorization to the Google
                             Drive API for your API key. Follow the link in the message for more details. Message:\n%s
                         """,
                             error[_MESSAGE],
@@ -186,7 +193,7 @@ class KrakenCsvPricing:
             bars.append(
                 HistoricalBar(
                     duration=timedelta(minutes=int(duration_in_minutes)),
-                    timestamp=datetime.fromtimestamp(int(line[self.__TIMESTAMP_INDEX])),
+                    timestamp=datetime.fromtimestamp(int(line[self.__TIMESTAMP_INDEX]), timezone.utc),
                     open=RP2Decimal(line[self.__OPEN]),
                     high=RP2Decimal(line[self.__HIGH]),
                     low=RP2Decimal(line[self.__LOW]),

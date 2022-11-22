@@ -78,10 +78,25 @@ class AbstractPairConverterPlugin:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
-        self.__cache[key] = historical_bar
+        self.__cache[self._floor_key(key)] = historical_bar
 
     def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
-        return self.__cache.get(key)
+        return self.__cache.get(self._floor_key(key))
+
+    # The most granular pricing available is 1 minute, to reduce the size of cache and increase the reuse of pricing data
+    def _floor_key(self, key: AssetPairAndTimestamp) -> AssetPairAndTimestamp:
+        raw_timestamp: datetime = key.timestamp
+        floored_timestamp: datetime = raw_timestamp - timedelta(
+            minutes=raw_timestamp.minute % 1, seconds=raw_timestamp.second, microseconds=raw_timestamp.microsecond
+        )
+        floored_key: AssetPairAndTimestamp = AssetPairAndTimestamp(
+            timestamp=floored_timestamp,
+            from_asset=key.from_asset,
+            to_asset=key.to_asset,
+            exchange=key.exchange,
+        )
+
+        return floored_key
 
     @property
     def historical_price_type(self) -> str:

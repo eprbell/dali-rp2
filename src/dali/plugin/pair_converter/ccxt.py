@@ -84,7 +84,7 @@ _ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {
     "BSVUSDT": _GATE,
     "BOBAUSD": _GATE,
     "EDGUSDT": _GATE,
-    "ETHWUSD": _FTX,
+    "ETHWUSD": _KRAKEN,
     "SGBUSD": _KRAKEN,
     "SOLOXRP": _LIQUID,
     "USDTUSD": _KRAKEN,
@@ -141,8 +141,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_csv_reader: Dict[str, Any] = {}
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
+        self.__csv_read: Dict[str, bool] = {}
         self.__transactions_processed: int = 0
-        self.__default_exchange: str = default_exchange if default_exchange is not None else _DEFAULT_EXCHANGE
         self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
 
     def name(self) -> str:
@@ -358,7 +358,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
-        if csv_pricing is not None:
+        if csv_pricing is not None and not self.__csv_read.get(exchange, False):
             csv_signature: Signature = signature(csv_pricing)
             if _GOOGLE_API_KEY in csv_signature.parameters:
                 if self.__google_api_key is not None:
@@ -371,16 +371,19 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing())
 
             if csv_reader:
-                csv_bars: List[HistoricalBar] = csv_reader.get_historical_bars_for_pair(from_asset, to_asset)
-                for csv_bar in csv_bars:
+                csv_bars: Dict[datetime, HistoricalBar] = csv_reader.get_historical_bars_for_pair(from_asset, to_asset)
+                for epoch, csv_bar in csv_bars.items():
                     self._add_bar_to_cache(
-                        key=AssetPairAndTimestamp(csv_bar.timestamp, from_asset, to_asset, exchange),
+                        key=AssetPairAndTimestamp(epoch, from_asset, to_asset, exchange),
                         historical_bar=csv_bar,
                     )
                 self.save_historical_price_cache()
                 self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
                 historical_bar = self._get_bar_from_cache(key)
-                return historical_bar
+                self.__csv_read[exchange] = True
+                if historical_bar is not None:
+                    self.__logger.debug("Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange)
+                    return historical_bar
 
         while retry_count < len(_TIME_GRANULARITY):
 

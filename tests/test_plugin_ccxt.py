@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Union
 
 from ccxt import binance, kraken
@@ -48,7 +48,7 @@ TEST_MARKETS: Dict[str, List[str]] = {
 
 # BTCUSDT conversion
 BAR_DURATION: str = "1m"
-BAR_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580)
+BAR_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580, timezone.utc)
 BAR_LOW: RP2Decimal = RP2Decimal("4230.0")
 BAR_HIGH: RP2Decimal = RP2Decimal("4240.6")
 BAR_OPEN: RP2Decimal = RP2Decimal("4235.4")
@@ -57,7 +57,7 @@ BAR_VOLUME: RP2Decimal = RP2Decimal("37.72941911")
 
 # USDTUSD conversion
 USDTUSD_DURATION: str = "1m"
-USDTUSD_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580)
+USDTUSD_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580, timezone.utc)
 USDTUSD_LOW: RP2Decimal = RP2Decimal("0.9987")
 USDTUSD_HIGH: RP2Decimal = RP2Decimal("0.9988")
 USDTUSD_OPEN: RP2Decimal = RP2Decimal("0.9987")
@@ -68,7 +68,7 @@ USDTUSD_VOLUME: RP2Decimal = RP2Decimal("113.786789")
 JPY_USD_RATE: RP2Decimal = RP2Decimal("115")
 
 # No Fiat pair conversion
-BETHETH_TIMESTAMP: datetime = datetime.fromtimestamp(1504541590)
+BETHETH_TIMESTAMP: datetime = datetime.fromtimestamp(1504541590, timezone.utc)
 BETHETH_LOW: RP2Decimal = RP2Decimal("0.9722")
 BETHETH_HIGH: RP2Decimal = RP2Decimal("0.9739")
 BETHETH_OPEN: RP2Decimal = RP2Decimal("0.9736")
@@ -82,7 +82,7 @@ ETHUSDT_CLOSE: RP2Decimal = RP2Decimal("1763.03")
 ETHUSDT_VOLUME: RP2Decimal = RP2Decimal("434")
 
 # Non-USD Fiat pair conversion
-BTCGBP_TIMESTAMP: datetime = datetime.fromtimestamp(1504541600)
+BTCGBP_TIMESTAMP: datetime = datetime.fromtimestamp(1504541600, timezone.utc)
 BTCGBP_LOW: RP2Decimal = RP2Decimal("3379.06")
 BTCGBP_HIGH: RP2Decimal = RP2Decimal("3387.53")
 BTCGBP_OPEN: RP2Decimal = RP2Decimal("3383.29")
@@ -91,10 +91,10 @@ BTCGBP_VOLUME: RP2Decimal = RP2Decimal("37.72941911")
 
 # Fiat to Fiat Test
 EUR_USD_RATE: RP2Decimal = RP2Decimal("1.0847")
-EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400)
+EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400, timezone.utc)
 
 # Kraken CSV read Test
-KRAKEN_TIMESTAMP: datetime = datetime.fromtimestamp(1490807100)
+KRAKEN_TIMESTAMP: datetime = datetime.fromtimestamp(1490807100, timezone.utc)
 KRAKEN_LOW: RP2Decimal = RP2Decimal("1")
 KRAKEN_HIGH: RP2Decimal = RP2Decimal("1")
 KRAKEN_OPEN: RP2Decimal = RP2Decimal("1")
