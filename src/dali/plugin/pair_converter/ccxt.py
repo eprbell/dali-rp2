@@ -26,7 +26,6 @@ from ccxt import (
     NetworkError,
     RequestTimeout,
     binance,
-    ftx,
     gateio,
     kraken,
     liquid,
@@ -60,13 +59,12 @@ _TIME_GRANULARITY_IN_SECONDS: List[int] = [60, 300, 900, 3600, 14400, 86400]
 
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
-_FTX: str = "FTX"
 _GATE: str = "Gate"
 _KRAKEN: str = "Kraken"
 _LIQUID: str = "Liquid"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = "Binance.com"
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _FTX: ftx, _GATE: gateio, _KRAKEN: kraken, _LIQUID: liquid}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _KRAKEN: kraken, _LIQUID: liquid}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
 # Kraken states it has a limit of 1 call per second, but this doesn't seem to be correct.
@@ -382,7 +380,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 historical_bar = self._get_bar_from_cache(key)
                 self.__csv_read[exchange] = True
                 if historical_bar is not None:
-                    self.__logger.debug("Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange)
+                    self.__logger.debug(
+                        "Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange
+                    )
                     return historical_bar
 
         while retry_count < len(_TIME_GRANULARITY):
