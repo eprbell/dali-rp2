@@ -39,7 +39,7 @@ from dali.abstract_pair_converter_plugin import (
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
-from dali.plugin.pair_converter.csv_reader.kraken_csv_pricing import KrakenCsvPricing
+from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 
 # Native format keywords
 _ID: str = "id"
@@ -139,7 +139,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_csv_reader: Dict[str, Any] = {}
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
-        self.__csv_read: Dict[str, bool] = {}
+        self.__csv_read_flag: Dict[str, bool] = {}
         self.__transactions_processed: int = 0
         self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
 
@@ -356,8 +356,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
-        if csv_pricing is not None and not self.__csv_read.get(exchange, False):
+        if csv_pricing is not None and not self.__csv_read_flag.get(exchange, False):
             csv_signature: Signature = signature(csv_pricing)
+
+            # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
             if _GOOGLE_API_KEY in csv_signature.parameters:
                 if self.__google_api_key is not None:
                     csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing(self.__google_api_key))
@@ -378,7 +380,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.save_historical_price_cache()
                 self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
                 historical_bar = self._get_bar_from_cache(key)
-                self.__csv_read[exchange] = True
+                self.__csv_read_flag[exchange] = True
                 if historical_bar is not None:
                     self.__logger.debug(
                         "Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange

@@ -24,7 +24,7 @@ from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.ccxt import PairConverterPlugin
-from dali.plugin.pair_converter.csv_reader.kraken_csv_pricing import KrakenCsvPricing
+from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 
 # Default exchange
 TEST_EXCHANGE: str = "Binance.com"

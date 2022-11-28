@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Kraken CSV format:
+# Kraken CSV format: (epoch) timestamp, open, high, low, close, volume, trades
 
 import logging
 from csv import reader
@@ -37,9 +37,16 @@ _ACCESS_NOT_CONFIGURED: str = "accessNotConfigured"
 _ERROR: str = "error"
 _ERRORS: str = "errors"
 _FILES: str = "files"
-_GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
+
+# The endpoint we will use to query Google Drive for the specific file we need
+# We will also use this to request a file download.
 _GOOGLE_APIS_URL: str = "https://www.googleapis.com/drive/v3/files"
 _ID: str = "id"
+
+# File ID for the folder which contains zipped OHLCVT files grouped by asset
+# In Google Drive lingo, this is the 'parent' of the files we need.
+# Files in this folder will be updated every quarter and thus will have new file IDs.
+# However, the file ID for the folder or parent should remain the same.
 _KRAKEN_FOLDER_ID: str = "1aoA6SKgPbS_p3pYStXUXFvmjqShJ2jv9"
 _MESSAGE: str = "message"
 _REASON: str = "reason"
@@ -54,7 +61,7 @@ _QUERY: str = "q"
 _MS_IN_SECOND: int = 1000
 
 
-class KrakenCsvPricing:
+class Kraken:
 
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
@@ -124,6 +131,8 @@ class KrakenCsvPricing:
             _API_KEY: self.__google_api_key,
         }
         try:
+            # Searching the Kraken folder for the specific file for the asset we are interested in
+            # This query returns a JSON with the file ID we need to download the specific file we need.
             response: Response = self.__session.get(_GOOGLE_APIS_URL, params=params, timeout=self.__TIMEOUT)
             # {
             #  "kind": "drive#fileList",
@@ -172,7 +181,9 @@ class KrakenCsvPricing:
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
 
-            params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # Bypasses large file warning
+            # Downloading the zipfile that contains the 6 files one for each of the standard durations of candles:
+            # 1m, 5m, 15m, 1h, 12h, 24h.
+            params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # _CONFIRM: 1 bypasses large file warning
             file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
 
         except JSONDecodeError as exc:
