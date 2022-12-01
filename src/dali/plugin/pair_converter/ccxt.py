@@ -28,7 +28,6 @@ from ccxt import (
     binance,
     gateio,
     kraken,
-    liquid,
 )
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
@@ -64,7 +63,7 @@ _KRAKEN: str = "Kraken"
 _LIQUID: str = "Liquid"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = "Binance.com"
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _KRAKEN: kraken, _LIQUID: liquid}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _KRAKEN: kraken}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
 # Kraken states it has a limit of 1 call per second, but this doesn't seem to be correct.
