@@ -149,8 +149,7 @@ class TestCcxtPlugin:
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
 
-    # Creates a lot of logger spam, so it must go first.
-    def test_market_graph_generation(self, mocker: Any) -> None:
+    def test_unknown_exchange(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         exchange = binance(
             {
@@ -158,25 +157,16 @@ class TestCcxtPlugin:
                 "secret": "secret",
             }
         )
-        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
-            [
-                2,  # UTC timestamp in milliseconds, integer
-                2,  # (O)pen price, float
-                2,  # (H)ighest price, float
-                2,  # (L)owest price, float
-                2,  # (C)losing price, float
-                2,  # (V)olume (in terms of the base currency), float
-            ],
-        ]
+        alt_exchange = kraken(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
 
-        plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "JPY", TEST_EXCHANGE)
-
-        assert plugin.exchanges is not None
-        assert plugin.exchange_markets is not None
-        assert plugin.exchange_graphs is not None
-
-    def test_unknown_exchange(self) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "Bogus Exchange")
         assert data
 
