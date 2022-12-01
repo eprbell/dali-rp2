@@ -64,6 +64,10 @@ class gateio(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
+class huobi(Exchange):
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
+    options: Dict[str, str]
+
 class kraken(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]

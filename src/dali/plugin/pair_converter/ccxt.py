@@ -27,6 +27,7 @@ from ccxt import (
     RequestTimeout,
     binance,
     gateio,
+    huobi,
     kraken,
 )
 from rp2.logger import create_logger
@@ -59,11 +60,11 @@ _TIME_GRANULARITY_IN_SECONDS: List[int] = [60, 300, 900, 3600, 14400, 86400]
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
 _GATE: str = "Gate"
+_HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
-_LIQUID: str = "Liquid"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = "Binance.com"
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _KRAKEN: kraken}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
 # Kraken states it has a limit of 1 call per second, but this doesn't seem to be correct.
@@ -83,7 +84,7 @@ _ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {
     "EDGUSDT": _GATE,
     "ETHWUSD": _KRAKEN,
     "SGBUSD": _KRAKEN,
-    "SOLOXRP": _LIQUID,
+    "SOLOUSDT": _HUOBI,
     "USDTUSD": _KRAKEN,
 }
 
@@ -94,7 +95,7 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {
     "EDG": "USDT",
     "ETHW": "USD",
     "SGB": "USD",
-    "SOLO": "XRP",
+    "SOLO": "USDT",
     "USDT": "USD",
 }
 
