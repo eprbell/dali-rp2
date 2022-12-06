@@ -408,14 +408,16 @@ Initialize this plugin section as follows:
 <pre>
 [dali.plugin.pair_converter.ccxt</em>]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
-fiat_priority = <em>&lt;fiat_priority&gt;</em>
 default_exchange = <em>&lt;default_exchange&gt;</em>
+fiat_priority = <em>&lt;fiat_priority&gt;</em>
+google_api_key = <em>&lt;google_api_key&gt;</em>
 </pre>
 
 Where:
 * `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
-* `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Binance.com is used. If you would like an exchange added please open an issue.
+* `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
+* `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
 
 The CCXT pair converter plugin uses a routing system to find the shortest pricing path between a base asset and a quote asset (what the asset is priced in). It does this by assembling a graph of nodes made out of assets and edges made from markets with a preference for the exchange the asset was purchased on. Fiat exchange rates from the European Central Bank are also added to the graph to allow any fiat to be converted between each other.
 

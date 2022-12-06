@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Union
 
 from ccxt import binance, kraken
@@ -24,6 +24,7 @@ from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.ccxt import PairConverterPlugin
+from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 
 # Default exchange
 TEST_EXCHANGE: str = "Binance.com"
@@ -47,7 +48,7 @@ TEST_MARKETS: Dict[str, List[str]] = {
 
 # BTCUSDT conversion
 BAR_DURATION: str = "1m"
-BAR_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580)
+BAR_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580, timezone.utc)
 BAR_LOW: RP2Decimal = RP2Decimal("4230.0")
 BAR_HIGH: RP2Decimal = RP2Decimal("4240.6")
 BAR_OPEN: RP2Decimal = RP2Decimal("4235.4")
@@ -56,7 +57,7 @@ BAR_VOLUME: RP2Decimal = RP2Decimal("37.72941911")
 
 # USDTUSD conversion
 USDTUSD_DURATION: str = "1m"
-USDTUSD_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580)
+USDTUSD_TIMESTAMP: datetime = datetime.fromtimestamp(1504541580, timezone.utc)
 USDTUSD_LOW: RP2Decimal = RP2Decimal("0.9987")
 USDTUSD_HIGH: RP2Decimal = RP2Decimal("0.9988")
 USDTUSD_OPEN: RP2Decimal = RP2Decimal("0.9987")
@@ -67,7 +68,7 @@ USDTUSD_VOLUME: RP2Decimal = RP2Decimal("113.786789")
 JPY_USD_RATE: RP2Decimal = RP2Decimal("115")
 
 # No Fiat pair conversion
-BETHETH_TIMESTAMP: datetime = datetime.fromtimestamp(1504541590)
+BETHETH_TIMESTAMP: datetime = datetime.fromtimestamp(1504541590, timezone.utc)
 BETHETH_LOW: RP2Decimal = RP2Decimal("0.9722")
 BETHETH_HIGH: RP2Decimal = RP2Decimal("0.9739")
 BETHETH_OPEN: RP2Decimal = RP2Decimal("0.9736")
@@ -81,7 +82,7 @@ ETHUSDT_CLOSE: RP2Decimal = RP2Decimal("1763.03")
 ETHUSDT_VOLUME: RP2Decimal = RP2Decimal("434")
 
 # Non-USD Fiat pair conversion
-BTCGBP_TIMESTAMP: datetime = datetime.fromtimestamp(1504541600)
+BTCGBP_TIMESTAMP: datetime = datetime.fromtimestamp(1504541600, timezone.utc)
 BTCGBP_LOW: RP2Decimal = RP2Decimal("3379.06")
 BTCGBP_HIGH: RP2Decimal = RP2Decimal("3387.53")
 BTCGBP_OPEN: RP2Decimal = RP2Decimal("3383.29")
@@ -90,9 +91,19 @@ BTCGBP_VOLUME: RP2Decimal = RP2Decimal("37.72941911")
 
 # Fiat to Fiat Test
 EUR_USD_RATE: RP2Decimal = RP2Decimal("1.0847")
-EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400)
+EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400, timezone.utc)
+
+# Kraken CSV read Test
+KRAKEN_TIMESTAMP: datetime = datetime.fromtimestamp(1490807100, timezone.utc)
+KRAKEN_LOW: RP2Decimal = RP2Decimal("1")
+KRAKEN_HIGH: RP2Decimal = RP2Decimal("1")
+KRAKEN_OPEN: RP2Decimal = RP2Decimal("1")
+KRAKEN_CLOSE: RP2Decimal = RP2Decimal("1")
+KRAKEN_VOLUME: RP2Decimal = RP2Decimal("1")
 
 _MS_IN_SECOND: int = 1000
+
+_GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
 
 
 class TestCcxtPlugin:
@@ -109,7 +120,11 @@ class TestCcxtPlugin:
                 "secret": "secret",
             }
         )
+        kraken_csv = KrakenCsvPricing(google_api_key="whatever")
+
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
+        mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"kraken": kraken_csv})
         mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
@@ -134,8 +149,7 @@ class TestCcxtPlugin:
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
 
-    # Creates a lot of logger spam, so it must go first.
-    def test_market_graph_generation(self, mocker: Any) -> None:
+    def test_unknown_exchange(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         exchange = binance(
             {
@@ -143,25 +157,16 @@ class TestCcxtPlugin:
                 "secret": "secret",
             }
         )
-        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
-            [
-                2,  # UTC timestamp in milliseconds, integer
-                2,  # (O)pen price, float
-                2,  # (H)ighest price, float
-                2,  # (L)owest price, float
-                2,  # (C)losing price, float
-                2,  # (V)olume (in terms of the base currency), float
-            ],
-        ]
+        alt_exchange = kraken(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
 
-        plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "JPY", TEST_EXCHANGE)
-
-        assert plugin.exchanges is not None
-        assert plugin.exchange_markets is not None
-        assert plugin.exchange_graphs is not None
-
-    def test_unknown_exchange(self) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "Bogus Exchange")
         assert data
 
@@ -196,7 +201,9 @@ class TestCcxtPlugin:
         # Load plugin cache and verify
         cache = load_from_cache(plugin.cache_key())
         key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
-        assert len(cache) == 1, str(cache)
+
+        # 3 cached prices - BTC/USDT, USDT/USD, BTC/USD
+        assert len(cache) == 3, str(cache)
         assert key in cache
         data = cache[key]
 
@@ -246,6 +253,7 @@ class TestCcxtPlugin:
     # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
     def test_no_fiat_pair(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+
         exchange = binance(
             {
                 "apiKey": "key",
@@ -378,3 +386,62 @@ class TestCcxtPlugin:
         assert data.open == EUR_USD_RATE
         assert data.close == EUR_USD_RATE
         assert data.volume == ZERO
+
+    def test_kraken_csv(self, mocker: Any) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
+
+        cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
+        if os.path.exists(cache_path):
+            os.remove(cache_path)
+
+        kraken_csv = KrakenCsvPricing(google_api_key="whatever")
+        with open("input/test_kraken_CSV.zip", "rb") as file:
+            mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
+
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        alt_exchange = kraken(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+            [
+                KRAKEN_TIMESTAMP,  # Match the timestamp to assure correct price look up
+                BAR_OPEN,  # (O)pen price, float
+                BAR_HIGH,  # (H)ighest price, float
+                BAR_LOW,  # (L)owest price, float
+                BAR_CLOSE,  # (C)losing price, float
+                BAR_VOLUME,  # (V)olume (in terms of the base currency), float
+            ],
+        ]
+
+        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
+            [
+                KRAKEN_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                USDTUSD_OPEN,  # (O)pen price, float
+                USDTUSD_HIGH,  # (H)ighest price, float
+                USDTUSD_LOW,  # (L)owest price, float
+                USDTUSD_CLOSE,  # (C)losing price, float
+                USDTUSD_VOLUME,  # (V)olume (in terms of the base currency), float
+            ],
+        ]
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
+
+        data = plugin.get_historic_bar_from_native_source(KRAKEN_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
+
+        assert data
+        assert data.timestamp == KRAKEN_TIMESTAMP
+        assert data.low == BAR_LOW * KRAKEN_LOW
+        assert data.high == BAR_HIGH * KRAKEN_HIGH
+        assert data.open == BAR_OPEN * KRAKEN_OPEN
+        assert data.close == BAR_CLOSE * KRAKEN_CLOSE
+        assert data.volume == BAR_VOLUME + KRAKEN_VOLUME

@@ -14,6 +14,7 @@
 
 import logging
 from datetime import datetime, timedelta
+from inspect import Signature, signature
 from time import sleep, time
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
@@ -25,22 +26,26 @@ from ccxt import (
     NetworkError,
     RequestTimeout,
     binance,
-    ftx,
     gateio,
+    huobi,
     kraken,
-    liquid,
 )
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
-from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
+from dali.abstract_pair_converter_plugin import (
+    AbstractPairConverterPlugin,
+    AssetPairAndTimestamp,
+)
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
+from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 
 # Native format keywords
 _ID: str = "id"
 _BASE: str = "base"
 _QUOTE: str = "quote"
+_SYMBOL: str = "symbol"
 
 # Time in ms
 _MINUTE: str = "1m"
@@ -54,13 +59,12 @@ _TIME_GRANULARITY_IN_SECONDS: List[int] = [60, 300, 900, 3600, 14400, 86400]
 
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
-_FTX: str = "FTX"
 _GATE: str = "Gate"
+_HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
-_LIQUID: str = "Liquid"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = "Binance.com"
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _FTX: ftx, _GATE: gateio, _KRAKEN: kraken, _LIQUID: liquid}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
 # Kraken states it has a limit of 1 call per second, but this doesn't seem to be correct.
@@ -69,15 +73,18 @@ _EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _FTX: ftx, _GATE: gateio, _
 # Being authenticated lowers this limit.
 _REQUEST_DELAYDICT: Dict[str, float] = {_KRAKEN: 5.1}
 
+# CSV Pricing classes
+_CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
+
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {
     "ATDUSDT": _GATE,
     "BSVUSDT": _GATE,
     "BOBAUSD": _GATE,
     "EDGUSDT": _GATE,
-    "ETHWUSD": _FTX,
+    "ETHWUSD": _KRAKEN,
     "SGBUSD": _KRAKEN,
-    "SOLOXRP": _LIQUID,
+    "SOLOUSDT": _HUOBI,
     "USDTUSD": _KRAKEN,
 }
 
@@ -88,7 +95,7 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {
     "EDG": "USDT",
     "ETHW": "USD",
     "SGB": "USD",
-    "SOLO": "XRP",
+    "SOLO": "USDT",
     "USDT": "USD",
 }
 
@@ -97,6 +104,9 @@ _MS_IN_SECOND: int = 1000
 
 # Cache
 _CACHE_INTERVAL: int = 50
+
+# CSV Reader
+_GOOGLE_API_KEY: str = "google_api_key"
 
 
 class AssetPairAndHistoricalPrice(NamedTuple):
@@ -108,19 +118,29 @@ class AssetPairAndHistoricalPrice(NamedTuple):
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
     # TO BE IMPLEMENTED - main_exchange that refers to the main exchange to be used, ignoring the exchange listed in the transaction
-    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None, default_exchange: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        historical_price_type: str,
+        default_exchange: Optional[str] = None,
+        fiat_priority: Optional[str] = None,
+        google_api_key: Optional[str] = None,
+    ) -> None:
+
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
+        self.__google_api_key: Optional[str] = google_api_key
 
         # TO BE IMPLEMENTED - graph and vertex classes to make this more understandable
         # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924056308
+        self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
+        self.__exchange_csv_reader: Dict[str, Any] = {}
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
+        self.__csv_read_flag: Dict[str, bool] = {}
         self.__transactions_processed: int = 0
-        self.__default_exchange: str = default_exchange if default_exchange is not None else _DEFAULT_EXCHANGE
         self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
 
     def name(self) -> str:
@@ -199,6 +219,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
                 for market in current_exchange.fetch_markets():
                     self.__logger.debug("Market: %s", market)
+
                     current_markets[f"{market[_BASE]}{market[_QUOTE]}"] = [exchange]
 
                     # TO BE IMPLEMENTED - lazy build graph only if needed
@@ -326,6 +347,45 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         retry_count: int = 0
         current_exchange: Any = self.__exchanges[exchange]
         ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
+        key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange)
+        historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)
+        csv_pricing: Any = _CSV_PRICING_DICT.get(exchange)
+        csv_reader: Any = None
+
+        if historical_bar is not None:
+            self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
+            return historical_bar
+
+        if csv_pricing is not None and not self.__csv_read_flag.get(exchange, False):
+            csv_signature: Signature = signature(csv_pricing)
+
+            # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
+            if _GOOGLE_API_KEY in csv_signature.parameters:
+                if self.__google_api_key is not None:
+                    csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing(self.__google_api_key))
+                else:
+                    self.__logger.debug(
+                        "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
+                    )
+            else:
+                csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing())
+
+            if csv_reader:
+                csv_bars: Dict[datetime, HistoricalBar] = csv_reader.get_historical_bars_for_pair(from_asset, to_asset)
+                for epoch, csv_bar in csv_bars.items():
+                    self._add_bar_to_cache(
+                        key=AssetPairAndTimestamp(epoch, from_asset, to_asset, exchange),
+                        historical_bar=csv_bar,
+                    )
+                self.save_historical_price_cache()
+                self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
+                historical_bar = self._get_bar_from_cache(key)
+                self.__csv_read_flag[exchange] = True
+                if historical_bar is not None:
+                    self.__logger.debug(
+                        "Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange
+                    )
+                    return historical_bar
 
         while retry_count < len(_TIME_GRANULARITY):
 
@@ -378,5 +438,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 break
 
             retry_count += 1
+
+        # Save the individual pair to cache
+        if result is not None:
+            self._add_bar_to_cache(key, result)
 
         return result
