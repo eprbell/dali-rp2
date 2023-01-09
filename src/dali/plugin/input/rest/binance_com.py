@@ -295,7 +295,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 earliest_record_epoch = int(dividends[_ROWS][-1][_DIV_TIME]) - 1
 
             # We need to track subscription and redemption amounts since Binance will take a fee equal to the amount of interest
-            # earned during the lock period if the user prematurely redems their funds.
+            # earned during the lock period if the user prematurely redeems their funds.
 
         # Old system Locked Savings
 
@@ -967,27 +967,50 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         fiat_in_no_fee=None,
                         fiat_in_with_fee=None,
                         fiat_fee=None,
-                        notes=(f"{notes + '; ' if notes else ''}Buy transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
+                        notes=(f"{notes + '; ' if notes else ''}Buy transaction conversion from non-native_fiat orderNo - {transaction[_ORDER_NO]}"),
                     )
                 )
-                out_transaction_list.append(
-                    OutTransaction(
-                        plugin=self.__PLUGIN_NAME,
-                        unique_id=transaction[_ORDER_NO],
-                        raw_data=json.dumps(transaction),
-                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
-                        asset=transaction[_FIAT_CURRENCY],
-                        exchange=self.__EXCHANGE_NAME,
-                        holder=self.account_holder,
-                        transaction_type=Keyword.SELL.value,
-                        spot_price=Keyword.UNKNOWN.value,
-                        crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
-                        crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
-                        crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
-                        fiat_out_no_fee=None,
-                        fiat_fee=None,
-                        notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
-                    )
+
+            # An InTransaction is needed for the fiat in order for the accounting to zero out
+            in_transaction_list.append(
+                InTransaction(
+                    plugin=self.__PLUGIN_NAME,
+                    unique_id=transaction[_ORDER_NO],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                    asset=transaction[_FIAT_CURRENCY],
+                    exchange=self.__EXCHANGE_NAME,
+                    holder=self.account_holder,
+                    transaction_type=Keyword.BUY.value,
+                    spot_price=str(RP2Decimal("1")),
+                    crypto_in=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                    crypto_fee=None,
+                    fiat_in_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                    fiat_in_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                    fiat_fee=None,
+                    fiat_ticker=transaction[_FIAT_CURRENCY],
+                    notes=(f"{notes + '; ' if notes else ''}Fiat deposit for orderNo - {transaction[_ORDER_NO]}"),
                 )
+            )
+
+            out_transaction_list.append(
+                OutTransaction(
+                    plugin=self.__PLUGIN_NAME,
+                    unique_id=transaction[_ORDER_NO],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                    asset=transaction[_FIAT_CURRENCY],
+                    exchange=self.__EXCHANGE_NAME,
+                    holder=self.account_holder,
+                    transaction_type=Keyword.SELL.value,
+                    spot_price=Keyword.UNKNOWN.value,
+                    crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                    crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
+                    crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                    fiat_out_no_fee=None,
+                    fiat_fee=None,
+                    notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
+                )
+            )
 
         return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])

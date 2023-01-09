@@ -26,6 +26,7 @@ from rp2.logger import create_logger
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import Keyword
+from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 
 
@@ -36,7 +37,9 @@ class InputPlugin(AbstractInputPlugin):
 
     __TIMESTAMP_INDEX: int = 0
     __SENT_AMOUNT: int = 1
+    __DEPOSIT_TOTAL: int = 1
     __TRANSACTION_FEE: int = 2
+    __DEPOSIT_STATUS: int = 2
     __TOTAL: int = 3
     __LABEL: int = 4
     __ADDRESS: int = 5
@@ -48,19 +51,70 @@ class InputPlugin(AbstractInputPlugin):
     def __init__(
         self,
         account_holder: str,
-        withdrawals_csv_file: str,
-        withdrawals_code: str,
+        deposits_csv_file: Optional[str],
+        deposits_code: Optional[str],
+        withdrawals_csv_file: Optional[str],
+        withdrawals_code: Optional[str],
         native_fiat: Optional[str] = None,
     ) -> None:
 
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
+        self.__deposits_csv_file: str = deposits_csv_file
+        self.__deposits_code: str = deposits_code
         self.__withdrawals_csv_file: str = withdrawals_csv_file
         # Code of the asset being withdrawn since it is NOT included in the CSV file.
         self.__withdrawals_code: str = withdrawals_code
         self.__logger: logging.Logger = create_logger(f"{self.__BITBANK_PLUGIN}/{self.account_holder}")
 
     def load(self) -> List[AbstractTransaction]:
-        return self.parse_withdrawals_file(self.__withdrawals_csv_file)
+        result: List[AbstractTransaction] = []
+
+        if self.__withdrawals_csv_file:
+            result.extend(self.parse_withdrawals_file(self.__withdrawals_csv_file))
+
+        if self.__deposits_csv_file:
+            result.extend(self.parse_deposits_file(self.__deposits_csv_file))
+
+        return result
+
+    def parse_deposits_file(self, file_path: str) -> List[AbstractTransaction]:
+        result: List[AbstractTransaction] = []
+
+        with open(file_path, encoding="utf-8") as csv_file:
+            lines = reader(csv_file)
+
+            header = next(lines)
+            self.__logger.debug("Header: %s", header)
+            for line in lines:
+                if line[self.__DEPOSIT_STATUS] == "DONE":
+                    raw_data: str = self.__DELIMITER.join(line)
+                    self.__logger.debug("Transaction: %s", raw_data)
+
+                    jst_timezone = PytzTimezone("Asia/Tokyo")
+                    jst_datetime: datetime = jst_timezone.localize(datetime.strptime(line[self.__TIMESTAMP_INDEX], "%Y/%m/%d %H:%M:%S"))
+                    utc_timestamp: str = jst_datetime.astimezone(DatetimeTimezone.utc).strftime("%Y-%m-%d %H:%M:%S%z")
+
+                    result.append(
+                        InTransaction(
+                            plugin=self.__BITBANK_PLUGIN,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=utc_timestamp,
+                            asset=self.__deposits_code,
+                            exchange=self.__BITBANK,
+                            holder=self.account_holder,
+                            transaction_type=Keyword.BUY.value,
+                            spot_price="1.0",
+                            crypto_in=str(line[self.__DEPOSIT_TOTAL]),
+                            crypto_fee=None,
+                            fiat_in_no_fee=str(line[self.__DEPOSIT_TOTAL]),
+                            fiat_in_with_fee=str(line[self.__DEPOSIT_TOTAL]),
+                            fiat_ticker="JPY",
+                            notes="Fiat deposit",
+                        )
+                    )
+
+        return result
 
     def parse_withdrawals_file(self, file_path: str) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
