@@ -20,6 +20,8 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
+# pylint: disable=too-many-lines
+
 import json
 import re
 from datetime import datetime
@@ -947,7 +949,27 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         fiat_in_with_fee=str(transaction[_SOURCE_AMOUNT]),
                         fiat_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
                         fiat_ticker=transaction[_FIAT_CURRENCY],
-                        notes=(f"{notes + '; ' if notes else ''}Buy transaction for fiat payment orderNo - {transaction[_ORDER_NO]}"),
+                        notes=(f"{notes + '; ' if notes else ''}Buy transaction for native fiat payment orderNo - {transaction[_ORDER_NO]}"),
+                    )
+                )
+                out_transaction_list.append(
+                    OutTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_FIAT_CURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.SELL.value,
+                        spot_price=str(RP2Decimal("1")),
+                        crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                        fiat_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        fiat_fee=None,
+                        fiat_ticker=transaction[_FIAT_CURRENCY],
+                        notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from native fiat orderNo - " f"{transaction[_ORDER_NO]}"),
                     )
                 )
             else:
@@ -971,6 +993,26 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     )
                 )
 
+                out_transaction_list.append(
+                    OutTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_FIAT_CURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.SELL.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                        fiat_out_no_fee=None,
+                        fiat_fee=None,
+                        notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
+                    )
+                )
+
             # An InTransaction is needed for the fiat in order for the accounting to zero out
             in_transaction_list.append(
                 InTransaction(
@@ -990,26 +1032,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     fiat_fee=None,
                     fiat_ticker=transaction[_FIAT_CURRENCY],
                     notes=(f"{notes + '; ' if notes else ''}Fiat deposit for orderNo - {transaction[_ORDER_NO]}"),
-                )
-            )
-
-            out_transaction_list.append(
-                OutTransaction(
-                    plugin=self.__PLUGIN_NAME,
-                    unique_id=transaction[_ORDER_NO],
-                    raw_data=json.dumps(transaction),
-                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
-                    asset=transaction[_FIAT_CURRENCY],
-                    exchange=self.__EXCHANGE_NAME,
-                    holder=self.account_holder,
-                    transaction_type=Keyword.SELL.value,
-                    spot_price=Keyword.UNKNOWN.value,
-                    crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
-                    crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
-                    crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
-                    fiat_out_no_fee=None,
-                    fiat_fee=None,
-                    notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
                 )
             )
 

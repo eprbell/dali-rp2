@@ -18,7 +18,7 @@ import logging
 from csv import reader
 from datetime import datetime
 from datetime import timezone as DatetimeTimezone
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from pytz import timezone as PytzTimezone
 from rp2.logger import create_logger
@@ -51,19 +51,19 @@ class InputPlugin(AbstractInputPlugin):
     def __init__(
         self,
         account_holder: str,
-        deposits_csv_file: Optional[str],
-        deposits_code: Optional[str],
-        withdrawals_csv_file: Optional[str],
-        withdrawals_code: Optional[str],
+        deposits_csv_file: Optional[str] = None,
+        deposits_code: Optional[str] = None,
+        withdrawals_csv_file: Optional[str] = None,
+        withdrawals_code: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
 
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
-        self.__deposits_csv_file: str = deposits_csv_file
-        self.__deposits_code: str = deposits_code
-        self.__withdrawals_csv_file: str = withdrawals_csv_file
+        self.__deposits_csv_file: Optional[str] = deposits_csv_file
+        self.__deposits_code: Optional[str] = deposits_code
+        self.__withdrawals_csv_file: Optional[str] = withdrawals_csv_file
         # Code of the asset being withdrawn since it is NOT included in the CSV file.
-        self.__withdrawals_code: str = withdrawals_code
+        self.__withdrawals_code: Optional[str] = withdrawals_code
         self.__logger: logging.Logger = create_logger(f"{self.__BITBANK_PLUGIN}/{self.account_holder}")
 
     def load(self) -> List[AbstractTransaction]:
@@ -100,7 +100,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=utc_timestamp,
-                            asset=self.__deposits_code,
+                            asset=cast(str, self.__deposits_code),
                             exchange=self.__BITBANK,
                             holder=self.account_holder,
                             transaction_type=Keyword.BUY.value,
@@ -138,7 +138,7 @@ class InputPlugin(AbstractInputPlugin):
                         unique_id=line[self.__TX_ID],
                         raw_data=raw_data,
                         timestamp=utc_timestamp,
-                        asset=self.__withdrawals_code,
+                        asset=cast(str, self.__withdrawals_code),
                         from_exchange=self.__BITBANK,
                         from_holder=self.account_holder,
                         to_exchange=Keyword.UNKNOWN.value,

@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from rp2.rp2_decimal import RP2Decimal, ZERO
+from rp2.rp2_decimal import RP2Decimal
 
 from dali.configuration import Keyword
+from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.plugin.input.csv.bitbank_supplemental import InputPlugin
 
@@ -37,7 +38,7 @@ class TestBitbank:
         assert len(result) == 2
 
         xlm_transaction: IntraTransaction = result[0]  # type: ignore
-        jpy_transaction: InTransaction = result[1] # type: ignore
+        jpy_transaction: InTransaction = result[1]  # type: ignore
 
         assert xlm_transaction.asset == "XLM"
         assert xlm_transaction.timestamp == "2022-04-20 07:20:00+0000"
@@ -54,7 +55,7 @@ class TestBitbank:
         assert jpy_transaction.timestamp == "2022-04-19 22:19:00+0000"
         assert RP2Decimal(jpy_transaction.spot_price) == RP2Decimal("1")
         assert RP2Decimal(jpy_transaction.crypto_in) == RP2Decimal("6900")
-        assert jpy_transaction.crypto_fee == None
+        assert jpy_transaction.crypto_fee is None
         assert RP2Decimal(jpy_transaction.fiat_in_no_fee) == RP2Decimal("6900")
         assert RP2Decimal(jpy_transaction.fiat_in_with_fee) == RP2Decimal("6900")
         assert jpy_transaction.fiat_ticker == "JPY"

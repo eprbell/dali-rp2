@@ -701,57 +701,101 @@ class TestBinance:
 
         result = plugin.load()
 
-        # 1 fiat sell (priced in native fiat) +
-        # 1 crypto conversion +
-        # 1 crypto buy +
+        # 1 EUR deposit +
+        # 1 EUR sell (priced in native fiat) +
+        # 1 EUR -> LUNA conversion +
+        # 1 GBP deposit +
+        # 1 GBP sell +
+        # 1 GBP -> LUNA buy +
         # 1 fiat deposit +
-        # 1 fiat withdrawal = 5
-        assert len(result) == 5
+        # 1 fiat withdrawal = 8
+        assert len(result) == 8
 
-        fiat_sell_transaction: OutTransaction = next(
+        eur_deposit_transaction: InTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and item.asset == "EUR" and isinstance(item, InTransaction)
+        )
+        eur_sell_transaction: OutTransaction = next(
             item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and isinstance(item, OutTransaction)
         )
-        crypto_conversion_transaction: InTransaction = next(
-            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and isinstance(item, InTransaction)
+        eur_luna_conversion_transaction: InTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and item.asset == "LUNA" and isinstance(item, InTransaction)
         )
-        crypto_buy_transaction: InTransaction = next(
-            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and isinstance(item, InTransaction)
+        gbp_deposit_transaction: InTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and item.asset == "GBP" and isinstance(item, InTransaction)
+        )
+        gbp_sell_transaction: OutTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and isinstance(item, OutTransaction)
+        )
+        gbp_luna_buy_transaction: InTransaction = next(
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and item.asset == "LUNA" and isinstance(item, InTransaction)
         )
         fiat_deposit: InTransaction = next(item for item in result if item.unique_id == "25ced37075c1470ba8939d0df2316e23" and isinstance(item, InTransaction))
         fiat_withdrawal: OutTransaction = next(
             item for item in result if item.unique_id == "25ced37075c1470ba8939d0df2316e46" and isinstance(item, OutTransaction)
         )
 
+        # fiat deposit must still be recorded
+        assert eur_deposit_transaction.asset == "EUR"
+        assert int(parser.parse(eur_deposit_transaction.timestamp).timestamp()) * 1000 == 1624529919000
+        assert eur_deposit_transaction.transaction_type == Keyword.BUY.value.capitalize()
+        assert eur_deposit_transaction.spot_price == "1"
+        assert RP2Decimal(eur_deposit_transaction.crypto_in) == RP2Decimal("20.0")
+        assert eur_deposit_transaction.crypto_fee is None
+        assert RP2Decimal(str(eur_deposit_transaction.fiat_in_no_fee)) == RP2Decimal("20.0")
+        assert RP2Decimal(str(eur_deposit_transaction.fiat_in_with_fee)) == RP2Decimal("20.0")
+        assert eur_deposit_transaction.fiat_fee is None
+        assert eur_deposit_transaction.fiat_ticker == "EUR"
+
         # Purchase made in fiat other than native_fiat is a regular conversion
-        assert fiat_sell_transaction.asset == "EUR"
-        assert int(parser.parse(fiat_sell_transaction.timestamp).timestamp()) * 1000 == 1624529919000
-        assert fiat_sell_transaction.transaction_type == Keyword.SELL.value.capitalize()
-        assert fiat_sell_transaction.spot_price == Keyword.UNKNOWN.value
-        assert RP2Decimal(fiat_sell_transaction.crypto_out_no_fee) == RP2Decimal("19.8")
-        assert RP2Decimal(fiat_sell_transaction.crypto_fee) == RP2Decimal("0.2")
-        assert fiat_sell_transaction.fiat_out_no_fee is None
-        assert fiat_sell_transaction.fiat_fee is None
+        assert eur_sell_transaction.asset == "EUR"
+        assert int(parser.parse(eur_sell_transaction.timestamp).timestamp()) * 1000 == 1624529919000
+        assert eur_sell_transaction.transaction_type == Keyword.SELL.value.capitalize()
+        assert eur_sell_transaction.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(eur_sell_transaction.crypto_out_no_fee) == RP2Decimal("19.8")
+        assert RP2Decimal(eur_sell_transaction.crypto_fee) == RP2Decimal("0.2")
+        assert eur_sell_transaction.fiat_out_no_fee is None
+        assert eur_sell_transaction.fiat_fee is None
 
-        assert crypto_conversion_transaction.asset == "LUNA"
-        assert int(parser.parse(crypto_conversion_transaction.timestamp).timestamp()) * 1000 == 1624529919000
-        assert crypto_conversion_transaction.transaction_type == Keyword.BUY.value.capitalize()
-        assert crypto_conversion_transaction.spot_price == Keyword.UNKNOWN.value
-        assert RP2Decimal(crypto_conversion_transaction.crypto_in) == RP2Decimal("4.462")
-        assert crypto_conversion_transaction.crypto_fee is None
-        assert crypto_conversion_transaction.fiat_in_no_fee is None
-        assert crypto_conversion_transaction.fiat_in_with_fee is None
-        assert crypto_conversion_transaction.fiat_fee is None
+        assert eur_luna_conversion_transaction.asset == "LUNA"
+        assert int(parser.parse(eur_luna_conversion_transaction.timestamp).timestamp()) * 1000 == 1624529919000
+        assert eur_luna_conversion_transaction.transaction_type == Keyword.BUY.value.capitalize()
+        assert eur_luna_conversion_transaction.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(eur_luna_conversion_transaction.crypto_in) == RP2Decimal("4.462")
+        assert eur_luna_conversion_transaction.crypto_fee is None
+        assert eur_luna_conversion_transaction.fiat_in_no_fee is None
+        assert eur_luna_conversion_transaction.fiat_in_with_fee is None
+        assert eur_luna_conversion_transaction.fiat_fee is None
 
-        assert crypto_buy_transaction.asset == "LUNA"
-        assert int(parser.parse(crypto_buy_transaction.timestamp).timestamp()) * 1000 == 1624529915000
-        assert crypto_buy_transaction.transaction_type == Keyword.BUY.value.capitalize()
-        assert RP2Decimal(crypto_buy_transaction.spot_price) == RP2Decimal("3.4044016506")
-        assert RP2Decimal(crypto_buy_transaction.crypto_in) == RP2Decimal("4.362")
-        assert crypto_buy_transaction.crypto_fee is None
-        assert RP2Decimal(str(crypto_buy_transaction.fiat_in_no_fee)) == RP2Decimal("14.85")
-        assert RP2Decimal(str(crypto_buy_transaction.fiat_in_with_fee)) == RP2Decimal("15.0")
-        assert RP2Decimal(str(crypto_buy_transaction.fiat_fee)) == RP2Decimal("0.15")
-        assert crypto_buy_transaction.fiat_ticker == "GBP"
+        assert gbp_deposit_transaction.asset == "GBP"
+        assert int(parser.parse(gbp_deposit_transaction.timestamp).timestamp()) * 1000 == 1624529915000
+        assert gbp_deposit_transaction.transaction_type == Keyword.BUY.value.capitalize()
+        assert gbp_deposit_transaction.spot_price == "1"
+        assert RP2Decimal(gbp_deposit_transaction.crypto_in) == RP2Decimal("15.0")
+        assert gbp_deposit_transaction.crypto_fee is None
+        assert RP2Decimal(str(gbp_deposit_transaction.fiat_in_no_fee)) == RP2Decimal("15.0")
+        assert RP2Decimal(str(gbp_deposit_transaction.fiat_in_with_fee)) == RP2Decimal("15.0")
+        assert gbp_deposit_transaction.fiat_fee is None
+        assert gbp_deposit_transaction.fiat_ticker == "GBP"
+
+        assert gbp_sell_transaction.asset == "GBP"
+        assert int(parser.parse(gbp_sell_transaction.timestamp).timestamp()) * 1000 == 1624529915000
+        assert gbp_sell_transaction.transaction_type == Keyword.SELL.value.capitalize()
+        assert gbp_sell_transaction.spot_price == "1"
+        assert RP2Decimal(gbp_sell_transaction.crypto_out_no_fee) == RP2Decimal("14.85")
+        assert RP2Decimal(gbp_sell_transaction.crypto_fee) == RP2Decimal("0.15")
+        assert RP2Decimal(str(gbp_sell_transaction.fiat_out_no_fee)) == RP2Decimal("14.85")
+        assert gbp_sell_transaction.fiat_fee is None
+
+        assert gbp_luna_buy_transaction.asset == "LUNA"
+        assert int(parser.parse(gbp_luna_buy_transaction.timestamp).timestamp()) * 1000 == 1624529915000
+        assert gbp_luna_buy_transaction.transaction_type == Keyword.BUY.value.capitalize()
+        assert RP2Decimal(gbp_luna_buy_transaction.spot_price) == RP2Decimal("3.4044016506")
+        assert RP2Decimal(gbp_luna_buy_transaction.crypto_in) == RP2Decimal("4.362")
+        assert gbp_luna_buy_transaction.crypto_fee is None
+        assert RP2Decimal(str(gbp_luna_buy_transaction.fiat_in_no_fee)) == RP2Decimal("14.85")
+        assert RP2Decimal(str(gbp_luna_buy_transaction.fiat_in_with_fee)) == RP2Decimal("15.0")
+        assert RP2Decimal(str(gbp_luna_buy_transaction.fiat_fee)) == RP2Decimal("0.15")
+        assert gbp_luna_buy_transaction.fiat_ticker == "GBP"
 
         assert fiat_deposit.asset == "EUR"
         assert int(parser.parse(fiat_deposit.timestamp).timestamp()) * 1000 == 1627501026000

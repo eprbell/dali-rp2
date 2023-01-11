@@ -91,7 +91,8 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.debug("Header: %s", header)
             for line in lines:
                 # If there is a blank sent/receive asset, this is a transfer, which we will process under transfers
-                if line[self.__ASSET_SENT] == "" or line[self.__ASSET_RECEIVED] == "":
+                # Pionex sometimes creates 0 entries for some reason
+                if line[self.__ASSET_SENT] == "" or line[self.__ASSET_RECEIVED] == "" or line[self.__RECEIVED_AMOUNT] == "0":
                     continue
 
                 raw_data: str = self.__DELIMITER.join(line)
