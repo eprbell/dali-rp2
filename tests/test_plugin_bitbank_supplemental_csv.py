@@ -56,6 +56,6 @@ class TestBitbank:
         assert RP2Decimal(jpy_transaction.spot_price) == RP2Decimal("1")
         assert RP2Decimal(jpy_transaction.crypto_in) == RP2Decimal("6900")
         assert jpy_transaction.crypto_fee is None
-        assert RP2Decimal(jpy_transaction.fiat_in_no_fee) == RP2Decimal("6900")
-        assert RP2Decimal(jpy_transaction.fiat_in_with_fee) == RP2Decimal("6900")
+        assert RP2Decimal(str(jpy_transaction.fiat_in_no_fee)) == RP2Decimal("6900")
+        assert RP2Decimal(str(jpy_transaction.fiat_in_with_fee)) == RP2Decimal("6900")
         assert jpy_transaction.fiat_ticker == "JPY"
