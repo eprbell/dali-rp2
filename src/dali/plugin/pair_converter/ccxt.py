@@ -103,7 +103,7 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {
 _MS_IN_SECOND: int = 1000
 
 # Cache
-_CACHE_INTERVAL: int = 50
+_CACHE_INTERVAL: int = 200
 
 # CSV Reader
 _GOOGLE_API_KEY: str = "google_api_key"
@@ -140,7 +140,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         self.__csv_read_flag: Dict[str, bool] = {}
-        self.__transactions_processed: int = 0
         self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
 
     def name(self) -> str:
@@ -333,12 +332,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 )
             else:
                 result = hop_bar
-
-        if self.__transactions_processed % _CACHE_INTERVAL == 0:
-            self.save_historical_price_cache()
-            self.__logger.debug("Resolved %s transactions. Saving to cache.", self.__transactions_processed)
-
-        self.__transactions_processed += 1
 
         return result
 

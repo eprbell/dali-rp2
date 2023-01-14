@@ -231,62 +231,72 @@ def resolve_transactions(
     unique_id_2_transactions: Dict[AssetAndUniqueId, List[AbstractTransaction]] = {}
     transaction: AbstractTransaction
 
-    for transaction in transactions:
-        if not isinstance(transaction, AbstractTransaction):
-            raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
+    try:
+        for transaction in transactions:
+            if not isinstance(transaction, AbstractTransaction):
+                raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
 
-        if transaction.fiat_ticker not in {None, global_configuration[Keyword.NATIVE_FIAT.value]}:
-            # Foreign exchanges may have transactions denominated in non-native fiat
-            transaction = _convert_fiat_fields_to_native_fiat(transaction, global_configuration)
+            if transaction.fiat_ticker not in {None, global_configuration[Keyword.NATIVE_FIAT.value]}:
+                # Foreign exchanges may have transactions denominated in non-native fiat
+                transaction = _convert_fiat_fields_to_native_fiat(transaction, global_configuration)
 
-        if is_unknown(transaction.unique_id):
-            # Cannot resolve further if unique_id is not known
+            if is_unknown(transaction.unique_id):
+                # Cannot resolve further if unique_id is not known
+                if read_spot_price_from_web:
+                    transaction = _update_spot_price_from_web(transaction, global_configuration)
+                LOGGER.debug("Unresolvable transaction (no %s): %s", Keyword.UNIQUE_ID.value, str(transaction))
+                resolved_transactions.append(transaction)
+            else:
+                transaction_list: List[AbstractTransaction]
+                transaction_list = unique_id_2_transactions.setdefault(AssetAndUniqueId(transaction.asset, transaction.unique_id), [])
+                transaction_list.append(transaction)
+                unique_id_2_transactions[AssetAndUniqueId(transaction.asset, transaction.unique_id)] = transaction_list
+
+        for transaction_list in unique_id_2_transactions.values():
+            if len(transaction_list) > 2:
+                raise Exception(f"Internal error: Attempting to resolve more than two transactions with same {Keyword.UNIQUE_ID.value}: {transaction_list}")
+            if len(transaction_list) == 1:
+                transaction = _apply_transaction_hint(transaction_list[0], global_configuration)
+                if read_spot_price_from_web:
+                    transaction = _update_spot_price_from_web(transaction, global_configuration)
+                LOGGER.debug("Self-contained transaction: %s", str(transaction))
+                resolved_transactions.append(transaction)
+                continue
+            if len(transaction_list) == 0:
+                raise Exception(f"Internal error: Attempting to resolve zero transactions: {transaction_list}")
+
+            transaction1: AbstractTransaction = transaction_list[0]
+            transaction2: AbstractTransaction = transaction_list[1]
+
+            if transaction1.unique_id != transaction2.unique_id:
+                raise Exception(
+                    f"Internal error: transaction1.{Keyword.UNIQUE_ID.value} != transaction2.{Keyword.UNIQUE_ID.value}: {transaction1}\n{transaction2}"
+                )
+            if transaction1.asset != transaction2.asset:
+                raise Exception(f"Internal error: transaction1.{Keyword.ASSET.value} != transaction2.{Keyword.ASSET.value}: {transaction1}\n{transaction2}")
+
+            if isinstance(transaction1, InTransaction) and isinstance(transaction2, OutTransaction):
+                transaction = _resolve_in_out_transaction(transaction1, transaction2, None)
+            elif isinstance(transaction1, OutTransaction) and isinstance(transaction2, InTransaction):
+                transaction = _resolve_out_in_transaction(transaction1, transaction2, None)
+            elif isinstance(transaction1, IntraTransaction) and isinstance(transaction2, IntraTransaction):
+                transaction = _resolve_intra_intra_transaction(transaction1, transaction2, None)
+            else:
+                raise Exception(
+                    f"Internal error: attempting to resolve two transactions that aren't Intra/Intra, In/Out or Out/In:\n{transaction1}\n{transaction2}"
+                )
+
             if read_spot_price_from_web:
                 transaction = _update_spot_price_from_web(transaction, global_configuration)
-            LOGGER.debug("Unresolvable transaction (no %s): %s", Keyword.UNIQUE_ID.value, str(transaction))
+
+            LOGGER.debug("Resolved transaction: %s", str(transaction))
             resolved_transactions.append(transaction)
-        else:
-            transaction_list: List[AbstractTransaction] = unique_id_2_transactions.setdefault(AssetAndUniqueId(transaction.asset, transaction.unique_id), [])
-            transaction_list.append(transaction)
-            unique_id_2_transactions[AssetAndUniqueId(transaction.asset, transaction.unique_id)] = transaction_list
 
-    for transaction_list in unique_id_2_transactions.values():
-        if len(transaction_list) > 2:
-            raise Exception(f"Internal error: Attempting to resolve more than two transactions with same {Keyword.UNIQUE_ID.value}: {transaction_list}")
-        if len(transaction_list) == 1:
-            transaction = _apply_transaction_hint(transaction_list[0], global_configuration)
-            if read_spot_price_from_web:
-                transaction = _update_spot_price_from_web(transaction, global_configuration)
-            LOGGER.debug("Self-contained transaction: %s", str(transaction))
-            resolved_transactions.append(transaction)
-            continue
-        if len(transaction_list) == 0:
-            raise Exception(f"Internal error: Attempting to resolve zero transactions: {transaction_list}")
-
-        transaction1: AbstractTransaction = transaction_list[0]
-        transaction2: AbstractTransaction = transaction_list[1]
-
-        if transaction1.unique_id != transaction2.unique_id:
-            raise Exception(f"Internal error: transaction1.{Keyword.UNIQUE_ID.value} != transaction2.{Keyword.UNIQUE_ID.value}: {transaction1}\n{transaction2}")
-        if transaction1.asset != transaction2.asset:
-            raise Exception(f"Internal error: transaction1.{Keyword.ASSET.value} != transaction2.{Keyword.ASSET.value}: {transaction1}\n{transaction2}")
-
-        if isinstance(transaction1, InTransaction) and isinstance(transaction2, OutTransaction):
-            transaction = _resolve_in_out_transaction(transaction1, transaction2, None)
-        elif isinstance(transaction1, OutTransaction) and isinstance(transaction2, InTransaction):
-            transaction = _resolve_out_in_transaction(transaction1, transaction2, None)
-        elif isinstance(transaction1, IntraTransaction) and isinstance(transaction2, IntraTransaction):
-            transaction = _resolve_intra_intra_transaction(transaction1, transaction2, None)
-        else:
-            raise Exception(
-                f"Internal error: attempting to resolve two transactions that aren't Intra/Intra, In/Out or Out/In:\n{transaction1}\n{transaction2}"
-            )
-
-        if read_spot_price_from_web:
-            transaction = _update_spot_price_from_web(transaction, global_configuration)
-
-        LOGGER.debug("Resolved transaction: %s", str(transaction))
-        resolved_transactions.append(transaction)
+    except KeyboardInterrupt as exc:
+        LOGGER.info("Exiting and saving to cache.")
+        for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
+            cast(AbstractPairConverterPlugin, pair_converter).save_historical_price_cache()
+        raise Exception("Dali terminated by user.") from exc
 
     # Save pair converter caches
     for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
