@@ -544,7 +544,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.plugin_name(),
-                    unique_id=transaction[_ID],
+                    unique_id=f"B{transaction[_ID]}",
                     raw_data=json.dumps(transaction),
                     timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                     asset=in_asset,
@@ -568,7 +568,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.plugin_name(),
-                    unique_id=transaction[_ID],
+                    unique_id=f"B{transaction[_ID]}",
                     raw_data=json.dumps(transaction),
                     timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                     asset=in_asset,
@@ -621,7 +621,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             out_transaction_list.append(
                 OutTransaction(
                     plugin=self.plugin_name(),
-                    unique_id=transaction[_ID],
+                    unique_id=f"S{transaction[_ID]}",
                     raw_data=json.dumps(transaction),
                     timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                     asset=out_asset,
@@ -644,7 +644,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             out_transaction_list.append(
                 OutTransaction(
                     plugin=self.plugin_name(),
-                    unique_id=transaction[_ID],
+                    unique_id=f"S{transaction[_ID]}",
                     raw_data=json.dumps(transaction),
                     timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                     asset=out_asset,
