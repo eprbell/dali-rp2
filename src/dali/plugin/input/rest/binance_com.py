@@ -274,24 +274,29 @@ class InputPlugin(AbstractCcxtInputPlugin):
             #     ],
             #     "total":2
             # }
-            with ThreadPool(self._thread_count) as pool:
-                processing_result_list = pool.map(self._process_dividend, dividends[_ROWS])
 
-            for processing_result in processing_result_list:
-                if processing_result is None:
-                    continue
-                if processing_result.in_transactions:
-                    in_transactions.extend(processing_result.in_transactions)
+
+            self._logger.debug("Pulled a total of %s records for %s to %s", dividends[_TOTAL], current_start, current_end)
 
             # If user received more than 500 dividends in a 30 day period we need to shrink the window.
-            if int(dividends[_TOTAL]) < _DIVIDEND_RECORD_LIMIT:
+            if int(dividends[_TOTAL]) <= _DIVIDEND_RECORD_LIMIT:
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
+                with ThreadPool(self._thread_count) as pool:
+                    processing_result_list = pool.map(self._process_dividend, dividends[_ROWS])
+
+                for processing_result in processing_result_list:
+                    if processing_result is None:
+                        continue
+                    if processing_result.in_transactions:
+                        in_transactions.extend(processing_result.in_transactions)
             else:
                 # Using implicit API so we need to follow Binance order, which sends latest record first ([0])
                 # CCXT standard API sorts by timestamp, so latest record is last ([499])
-                current_start = int(dividends[_ROWS][0][_DIV_TIME]) + 1  # times are inclusive
-                current_end = current_start + _THIRTY_DAYS_IN_MS
+                number_of_excess_records = int(dividends[_TOTAL]) - _DIVIDEND_RECORD_LIMIT
+                current_end = int(dividends[_ROWS][number_of_excess_records][_DIV_TIME])  # times are inclusive
+                self._logger.debug("Readjusting time window end to %s from %s", current_end, current_start + _THIRTY_DAYS_IN_MS)
+                # current_end = current_start + _THIRTY_DAYS_IN_MS
 
             if not earliest_record_epoch and int(dividends[_TOTAL]) > 0:
                 earliest_record_epoch = int(dividends[_ROWS][-1][_DIV_TIME]) - 1
@@ -842,7 +847,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     notes=notes,
                 )
             )
-        else:
+        elif RP2Decimal(transaction[_AMOUNT]) != ZERO: # Sometimes Binance reports interest payments with zero amounts
             amount = RP2Decimal(transaction[_AMOUNT])
             notes = f"{notes + '; ' if notes else ''}{transaction[_EN_INFO]}"
 
