@@ -32,7 +32,7 @@ from dali.intra_transaction import IntraTransaction
 
 class InputPlugin(AbstractInputPlugin):
 
-    __BITBANK: str = "Bitbank"
+    __BITBANK: str = "Bitbank.cc"
     __BITBANK_PLUGIN: str = "Bitbank_Supplemental_CSV"
 
     __TIMESTAMP_INDEX: int = 0
