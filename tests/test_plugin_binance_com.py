@@ -115,7 +115,7 @@ class TestBinance:
 
         client: Exchange = plugin._client
 
-        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC", "type": "spot"}]
         # itertools.chain / repeat allows us to return one value once, and empty values after that
         mocker.patch.object(client, "fetch_my_trades").side_effect = chain(
             [
@@ -574,7 +574,7 @@ class TestBinance:
 
         client = plugin._client
 
-        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC", "type": "spot"}]
         mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "sapiGetFiatPayments").return_value = {
             "code": "000000",
@@ -712,7 +712,7 @@ class TestBinance:
         assert len(result) == 8
 
         eur_deposit_transaction: InTransaction = next(
-            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and item.asset == "EUR" and isinstance(item, InTransaction)
+            item for item in result if item.unique_id == "FD353fca443f06466db0c4dc89f94f027a" and item.asset == "EUR" and isinstance(item, InTransaction)
         )
         eur_sell_transaction: OutTransaction = next(
             item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and isinstance(item, OutTransaction)
@@ -721,7 +721,7 @@ class TestBinance:
             item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and item.asset == "LUNA" and isinstance(item, InTransaction)
         )
         gbp_deposit_transaction: InTransaction = next(
-            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and item.asset == "GBP" and isinstance(item, InTransaction)
+            item for item in result if item.unique_id == "FD353fca443f06466db0c4dc89f94f027c" and item.asset == "GBP" and isinstance(item, InTransaction)
         )
         gbp_sell_transaction: OutTransaction = next(
             item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and isinstance(item, OutTransaction)

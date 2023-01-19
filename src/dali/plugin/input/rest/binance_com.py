@@ -275,7 +275,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
             #     "total":2
             # }
 
-
             self._logger.debug("Pulled a total of %s records for %s to %s", dividends[_TOTAL], current_start, current_end)
 
             # If user received more than 500 dividends in a 30 day period we need to shrink the window.
@@ -847,7 +846,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     notes=notes,
                 )
             )
-        elif RP2Decimal(transaction[_AMOUNT]) != ZERO: # Sometimes Binance reports interest payments with zero amounts
+        elif RP2Decimal(transaction[_AMOUNT]) != ZERO:  # Sometimes Binance reports interest payments with zero amounts
             amount = RP2Decimal(transaction[_AMOUNT])
             notes = f"{notes + '; ' if notes else ''}{transaction[_EN_INFO]}"
 

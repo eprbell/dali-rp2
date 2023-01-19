@@ -46,7 +46,7 @@ class TestBitbank:
         assert xlm_transaction.spot_price == Keyword.UNKNOWN.value
         assert xlm_transaction.crypto_received == Keyword.UNKNOWN.value
         assert RP2Decimal(xlm_transaction.crypto_sent) == RP2Decimal("900.01")
-        assert xlm_transaction.from_exchange == "Bitbank"
+        assert xlm_transaction.from_exchange == "Bitbank.cc"
         assert xlm_transaction.from_holder == "tester"
         assert xlm_transaction.to_exchange == Keyword.UNKNOWN.value
         assert xlm_transaction.to_holder == Keyword.UNKNOWN.value
