@@ -46,6 +46,7 @@ _ID: str = "id"
 _BASE: str = "base"
 _QUOTE: str = "quote"
 _SYMBOL: str = "symbol"
+_TYPE: str = "type"
 
 # Time in ms
 _MINUTE: str = "1m"
@@ -216,7 +217,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 current_markets: Dict[str, List[str]] = {}
                 current_graph: Dict[str, Dict[str, None]] = {}
 
-                for market in current_exchange.fetch_markets():
+                for market in filter(lambda x: x[_TYPE] == "spot", current_exchange.fetch_markets()):
                     self.__logger.debug("Market: %s", market)
 
                     current_markets[f"{market[_BASE]}{market[_QUOTE]}"] = [exchange]

@@ -137,7 +137,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         market_list: List[str] = []
         for market in ccxt_markets:
             self.__logger.debug("Market: %s", json.dumps(market))
-            market_list.append(market[_ID])
+            if market[_TYPE] == "spot":
+                market_list.append(market[_ID])
 
         self.__markets = market_list
 
