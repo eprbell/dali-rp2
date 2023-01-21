@@ -100,6 +100,22 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {
     "USDT": "USD",
 }
 
+# Priority for quote asset. If asset is not listed it will be filtered out.
+# In principle this should be fiat in order of trade volume and then stable coins in order of trade volume
+_QUOTE_PRIORITY: Dict[str, None] = {
+    "USD": None, 
+    "JPY": None,
+    "KRW": None,
+    "EUR": None,
+    "GBP": None,
+    "AUD": None,
+    "USDT": None,
+    "USDC": None,
+    "BUSD": None,
+    "TUSD": None,
+    "OUSD": None,
+}
+
 # Time constants
 _MS_IN_SECOND: int = 1000
 
@@ -196,6 +212,15 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # No path found
         return None
 
+    def _prioritize_quote_assets(self, current_graph: Dict[str, List[str]]) -> None:
+        for base_asset in current_graph.keys():
+            for priority_quote in reversed(_QUOTE_PRIORITY):
+                if priority_quote in current_graph[base_asset]:
+                    current_graph[base_asset].pop(current_graph[base_asset].index(priority_quote))
+                    remainder: List[str] = current_graph[base_asset]
+                    current_graph[base_asset] = [priority_quote]
+                    current_graph[base_asset].extend(remainder)
+
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         self.__logger.debug("Converting %s to %s", from_asset, to_asset)
 
@@ -214,10 +239,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
                 current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
                 # key: market, value: exchanges where the market is available in order of priority
-                current_markets: Dict[str, List[str]] = {}
+                current_markets = {}
                 current_graph: Dict[str, Dict[str, None]] = {}
 
-                for market in filter(lambda x: x[_TYPE] == "spot", current_exchange.fetch_markets()):
+                for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
                     self.__logger.debug("Market: %s", market)
 
                     current_markets[f"{market[_BASE]}{market[_QUOTE]}"] = [exchange]
@@ -225,12 +250,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     # TO BE IMPLEMENTED - lazy build graph only if needed
 
                     # Add the quote asset to the graph if it isn't there already.
-                    if current_graph.get(market[_BASE]) and (market[_QUOTE] not in current_graph[market[_BASE]]):
-                        current_graph[market[_BASE]][market[_QUOTE]] = None
-                    else:
-                        current_graph[market[_BASE]] = {market[_QUOTE]: None}
+                    current_graph.setdefault(market[_BASE], {})[market[_QUOTE]] = None
 
-                # TO BE IMPLEMENTED - possibly sort the lists to put the main stable coin first.
+                self._prioritize_quote_assets(current_markets)
 
                 # Add alternative markets if they don't exist
                 for base_asset, quote_asset in _ALTMARKET_BY_BASE_DICT.items():
