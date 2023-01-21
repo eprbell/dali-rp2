@@ -79,6 +79,10 @@ class InputPlugin(AbstractInputPlugin):
 
     def parse_deposits_file(self, file_path: str) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
+        if self.__deposits_code:
+            deposits_code: str = self.__deposits_code
+        else:
+            raise Exception("Bitbank.cc supplemental plugin deposits file declared without deposits code.")
 
         with open(file_path, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
@@ -100,7 +104,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=utc_timestamp,
-                            asset=cast(str, self.__deposits_code),
+                            asset=deposits_code,
                             exchange=self.__BITBANK,
                             holder=self.account_holder,
                             transaction_type=Keyword.BUY.value,
@@ -118,6 +122,10 @@ class InputPlugin(AbstractInputPlugin):
 
     def parse_withdrawals_file(self, file_path: str) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
+        if self.__withdrawals_code:
+            withdrawals_code: str = self.__withdrawals_code
+        else:
+            raise Exception("Bitbank.cc supplemental plugin withdrawals file declared without withdrawals code.")
 
         with open(file_path, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
@@ -138,7 +146,7 @@ class InputPlugin(AbstractInputPlugin):
                         unique_id=line[self.__TX_ID],
                         raw_data=raw_data,
                         timestamp=utc_timestamp,
-                        asset=cast(str, self.__withdrawals_code),
+                        asset=withdrawals_code,
                         from_exchange=self.__BITBANK,
                         from_holder=self.account_holder,
                         to_exchange=Keyword.UNKNOWN.value,

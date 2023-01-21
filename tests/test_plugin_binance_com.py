@@ -712,7 +712,7 @@ class TestBinance:
         assert len(result) == 8
 
         eur_deposit_transaction: InTransaction = next(
-            item for item in result if item.unique_id == "FD353fca443f06466db0c4dc89f94f027a" and item.asset == "EUR" and isinstance(item, InTransaction)
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a/fiat_buy" and item.asset == "EUR" and isinstance(item, InTransaction)
         )
         eur_sell_transaction: OutTransaction = next(
             item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and isinstance(item, OutTransaction)
@@ -721,7 +721,7 @@ class TestBinance:
             item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027a" and item.asset == "LUNA" and isinstance(item, InTransaction)
         )
         gbp_deposit_transaction: InTransaction = next(
-            item for item in result if item.unique_id == "FD353fca443f06466db0c4dc89f94f027c" and item.asset == "GBP" and isinstance(item, InTransaction)
+            item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c/fiat_buy" and item.asset == "GBP" and isinstance(item, InTransaction)
         )
         gbp_sell_transaction: OutTransaction = next(
             item for item in result if item.unique_id == "353fca443f06466db0c4dc89f94f027c" and isinstance(item, OutTransaction)

@@ -1021,7 +1021,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             in_transaction_list.append(
                 InTransaction(
                     plugin=self.__PLUGIN_NAME,
-                    unique_id=f"FD{transaction[_ORDER_NO]}",
+                    unique_id=f"{transaction[_ORDER_NO]}/fiat_buy",
                     raw_data=json.dumps(transaction),
                     timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
                     asset=transaction[_FIAT_CURRENCY],
