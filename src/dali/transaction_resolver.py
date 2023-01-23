@@ -292,11 +292,11 @@ def resolve_transactions(
             LOGGER.debug("Resolved transaction: %s", str(transaction))
             resolved_transactions.append(transaction)
 
-    except KeyboardInterrupt as exc:
+    except KeyboardInterrupt:
         LOGGER.info("Exiting and saving to cache.")
         for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
             cast(AbstractPairConverterPlugin, pair_converter).save_historical_price_cache()
-        raise Exception("Dali terminated by user.") from exc
+        raise
 
     # Save pair converter caches
     for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:

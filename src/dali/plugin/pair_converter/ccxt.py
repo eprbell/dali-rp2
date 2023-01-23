@@ -103,7 +103,7 @@ _ALTMARKET_BY_BASE_DICT: Dict[str, str] = {
 # Priority for quote asset. If asset is not listed it will be filtered out.
 # In principle this should be fiat in order of trade volume and then stable coins in order of trade volume
 _QUOTE_PRIORITY: Dict[str, None] = {
-    "USD": None, 
+    "USD": None,
     "JPY": None,
     "KRW": None,
     "EUR": None,

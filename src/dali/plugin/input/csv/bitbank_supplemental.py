@@ -18,10 +18,11 @@ import logging
 from csv import reader
 from datetime import datetime
 from datetime import timezone as DatetimeTimezone
-from typing import List, Optional, cast
+from typing import List, Optional
 
 from pytz import timezone as PytzTimezone
 from rp2.logger import create_logger
+from rp2.rp2_error import RP2ValueError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -79,10 +80,8 @@ class InputPlugin(AbstractInputPlugin):
 
     def parse_deposits_file(self, file_path: str) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
-        if self.__deposits_code:
-            deposits_code: str = self.__deposits_code
-        else:
-            raise Exception("Bitbank.cc supplemental plugin deposits file declared without deposits code.")
+        if not self.__deposits_code:
+            raise RP2ValueError("Bitbank.cc supplemental plugin deposits file declared without deposits code.")
 
         with open(file_path, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
@@ -104,7 +103,7 @@ class InputPlugin(AbstractInputPlugin):
                             unique_id=Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=utc_timestamp,
-                            asset=deposits_code,
+                            asset=self.__deposits_code,
                             exchange=self.__BITBANK,
                             holder=self.account_holder,
                             transaction_type=Keyword.BUY.value,
@@ -122,10 +121,8 @@ class InputPlugin(AbstractInputPlugin):
 
     def parse_withdrawals_file(self, file_path: str) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
-        if self.__withdrawals_code:
-            withdrawals_code: str = self.__withdrawals_code
-        else:
-            raise Exception("Bitbank.cc supplemental plugin withdrawals file declared without withdrawals code.")
+        if not self.__withdrawals_code:
+            raise RP2ValueError("Bitbank.cc supplemental plugin withdrawals file declared without withdrawals code.")
 
         with open(file_path, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
@@ -146,7 +143,7 @@ class InputPlugin(AbstractInputPlugin):
                         unique_id=line[self.__TX_ID],
                         raw_data=raw_data,
                         timestamp=utc_timestamp,
-                        asset=withdrawals_code,
+                        asset=self.__withdrawals_code,
                         from_exchange=self.__BITBANK,
                         from_holder=self.account_holder,
                         to_exchange=Keyword.UNKNOWN.value,
