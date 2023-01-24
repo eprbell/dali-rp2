@@ -17,6 +17,7 @@ from json import JSONDecodeError, loads
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
+from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -252,7 +253,7 @@ class AbstractPairConverterPlugin:
                     )
                 break
 
-            except JSONDecodeError as exc:
+            except (JSONDecodeError, ReadTimeout) as exc:
                 LOGGER.debug("Fetching of fiat exchange rates failed. The server might be down. Retrying the connection.")
                 request_count += 1
                 if request_count > 4:
