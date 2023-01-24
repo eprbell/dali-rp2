@@ -446,7 +446,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         params: Dict[str, Any],
     ) -> Iterable[Dict[str, Union[str, float]]]:
 
-        results: Iterable[Dict[str, Union[str, float]]]
+        results: Iterable[Dict[str, Union[str, float]]] = {}
         request_count: int = 0
 
         # Most exceptions are caused by request limits of the underlying APIs

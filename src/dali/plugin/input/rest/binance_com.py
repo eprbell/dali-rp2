@@ -936,6 +936,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         if transaction[_STATUS] == "Completed":
             if self.is_native_fiat(transaction[_FIAT_CURRENCY]):
+                
+                # For double entry accounting purposes we must create a fiat InTransaction
                 in_transaction_list.append(
                     InTransaction(
                         plugin=self.__PLUGIN_NAME,
@@ -956,6 +958,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         notes=(f"{notes + '; ' if notes else ''}Buy transaction for native fiat payment orderNo - {transaction[_ORDER_NO]}"),
                     )
                 )
+
+                # This is an OutTransaction for a buy or conversion based on what the native fiat is.
                 out_transaction_list.append(
                     OutTransaction(
                         plugin=self.__PLUGIN_NAME,
