@@ -936,7 +936,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         if transaction[_STATUS] == "Completed":
             if self.is_native_fiat(transaction[_FIAT_CURRENCY]):
-                
+
                 # For double entry accounting purposes we must create a fiat InTransaction
                 in_transaction_list.append(
                     InTransaction(
