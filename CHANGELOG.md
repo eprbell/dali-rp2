@@ -14,6 +14,12 @@
 
 # RP2 Change Log
 
+## 0.6.2
+* added Kraken CSV price importer
+* various fixes to CCXT-based plugins
+* small improvements to some CSV data loaders
+* updated documentation
+
 ## 0.6.1
 * added CCXT-based abstract superclass for REST data loader plugins (#80): this makes it much easier to add a new REST-based data loader
 * added Bitbank REST input plugin and CSV supplemental input plugin
