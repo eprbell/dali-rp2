@@ -150,7 +150,7 @@ class TestCcxtPlugin:
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
 
     # This test gets stuck: temporarily disabling it
-    def __disabled_test_unknown_exchange(self, mocker: Any) -> None:
+    def _disabled_test_unknown_exchange(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         exchange = binance(
             {
