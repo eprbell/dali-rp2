@@ -439,6 +439,16 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             # End of pagination details
             pass
 
+    def _safe_api_call(
+        self,
+        function: Callable[..., Iterable[Dict[str, Union[str, float]]]],
+        params: Dict[str, Any],
+    ) -> Iterable[Dict[str, Union[str, float]]]:
+        return self.__safe_api_call(
+            function,
+            params
+        )
+
     def __safe_api_call(
         self,
         function: Callable[..., Iterable[Dict[str, Union[str, float]]]],
