@@ -156,7 +156,7 @@ DaLI code adheres to these principles:
   * for public access add a read-only property starting with no underscore or an accessor function starting with `get_`;
 * runtime checks: parameters of public functions are type-checked at runtime;
 * type hints: all variables and functions have Python type hints (with the exception of local variables, for which type hints are optional);
-* no id-based hashing: classes that are added to dictionaries and sets redefine `__eq__()`, `__neq__()` and `__hash__()`;
+* no id-based hashing: hashable classes must redefine __eq__(), __neq__(), __hash__(). For hash(), utilizing immutable (i.e., read-only) attributes is appropriate (e.g., [example code](https://github.com/eprbell/rp2/blob/main/src/rp2/computed_data.py#L92));
 * encapsulated math: all high-precision math is done via `RP2Decimal` (a subclass of Decimal), to ensure the correct precision is used throughout the code. `RP2Decimal` instances are never mixed with other types in expressions;
 * f-strings only: every time string interpolation is needed, f-strings are used;
 * no raw strings (unless they occur only once): use global constants instead;
