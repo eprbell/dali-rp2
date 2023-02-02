@@ -29,6 +29,7 @@ from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 # Default exchange
 TEST_EXCHANGE: str = "Binance.com"
 ALT_EXCHANGE: str = "Kraken"
+LOCKED_EXCHANGE: str = "Kraken"
 FIAT_EXHANGE: str = "fiat"
 TEST_GRAPH: Dict[str, List[str]] = {
     "BETH": ["ETH"],
@@ -44,6 +45,10 @@ TEST_MARKETS: Dict[str, List[str]] = {
     "ETHUSDT": [TEST_EXCHANGE],
     "USDTUSD": [ALT_EXCHANGE],
     "USDJPY": [FIAT_EXHANGE],
+}
+LOCKED_MARKETS:  Dict[str, List[str]] = {
+    "BTCUSDT": [ALT_EXCHANGE],
+    "USDTUSD": [ALT_EXCHANGE],
 }
 
 # BTCUSDT conversion
@@ -434,4 +439,53 @@ class TestCcxtPlugin:
         assert data.volume == BAR_VOLUME + KRAKEN_VOLUME
 
     def test_locked_exchange(self, mocker: Any) -> None:
-        pass
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange=LOCKED_EXCHANGE, exchange_locked=True)
+        exchange = kraken(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        alt_exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        kraken_csv = KrakenCsvPricing(google_api_key="whatever")
+
+        mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {LOCKED_EXCHANGE: kraken_csv})
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+            [
+                BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                BAR_OPEN,  # (O)pen price, float
+                BAR_HIGH,  # (H)ighest price, float
+                BAR_LOW,  # (L)owest price, float
+                BAR_CLOSE,  # (C)losing price, float
+                BAR_VOLUME,  # (V)olume (in terms of the base currency), float
+            ],
+        ]
+
+        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
+            [
+                USDTUSD_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                USDTUSD_OPEN,  # (O)pen price, float
+                USDTUSD_HIGH,  # (H)ighest price, float
+                USDTUSD_LOW,  # (L)owest price, float
+                USDTUSD_CLOSE,  # (C)losing price, float
+                USDTUSD_VOLUME,  # (V)olume (in terms of the base currency), float
+            ],
+        ]
+
+        def add_exchange_side_effect(self, *args) -> None:
+            mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {LOCKED_EXCHANGE: exchange})
+            mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {LOCKED_EXCHANGE: TEST_GRAPH})
+            mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {LOCKED_EXCHANGE: LOCKED_MARKETS})            
+
+        mocker.patch.object(plugin, "_add_exchange_to_memcache").side_effect = add_exchange_side_effect
+
+        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "not-kraken")
+
+        assert data
+        assert plugin._add_exchange_to_memcache.call_count == 1
