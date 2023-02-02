@@ -141,6 +141,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         default_exchange: Optional[str] = None,
         fiat_priority: Optional[str] = None,
         google_api_key: Optional[str] = None,
+        exchange_locked: bool = False,
     ) -> None:
 
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
@@ -149,6 +150,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
         self.__google_api_key: Optional[str] = google_api_key
+        self.__exchange_locked: bool = exchange_locked
 
         # TO BE IMPLEMENTED - graph and vertex classes to make this more understandable
         # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924056308
@@ -157,7 +159,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         self.__csv_read_flag: Dict[str, bool] = {}
-        self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
+        if exchange_locked:
+            self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
+        else:
+            self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
 
     def name(self) -> str:
         return "CCXT-converter"
@@ -221,6 +226,51 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     current_graph[base_asset] = [priority_quote]
                     current_graph[base_asset].extend(remainder)
 
+    def _add_alternative_markets(self, current_graph: Dict[str, List[str]], current_markets: Dict[str, Exchange]) -> None:
+        for base_asset, quote_asset in _ALTMARKET_BY_BASE_DICT.items():
+            alt_market = base_asset + quote_asset
+            alt_exchange_name = _ALTMARKET_EXCHANGES_DICT[alt_market]
+
+            # TO BE IMPLEMENTED - Add alt market to the end of list if another exchange exists already
+            current_markets[alt_market] = [alt_exchange_name]
+
+            # Cache the exchange so that we can pull prices from it later
+            if alt_exchange_name not in self.__exchanges:
+                alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
+                self.__exchanges[alt_exchange_name] = alt_exchange
+
+            if current_graph.get(base_asset) and (quote_asset not in current_graph[base_asset]):
+                current_graph[base_asset][quote_asset] = None
+            else:
+                current_graph[base_asset] = {quote_asset: None}
+
+    def _add_exchange_to_memcache(self, exchange: str) -> None:
+        # initializes the cctx exchange instance which is used to get the historical data
+        # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
+        current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+
+        for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
+            self.__logger.debug("Market: %s", market)
+
+            current_markets[f"{market[_BASE]}{market[_QUOTE]}"] = [exchange]
+
+            # TO BE IMPLEMENTED - lazy build graph only if needed
+
+            # Add the quote asset to the graph if it isn't there already.
+            current_graph.setdefault(market[_BASE], {})[market[_QUOTE]] = None
+
+        self._prioritize_quote_assets(current_markets)
+
+        # Add alternative markets if they don't exist
+        if not self.__exchange_locked:
+            self._add_alternative_markets(current_graph, current_markets)
+
+        self._add_fiat_edges_to_graph(current_graph, current_markets)
+        self.__logger.debug("Added graph for %s : %s", current_exchange, current_graph)
+        self.__exchanges[exchange] = current_exchange
+        self.__exchange_markets[exchange] = current_markets
+        self.__exchange_graphs[exchange] = current_graph
+
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         self.__logger.debug("Converting %s to %s", from_asset, to_asset)
 
@@ -228,63 +278,31 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         if self._is_fiat_pair(from_asset, to_asset):
             return self._get_fiat_exchange_rate(timestamp, from_asset, to_asset)
 
-        if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT:
-            self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
+        if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT or self.__exchange_locked:
+            if self.__exchange_locked:
+                self.__logger.debug("Price routing locked to %s type for %s.", self.__default_exchange, exchange)
+            else:
+                self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
             exchange = self.__default_exchange
+
+        # key: market, value: exchanges where the market is available in order of priority
+        current_markets: Dict[str, Exchange] = {}
+        current_graph: Dict[str, Dict[str, None]] = {}
+        current_exchange: Exchange        
 
         # Caching of exchanges
         if exchange not in self.__exchanges:
-            if exchange in _EXCHANGE_DICT:
-                # initializes the cctx exchange instance which is used to get the historical data
-                # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
-                current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
-                # key: market, value: exchanges where the market is available in order of priority
-                current_markets = {}
-                current_graph: Dict[str, Dict[str, None]] = {}
-
-                for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
-                    self.__logger.debug("Market: %s", market)
-
-                    current_markets[f"{market[_BASE]}{market[_QUOTE]}"] = [exchange]
-
-                    # TO BE IMPLEMENTED - lazy build graph only if needed
-
-                    # Add the quote asset to the graph if it isn't there already.
-                    current_graph.setdefault(market[_BASE], {})[market[_QUOTE]] = None
-
-                self._prioritize_quote_assets(current_markets)
-
-                # Add alternative markets if they don't exist
-                for base_asset, quote_asset in _ALTMARKET_BY_BASE_DICT.items():
-                    alt_market = base_asset + quote_asset
-                    alt_exchange_name = _ALTMARKET_EXCHANGES_DICT[alt_market]
-
-                    # TO BE IMPLEMENTED - Add alt market to the end of list if another exchange exists already
-                    current_markets[alt_market] = [alt_exchange_name]
-
-                    # Cache the exchange so that we can pull prices from it later
-                    if alt_exchange_name not in self.__exchanges:
-                        alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
-                        self.__exchanges[alt_exchange_name] = alt_exchange
-
-                    if current_graph.get(base_asset) and (quote_asset not in current_graph[base_asset]):
-                        current_graph[base_asset][quote_asset] = None
-                    else:
-                        current_graph[base_asset] = {quote_asset: None}
-
-                self._add_fiat_edges_to_graph(current_graph, current_markets)
-                self.__logger.debug("Added graph for %s : %s", current_exchange, current_graph)
-                self.__exchanges[exchange] = current_exchange
-                self.__exchange_markets[exchange] = current_markets
-                self.__exchange_graphs[exchange] = current_graph
-
+            if self.__exchange_locked:
+                self._add_exchange_to_memcache(self.__default_exchange)
+            elif exchange in _EXCHANGE_DICT:
+                self._add_exchange_to_memcache(exchange)
             else:
                 self.__logger.error("WARNING: Unrecognized Exchange: %s. Please open an issue at %s", exchange, self.issues_url)
                 return None
-        else:
-            current_exchange = self.__exchanges[exchange]
-            current_markets = self.__exchange_markets[exchange]
-            current_graph = self.__exchange_graphs[exchange]
+
+        current_exchange = self.__exchanges[exchange]
+        current_markets = self.__exchange_markets[exchange]
+        current_graph = self.__exchange_graphs[exchange]
 
         market_symbol = from_asset + to_asset
         result: Optional[HistoricalBar] = None
@@ -380,7 +398,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 if self.__google_api_key is not None:
                     csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing(self.__google_api_key))
                 else:
-                    self.__logger.debug(
+                    self.__logger.info(
                         "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
                     )
             else:
