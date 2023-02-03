@@ -46,7 +46,7 @@ TEST_MARKETS: Dict[str, List[str]] = {
     "USDTUSD": [ALT_EXCHANGE],
     "USDJPY": [FIAT_EXHANGE],
 }
-LOCKED_MARKETS:  Dict[str, List[str]] = {
+LOCKED_MARKETS: Dict[str, List[str]] = {
     "BTCUSDT": [ALT_EXCHANGE],
     "USDTUSD": [ALT_EXCHANGE],
 }
@@ -440,7 +440,7 @@ class TestCcxtPlugin:
 
     def test_locked_exchange(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange=LOCKED_EXCHANGE, exchange_locked=True)
-        exchange = kraken(
+        exchange_instance = kraken(
             {
                 "apiKey": "key",
                 "secret": "secret",
@@ -456,7 +456,7 @@ class TestCcxtPlugin:
 
         mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {LOCKED_EXCHANGE: kraken_csv})
-        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+        mocker.patch.object(exchange_instance, "fetchOHLCV").return_value = [
             [
                 BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
                 BAR_OPEN,  # (O)pen price, float
@@ -478,15 +478,15 @@ class TestCcxtPlugin:
             ],
         ]
 
-        def add_exchange_side_effect(self, *args) -> None:
-            mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {LOCKED_EXCHANGE: exchange})
+        def add_exchange_side_effect(exchange: str) -> None:  # pylint: disable=unused-argument
+            mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {LOCKED_EXCHANGE: exchange_instance})
             mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {LOCKED_EXCHANGE: TEST_GRAPH})
-            mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {LOCKED_EXCHANGE: LOCKED_MARKETS})            
+            mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {LOCKED_EXCHANGE: LOCKED_MARKETS})
 
         mocker.patch.object(plugin, "_add_exchange_to_memcache").side_effect = add_exchange_side_effect
 
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "not-kraken")
 
         assert data
-        assert plugin._add_exchange_to_memcache.call_count == 1
-        assert plugin._add_exchange_to_memcache.called_with(LOCKED_EXCHANGE)
+        assert plugin._add_exchange_to_memcache.call_count == 1  # type: ignore pylint: disable=no-member, protected-access
+        assert plugin._add_exchange_to_memcache.called_with(LOCKED_EXCHANGE)  # type: ignore pylint: disable=no-member, protected-access

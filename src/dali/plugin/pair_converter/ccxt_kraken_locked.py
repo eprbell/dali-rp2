@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dali.plugin.pair_converter.ccxt import PairConverterPlugin as CcxtPairConverterPlugin
+from typing import Optional
 
-def PairConverterPlugin(CcxtPairConverterPlugin):
+from dali.plugin.pair_converter.ccxt import (
+    PairConverterPlugin as CcxtPairConverterPlugin,
+)
+
+
+class PairConverterPlugin(CcxtPairConverterPlugin):
     def __init__(
         self,
         historical_price_type: str,

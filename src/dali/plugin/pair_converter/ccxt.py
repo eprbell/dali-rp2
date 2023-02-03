@@ -225,7 +225,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     current_graph[base_asset] = [priority_quote]
                     current_graph[base_asset].extend(remainder)
 
-    def _add_alternative_markets(self, current_graph: Dict[str, List[str]], current_markets: Dict[str, Exchange]) -> None:
+    def _add_alternative_markets(self, current_graph: Dict[str, Dict[str, None]], current_markets: Dict[str, List[str]]) -> None:
         for base_asset, quote_asset in _ALTMARKET_BY_BASE_DICT.items():
             alt_market = base_asset + quote_asset
             alt_exchange_name = _ALTMARKET_EXCHANGES_DICT[alt_market]
@@ -247,6 +247,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # initializes the cctx exchange instance which is used to get the historical data
         # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
         current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+
+        # key: market, value: exchanges where the market is available in order of priority
+        current_markets: Dict[str, List[str]] = {}
+        current_graph: Dict[str, Dict[str, None]] = {}
 
         for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
             self.__logger.debug("Market: %s", market)
@@ -284,11 +288,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
             exchange = self.__default_exchange
 
-        # key: market, value: exchanges where the market is available in order of priority
-        current_markets: Dict[str, Exchange] = {}
-        current_graph: Dict[str, Dict[str, None]] = {}
-        current_exchange: Exchange        
-
         # Caching of exchanges
         if exchange not in self.__exchanges:
             if self.__exchange_locked:
@@ -299,7 +298,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.error("WARNING: Unrecognized Exchange: %s. Please open an issue at %s", exchange, self.issues_url)
                 return None
 
-        current_exchange = self.__exchanges[exchange]
         current_markets = self.__exchange_markets[exchange]
         current_graph = self.__exchange_graphs[exchange]
 
@@ -452,10 +450,12 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     request_count += 1
                     if request_count > 9:
                         if exchange == _BINANCE:
-                            self.__logger.info("""
-                                Binance server unavailable possibly because you are located in the USA. Try a non-Binance locked exchange pair converter. 
+                            self.__logger.info(
+                                """
+                                Binance server unavailable possibly because you are located in the USA. Try a non-Binance locked exchange pair converter.
                                 Saving to cache and exiting.
-                            """)
+                            """
+                            )
                         else:
                             self.__logger.info("Maximum number of retries reached. Saving to cache and exiting.")
                         self.save_historical_price_cache()
