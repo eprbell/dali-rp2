@@ -1,4 +1,4 @@
-# Copyright 2022 macanudo527
+# Copyright 2023 Neal Chambers
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -134,7 +134,6 @@ class AssetPairAndHistoricalPrice(NamedTuple):
 
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
-    # TO BE IMPLEMENTED - main_exchange that refers to the main exchange to be used, ignoring the exchange listed in the transaction
     def __init__(
         self,
         historical_price_type: str,

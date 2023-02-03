@@ -1,4 +1,4 @@
-# Copyright 2022 macanudo527
+# Copyright 2023 Neal Chambers
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -489,3 +489,4 @@ class TestCcxtPlugin:
 
         assert data
         assert plugin._add_exchange_to_memcache.call_count == 1
+        assert plugin._add_exchange_to_memcache.called_with(LOCKED_EXCHANGE)
