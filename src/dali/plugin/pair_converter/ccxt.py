@@ -389,6 +389,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
+        # Look for a CSV reader if one is available use it to read in historical data and save it to cache
         if csv_pricing is not None and not self.__csv_read_flag.get(exchange, False):
             csv_signature: Signature = signature(csv_pricing)
 
@@ -450,7 +451,13 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 except (ExchangeNotAvailable, NetworkError, RequestTimeout) as exc_na:
                     request_count += 1
                     if request_count > 9:
-                        self.__logger.info("Maximum number of retries reached. Saving to cache and exiting.")
+                        if exchange == _BINANCE:
+                            self.__logger.info("""
+                                Binance server unavailable possibly because you are located in the USA. Try a non-Binance locked exchange pair converter. 
+                                Saving to cache and exiting.
+                            """)
+                        else:
+                            self.__logger.info("Maximum number of retries reached. Saving to cache and exiting.")
                         self.save_historical_price_cache()
                         raise Exception("Server error") from exc_na
 
