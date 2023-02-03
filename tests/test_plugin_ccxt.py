@@ -488,5 +488,5 @@ class TestCcxtPlugin:
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "not-kraken")
 
         assert data
-        assert plugin._add_exchange_to_memcache.call_count == 1  # type: ignore pylint: disable=no-member, protected-access
-        assert plugin._add_exchange_to_memcache.called_with(LOCKED_EXCHANGE)  # type: ignore pylint: disable=no-member, protected-access
+        assert mocker.patch.object(plugin, "_add_exchange_to_memcache").call_count == 1
+        assert mocker.patch.object(plugin, "_add_exchange_to_memcache").called_with(LOCKED_EXCHANGE)
