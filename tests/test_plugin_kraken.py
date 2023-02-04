@@ -133,35 +133,75 @@ def test_kraken(mocker) -> None:
 
     assert len(actual_result) == 4
 
-    expected_result = [
+    expect_result = [
         InTransaction(
             plugin='kraken_REST',
             unique_id='__unknown',
-            raw_data="{'aclass': 'currency', 'amount': '8.0906135700', 'asset': 'XLTC', 'balance': '8.0906189200', 'fee': '0.0000000000', 'refid': 'somerefid2', 'time': '1403860822.8546317', 'type': 'trade', 'subtype': ''}",
-            timestamp='2014-06-27 09:20:22.854632+0000',
+            raw_data="{"
+                         "'aclass': 'currency', "
+                         "'amount': '8.0906135700', "
+                         "'asset': 'XLTC', "
+                         "'balance': '8.0906189200', "
+                         "'fee': '0.0000000000', "
+                         "'refid': 'somerefid2', "
+                         "'time': '1403860822.8546317', "
+                         "'type': 'trade', "
+                         "'subtype': ''"
+                     "}",
+            timestamp='2014-06-27 09:20:22+0000',
             asset='LTC', exchange='kraken', holder='tester', transaction_type='Buy',
             spot_price='43.80001', crypto_in='8.09061357', fiat_fee=None, fiat_in_no_fee='499.2', fiat_in_with_fee='500.00000',
             notes='buy_trade'),
         OutTransaction(plugin='kraken_REST',
                        unique_id='__unknown',
-                       raw_data="{'aclass': 'currency', 'amount': '-3.0000000000', 'asset': 'XLTC', 'balance': '0.0000000000', 'fee': '0.0000000000', 'refid': 'somerefid3', 'time': '1406122046.414707', 'type': 'trade', 'subtype': ''}",
-                       timestamp='2014-07-23 13:27:26.414707+0000',
+                       raw_data="{"
+                                    "'aclass': 'currency', "
+                                    "'amount': '-3.0000000000', "
+                                    "'asset': 'XLTC', "
+                                    "'balance': '0.0000000000', "
+                                    "'fee': '0.0000000000', "
+                                    "'refid': 'somerefid3', "
+                                    "'time': '1406122046.414707', "
+                                    "'type': 'trade', "
+                                    "'subtype': ''"
+                                "}",
+                       timestamp='2014-07-23 13:27:26+0000',
                        asset='LTC', exchange='kraken', holder='tester', transaction_type='Sell',
                        spot_price='0.01133800', crypto_out_no_fee='3.0', crypto_fee='0.0000000000',
                        crypto_out_with_fee='3.0', fiat_out_no_fee='0.03392556', fiat_fee=None,
                        notes='sell_trade'),
         IntraTransaction(plugin='kraken_REST',
                          unique_id='__unknown',
-                         raw_data="{'aclass': 'currency', 'amount': '3.0000000000', 'asset': 'XLTC', 'balance': '3.0000000000', 'fee': '0.0000000000', 'refid': 'somerefid0', 'time': '1406104521.2614448', 'type': 'deposit', 'subtype': ''}",
-                         timestamp='2014-07-23 08:35:21.261445+0000', asset='LTC',
+                         raw_data="{"
+                                      "'aclass': 'currency', "
+                                      "'amount': '3.0000000000', "
+                                      "'asset': 'XLTC', "
+                                      "'balance': '3.0000000000', "
+                                      "'fee': '0.0000000000', "
+                                      "'refid': 'somerefid0', "
+                                      "'time': '1406104521.2614448', "
+                                      "'type': 'deposit', "
+                                      "'subtype': ''"
+                                  "}",
+                         timestamp='2014-07-23 08:35:21+0000', asset='LTC',
                          from_exchange='__unknown', from_holder='__unknown',
                          to_exchange='kraken', to_holder='tester',
                          spot_price='0', crypto_sent=Keyword.UNKNOWN.value, crypto_received='3.0',
                          notes='deposit'),
         IntraTransaction(plugin='kraken_REST',
                          unique_id='__unknown',
-                         raw_data="{'aclass': 'currency', 'amount': '9.4149333100', 'asset': 'XLTC', 'balance': '9.4149333100', 'fee': '0.0000000000', 'refid': 'somerefid1', 'time': '1406812141.5408714', 'type': 'withdrawal', 'subtype': ''}",
-                         timestamp='2014-07-31 13:09:01.540871+0000',
+                         raw_data="{"
+                                      "'aclass': 'currency', "
+                                      "'amount': '9.4149333100', "
+                                      "'asset': 'XLTC', "
+                                      "'balance': '9.4149333100', "
+                                      "'fee': '0.0000000000', "
+                                      "'refid': 'somerefid1', "
+                                      "'time': '1406812141.5408714', "
+                                      "'type': 'withdrawal', "
+                                      "'subtype': ''"
+                                  "}",
+                         timestamp='2014-07-31 13:09:01+0000',
                          asset='LTC',
                          from_exchange='kraken', from_holder='tester',
                          to_exchange='__unknown', to_holder='__unknown',
@@ -169,5 +209,5 @@ def test_kraken(mocker) -> None:
                          notes='withdrawal')
     ]
 
-    assert str(actual_result) == str(expected_result)
+    assert str(actual_result) == str(expect_result)
 

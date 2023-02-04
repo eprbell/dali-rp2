@@ -23,12 +23,13 @@
 import pytz
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from ccxt import Exchange, kraken
 
 from dali.abstract_ccxt_input_plugin import (
     AbstractCcxtInputPlugin,
+    _MS_IN_SECOND,
 )
 from dali.ccxt_pagination import (
     AbstractPaginationDetailSet,
@@ -39,6 +40,7 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 from dali.configuration import Keyword, _FIAT_SET
+from dali.cache import load_from_cache, save_to_cache
 
 
 # keywords
@@ -145,28 +147,21 @@ class InputPlugin(AbstractCcxtInputPlugin):
         pass
 
     def _gather_api_data(self):
-        import pickle
-        import os
-
-        cache_exists = os.path.exists(self.__CACHE_FILE)
-        if self.use_cache and cache_exists:
-            with open(self.__CACHE_FILE, 'rb') as file:
-                something = pickle.load(file)
-                return something
+        loaded_cache = load_from_cache(self.__CACHE_FILE)
+        if self.use_cache and loaded_cache:
+            return loaded_cache
 
         # get initial trade history to get count
         index: int = 0
-        trade_history = self._client.private_post_tradeshistory(params={_OFFSET: index})
-        count: int = int(trade_history[_RESULT][_COUNT])
-        trade_history = dict()
+        count: int = int(self._client.private_post_tradeshistory(params={_OFFSET: index})[_RESULT][_COUNT])
+        trade_history: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         while index < count:
             trade_history.update(self._process_trade_history(index))
             index += _TRADE_RECORD_LIMIT
 
-        ledger = self._client.private_post_ledgers(params={_OFFSET: index})
         index = 0
-        count = int(ledger[_RESULT][_COUNT])
-        ledger = dict()
+        count: int = int(self._client.private_post_ledgers(params={_OFFSET: index})[_RESULT][_COUNT])
+        ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         while index < count:
             ledger.update(self._process_ledger(index))
             index += _TRADE_RECORD_LIMIT
@@ -174,8 +169,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         result = (trade_history, ledger)
 
         if self.use_cache:
-            with open(self.__CACHE_FILE, 'wb') as file:
-                pickle.dump(result, file)
+            save_to_cache(self.__CACHE_FILE, result)
 
         return result
 
@@ -221,9 +215,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         transactions = processed_transactions[_IN] + processed_transactions[_OUT] + processed_transactions[_INTRA]
         for key in transactions:
             record = ledger[key]
-            timestamp_value: datetime = datetime.fromtimestamp(float(record[_TIMESTAMP]))
-            timestamp_value = timestamp_value.astimezone(self.__timezone)
-            timestamp_value = self.__timezone.normalize(timestamp_value)
+            timestamp_value: str = self._rp2_timestamp_from_ms_epoch(float(record[_TIMESTAMP])*_MS_IN_SECOND)
 
             is_fiat_asset = record[_ASSET] in _FIAT_SET or 'USD' in record[_ASSET]
 
