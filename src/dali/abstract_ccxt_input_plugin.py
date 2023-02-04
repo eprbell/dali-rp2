@@ -137,7 +137,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         market_list: List[str] = []
         for market in ccxt_markets:
             self.__logger.debug("Market: %s", json.dumps(market))
-            market_list.append(market[_ID])
+            if market[_TYPE] == "spot":
+                market_list.append(market[_ID])
 
         self.__markets = market_list
 
@@ -445,7 +446,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         params: Dict[str, Any],
     ) -> Iterable[Dict[str, Union[str, float]]]:
 
-        results: Iterable[Dict[str, Union[str, float]]]
+        results: Iterable[Dict[str, Union[str, float]]] = {}
         request_count: int = 0
 
         # Most exceptions are caused by request limits of the underlying APIs
