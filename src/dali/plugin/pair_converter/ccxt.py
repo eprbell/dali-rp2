@@ -140,7 +140,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         default_exchange: Optional[str] = None,
         fiat_priority: Optional[str] = None,
         google_api_key: Optional[str] = None,
-        exchange_locked: bool = False,
     ) -> None:
 
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
@@ -149,7 +148,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
         self.__google_api_key: Optional[str] = google_api_key
-        self.__exchange_locked: bool = exchange_locked
 
         # TO BE IMPLEMENTED - graph and vertex classes to make this more understandable
         # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924056308
@@ -387,7 +385,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
-        # Look for a CSV reader if one is available use it to read in historical data and save it to cache
         if csv_pricing is not None and not self.__csv_read_flag.get(exchange, False):
             csv_signature: Signature = signature(csv_pricing)
 

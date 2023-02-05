@@ -17,6 +17,7 @@ from json import JSONDecodeError, loads
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
+from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -219,38 +220,45 @@ class AbstractPairConverterPlugin:
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
         result: Optional[HistoricalBar] = None
         params: Dict[str, Any] = {"base": from_asset, "symbols": to_asset}
+        request_count: int = 0
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
-        try:
-            response: Response = self.__session.get(f"{_EXCHANGE_BASE_URL}{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
-            # {
-            #     'motd':
-            #         {
-            #             'msg': 'If you or your company ...',
-            #             'url': 'https://exchangerate.host/#/donate'
-            #         },
-            #     'success': True,
-            #     'historical': True,
-            #     'base': 'EUR',
-            #     'date': '2020-04-04',
-            #     'rates':
-            #         {
-            #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
-            #         }
-            # }
-            data: Any = response.json()
-            if data[_SUCCESS]:
-                result = HistoricalBar(
-                    duration=timedelta(seconds=_DAYS_IN_SECONDS),
-                    timestamp=timestamp,
-                    open=RP2Decimal(str(data[_RATES][to_asset])),
-                    high=RP2Decimal(str(data[_RATES][to_asset])),
-                    low=RP2Decimal(str(data[_RATES][to_asset])),
-                    close=RP2Decimal(str(data[_RATES][to_asset])),
-                    volume=ZERO,
-                )
+        while request_count < 5:
+            try:
+                response: Response = self.__session.get(f"{_EXCHANGE_BASE_URL}{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+                # {
+                #     'motd':
+                #         {
+                #             'msg': 'If you or your company ...',
+                #             'url': 'https://exchangerate.host/#/donate'
+                #         },
+                #     'success': True,
+                #     'historical': True,
+                #     'base': 'EUR',
+                #     'date': '2020-04-04',
+                #     'rates':
+                #         {
+                #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
+                #         }
+                # }
+                data: Any = response.json()
+                if data[_SUCCESS]:
+                    result = HistoricalBar(
+                        duration=timedelta(seconds=_DAYS_IN_SECONDS),
+                        timestamp=timestamp,
+                        open=RP2Decimal(str(data[_RATES][to_asset])),
+                        high=RP2Decimal(str(data[_RATES][to_asset])),
+                        low=RP2Decimal(str(data[_RATES][to_asset])),
+                        close=RP2Decimal(str(data[_RATES][to_asset])),
+                        volume=ZERO,
+                    )
+                break
 
-        except JSONDecodeError as exc:
-            LOGGER.debug("Fetching of fiat exchange rates failed. The server might be down. Please try again later.")
-            raise Exception("JSON decode error") from exc
+            except (JSONDecodeError, ReadTimeout) as exc:
+                LOGGER.debug("Fetching of fiat exchange rates failed. The server might be down. Retrying the connection.")
+                request_count += 1
+                if request_count > 4:
+                    LOGGER.info("Giving up after 4 tries. Saving to Cache.")
+                    self.save_historical_price_cache()
+                    raise Exception("JSON decode error") from exc
 
         return result

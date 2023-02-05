@@ -20,6 +20,8 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
+# pylint: disable=too-many-lines
+
 import json
 import re
 from datetime import datetime
@@ -272,30 +274,34 @@ class InputPlugin(AbstractCcxtInputPlugin):
             #     ],
             #     "total":2
             # }
-            with ThreadPool(self._thread_count) as pool:
-                processing_result_list = pool.map(self._process_dividend, dividends[_ROWS])
 
-            for processing_result in processing_result_list:
-                if processing_result is None:
-                    continue
-                if processing_result.in_transactions:
-                    in_transactions.extend(processing_result.in_transactions)
+            self._logger.debug("Pulled a total of %s records for %s to %s", dividends[_TOTAL], current_start, current_end)
 
             # If user received more than 500 dividends in a 30 day period we need to shrink the window.
-            if int(dividends[_TOTAL]) < _DIVIDEND_RECORD_LIMIT:
+            if int(dividends[_TOTAL]) <= _DIVIDEND_RECORD_LIMIT:
                 current_start = current_end + 1
                 current_end = current_start + _THIRTY_DAYS_IN_MS
+                with ThreadPool(self._thread_count) as pool:
+                    processing_result_list = pool.map(self._process_dividend, dividends[_ROWS])
+
+                for processing_result in processing_result_list:
+                    if processing_result is None:
+                        continue
+                    if processing_result.in_transactions:
+                        in_transactions.extend(processing_result.in_transactions)
             else:
                 # Using implicit API so we need to follow Binance order, which sends latest record first ([0])
                 # CCXT standard API sorts by timestamp, so latest record is last ([499])
-                current_start = int(dividends[_ROWS][0][_DIV_TIME]) + 1  # times are inclusive
-                current_end = current_start + _THIRTY_DAYS_IN_MS
+                number_of_excess_records = int(dividends[_TOTAL]) - _DIVIDEND_RECORD_LIMIT
+                current_end = int(dividends[_ROWS][number_of_excess_records][_DIV_TIME])  # times are inclusive
+                self._logger.debug("Readjusting time window end to %s from %s", current_end, current_start + _THIRTY_DAYS_IN_MS)
+                # current_end = current_start + _THIRTY_DAYS_IN_MS
 
             if not earliest_record_epoch and int(dividends[_TOTAL]) > 0:
                 earliest_record_epoch = int(dividends[_ROWS][-1][_DIV_TIME]) - 1
 
             # We need to track subscription and redemption amounts since Binance will take a fee equal to the amount of interest
-            # earned during the lock period if the user prematurely redems their funds.
+            # earned during the lock period if the user prematurely redeems their funds.
 
         # Old system Locked Savings
 
@@ -840,7 +846,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     notes=notes,
                 )
             )
-        else:
+        elif RP2Decimal(transaction[_AMOUNT]) != ZERO:  # Sometimes Binance reports interest payments with zero amounts
             amount = RP2Decimal(transaction[_AMOUNT])
             notes = f"{notes + '; ' if notes else ''}{transaction[_EN_INFO]}"
 
@@ -930,6 +936,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         if transaction[_STATUS] == "Completed":
             if self.is_native_fiat(transaction[_FIAT_CURRENCY]):
+
+                # For double entry accounting purposes we must create a fiat InTransaction
                 in_transaction_list.append(
                     InTransaction(
                         plugin=self.__PLUGIN_NAME,
@@ -947,7 +955,29 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         fiat_in_with_fee=str(transaction[_SOURCE_AMOUNT]),
                         fiat_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
                         fiat_ticker=transaction[_FIAT_CURRENCY],
-                        notes=(f"{notes + '; ' if notes else ''}Buy transaction for fiat payment orderNo - {transaction[_ORDER_NO]}"),
+                        notes=(f"{notes + '; ' if notes else ''}Buy transaction for native fiat payment orderNo - {transaction[_ORDER_NO]}"),
+                    )
+                )
+
+                # This is an OutTransaction for a buy or conversion based on what the native fiat is.
+                out_transaction_list.append(
+                    OutTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=transaction[_ORDER_NO],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                        asset=transaction[_FIAT_CURRENCY],
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.SELL.value,
+                        spot_price=str(RP2Decimal("1")),
+                        crypto_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_fee=str(RP2Decimal(transaction[_TOTAL_FEE])),
+                        crypto_out_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                        fiat_out_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT]) - RP2Decimal(transaction[_TOTAL_FEE])),
+                        fiat_fee=None,
+                        fiat_ticker=transaction[_FIAT_CURRENCY],
+                        notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from native fiat orderNo - " f"{transaction[_ORDER_NO]}"),
                     )
                 )
             else:
@@ -967,9 +997,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         fiat_in_no_fee=None,
                         fiat_in_with_fee=None,
                         fiat_fee=None,
-                        notes=(f"{notes + '; ' if notes else ''}Buy transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
+                        notes=(f"{notes + '; ' if notes else ''}Buy transaction conversion from non-native_fiat orderNo - {transaction[_ORDER_NO]}"),
                     )
                 )
+
                 out_transaction_list.append(
                     OutTransaction(
                         plugin=self.__PLUGIN_NAME,
@@ -989,5 +1020,27 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         notes=(f"{notes + '; ' if notes else ''}Sell transaction conversion from non-native_fiat orderNo - " f"{transaction[_ORDER_NO]}"),
                     )
                 )
+
+            # An InTransaction is needed for the fiat in order for the accounting to zero out
+            in_transaction_list.append(
+                InTransaction(
+                    plugin=self.__PLUGIN_NAME,
+                    unique_id=f"{transaction[_ORDER_NO]}/fiat_buy",
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_CREATE_TIME]),
+                    asset=transaction[_FIAT_CURRENCY],
+                    exchange=self.__EXCHANGE_NAME,
+                    holder=self.account_holder,
+                    transaction_type=Keyword.BUY.value,
+                    spot_price=str(RP2Decimal("1")),
+                    crypto_in=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                    crypto_fee=None,
+                    fiat_in_no_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                    fiat_in_with_fee=str(RP2Decimal(transaction[_SOURCE_AMOUNT])),
+                    fiat_fee=None,
+                    fiat_ticker=transaction[_FIAT_CURRENCY],
+                    notes=(f"{notes + '; ' if notes else ''}Fiat deposit for orderNo - {transaction[_ORDER_NO]}"),
+                )
+            )
 
         return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
