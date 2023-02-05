@@ -482,10 +482,9 @@ class TestCcxtPlugin:
             mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {LOCKED_EXCHANGE: TEST_GRAPH})
             mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {LOCKED_EXCHANGE: LOCKED_MARKETS})
 
-        mocker.patch.object(plugin, "_add_exchange_to_memcache").side_effect = add_exchange_side_effect
+        mocker.patch.object(plugin, "_add_exchange_to_memcache", autospec=True).side_effect = add_exchange_side_effect
 
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "not-kraken")
 
         assert data
-        assert mocker.patch.object(plugin, "_add_exchange_to_memcache").call_count == 1
-        assert mocker.patch.object(plugin, "_add_exchange_to_memcache").called_with(LOCKED_EXCHANGE)
+        assert mocker.patch.object(plugin, "_add_exchange_to_memcache").called_once_with(LOCKED_EXCHANGE)
