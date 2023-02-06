@@ -34,6 +34,7 @@ from ccxt import (
 )
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -208,7 +209,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_deposits_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            raise Exception("No Pagination Details for Deposits")
+            raise RP2RuntimeError("No Pagination Details for Deposits")
 
         has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
@@ -304,7 +305,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_trades_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            raise Exception("No pagination details for trades.")
+            raise RP2RuntimeError("No pagination details for trades.")
 
         has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
@@ -373,7 +374,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
         # Strip optionality
         if not pagination_detail_set:
-            raise Exception("No pagination details for withdrawals.")
+            raise RP2RuntimeError("No pagination details for withdrawals.")
 
         has_pagination_detail_set: AbstractPaginationDetailSet = pagination_detail_set
 
@@ -465,7 +466,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 request_count += 1
                 if request_count > 9:
                     self.__logger.info("Maximum number of retries reached.")
-                    raise Exception("Server error") from exc_na
+                    raise RP2RuntimeError("Server error") from exc_na
 
                 self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
                 sleep(10)
@@ -500,7 +501,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             crypto_in = RP2Decimal(str(transaction[_COST]))
             conversion_info = f"{trade.base_info} -> {trade.quote_info}"
         else:
-            raise Exception(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
+            raise RP2RuntimeError(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
 
         if fee_asset == in_asset:
             crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
@@ -605,7 +606,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             crypto_out_no_fee = RP2Decimal(str(transaction[_AMOUNT]))
             conversion_info = f"{trade.base_info} -> {trade.quote_info}"
         else:
-            raise Exception(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
+            raise RP2RuntimeError(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
 
         if transaction[_FEE][_CURRENCY] == out_asset:
             crypto_fee: RP2Decimal = RP2Decimal(str(transaction[_FEE][_COST]))
