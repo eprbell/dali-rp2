@@ -33,6 +33,7 @@ from requests.models import Response
 from requests.sessions import Session
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction, AssetAndUniqueId
@@ -139,7 +140,7 @@ class InputPlugin(AbstractInputPlugin):
         self.__cache_key: str = f"coinbase_pro-{account_holder}"
         self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         if self.__thread_count > self.__MAX_THREAD_COUNT:
-            raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
+            raise RP2RuntimeError(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
         self.__account_id_2_account: Dict[str, Any] = {}
 
     def cache_key(self) -> Optional[str]:
@@ -372,7 +373,7 @@ class InputPlugin(AbstractInputPlugin):
                 from_currency_size = to_currency_size * RP2Decimal(fill[_PRICE])
                 from_currency_price = usd_volume / from_currency_size
             else:
-                raise Exception(f"Internal error: unsupported fill side {transaction}\n{fill}")
+                raise RP2RuntimeError(f"Internal error: unsupported fill side {transaction}\n{fill}")
             self.__append_transaction(
                 cast(List[AbstractTransaction], out_transaction_list),
                 OutTransaction(
@@ -431,7 +432,7 @@ class InputPlugin(AbstractInputPlugin):
         amount: str = conversion[_AMOUNT]
 
         if not self.is_native_fiat(from_currency) and not self.is_native_fiat(to_currency):
-            raise Exception(f"Internal error: conversion without fiat currency ({from_currency} -> {to_currency}):{transaction}//{conversion}")
+            raise RP2RuntimeError(f"Internal error: conversion without fiat currency ({from_currency} -> {to_currency}):{transaction}//{conversion}")
 
         self.__append_transaction(
             cast(List[AbstractTransaction], out_transaction_list),
@@ -529,4 +530,4 @@ class InputPlugin(AbstractInputPlugin):
 
         # Defensive programming: we shouldn't reach here.
         self.__logger.debug("Reached past raise_for_status() call: %s", json_response["message"])
-        raise Exception(message)
+        raise RP2RuntimeError(message)
