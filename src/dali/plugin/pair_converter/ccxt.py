@@ -78,7 +78,7 @@ _REQUEST_DELAYDICT: Dict[str, float] = {_KRAKEN: 5.1}
 _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
 
 # Alternative Markets and exchanges for stablecoins or untradeable assets
-_ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {
+_ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "ATDUSDT": _GATE,
     "BSVUSDT": _GATE,
     "BOBAUSD": _GATE,
@@ -89,7 +89,7 @@ _ALTMARKET_EXCHANGES_DICT: Dict[str, str] = {
     "USDTUSD": _KRAKEN,
 }
 
-_ALTMARKET_BY_BASE_DICT: Dict[str, str] = {
+_ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "ATD": "USDT",
     "BOBA": "USD",
     "BSV": "USDT",
@@ -402,9 +402,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         if exchange == _BINANCE:
                             self.__logger.info(
                                 """
-                                Binance server unavailable possibly because you are located in the USA. Try a non-Binance locked exchange pair converter.
+                                Binance server unavailable. Try a non-Binance locked exchange pair converter.
                                 Saving to cache and exiting.
-                            """
+                                """
                             )
                         else:
                             self.__logger.info("Maximum number of retries reached. Saving to cache and exiting.")
@@ -436,9 +436,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return result
 
     def _add_alternative_markets(self, current_graph: Dict[str, Dict[str, None]], current_markets: Dict[str, List[str]]) -> None:
-        for base_asset, quote_asset in _ALTMARKET_BY_BASE_DICT.items():
+        for base_asset, quote_asset in _ALT_MARKET_BY_BASE_DICT.items():
             alt_market = base_asset + quote_asset
-            alt_exchange_name = _ALTMARKET_EXCHANGES_DICT[alt_market]
+            alt_exchange_name = _ALT_MARKET_EXCHANGES_DICT[alt_market]
 
             # TO BE IMPLEMENTED - Add alt market to the end of list if another exchange exists already
             current_markets[alt_market] = [alt_exchange_name]
