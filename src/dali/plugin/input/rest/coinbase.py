@@ -32,6 +32,7 @@ from requests.models import Response
 from requests.sessions import Session
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -161,7 +162,7 @@ class InputPlugin(AbstractInputPlugin):
         self.__cache_key: str = f"{self.__COINBASE.lower()}-{account_holder}"
         self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         if self.__thread_count > self.__MAX_THREAD_COUNT:
-            raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
+            raise RP2RuntimeError(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
@@ -251,7 +252,9 @@ class InputPlugin(AbstractInputPlugin):
                 trade_id = in_transaction_2_trade_id[in_transaction]
                 out_transaction = trade_id_2_out_transaction[trade_id]
                 if in_transaction.asset == out_transaction.asset:
-                    raise Exception(f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}")
+                    raise RP2RuntimeError(
+                        f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}"
+                    )
                 in_transaction_and_index: _InTransactionAndIndex = _InTransactionAndIndex(
                     in_transaction=in_transaction,
                     in_transaction_index=index,
@@ -272,7 +275,9 @@ class InputPlugin(AbstractInputPlugin):
                 trade_id = out_transaction_2_trade_id[out_transaction]
                 in_transaction = trade_id_2_in_transaction[trade_id]
                 if in_transaction.asset == out_transaction.asset:
-                    raise Exception(f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}")
+                    raise RP2RuntimeError(
+                        f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}"
+                    )
                 out_transaction_and_index: _OutTransactionAndIndex = _OutTransactionAndIndex(
                     out_transaction=out_transaction,
                     out_transaction_index=index,
@@ -297,27 +302,27 @@ class InputPlugin(AbstractInputPlugin):
         # Process swaps
         for trade_id, swap_pair in trade_id_2_swap_pair.items():
             if swap_pair.in_transaction is None or swap_pair.out_transaction is None:
-                raise Exception(f"Internal error: unmatched swap pair: {swap_pair}")
+                raise RP2RuntimeError(f"Internal error: unmatched swap pair: {swap_pair}")
             in_transaction = swap_pair.in_transaction.in_transaction
             out_transaction = swap_pair.out_transaction.out_transaction
 
             # Ensure fees are not yet computed
             if in_transaction.crypto_fee is not None or in_transaction.fiat_fee is None or RP2Decimal(in_transaction.fiat_fee) != ZERO:
-                raise Exception(f"Internal error: in-transaction crypto_fee is not None or fiat_fee != 0: {in_transaction}")
+                raise RP2RuntimeError(f"Internal error: in-transaction crypto_fee is not None or fiat_fee != 0: {in_transaction}")
             if (
                 out_transaction.crypto_fee is None
                 or RP2Decimal(out_transaction.crypto_fee) != ZERO
                 or out_transaction.fiat_fee is None
                 or RP2Decimal(out_transaction.fiat_fee) != ZERO
             ):
-                raise Exception(f"Internal error: out-transaction crypto_fee != 0 or fiat_fee != 0: {out_transaction}")
+                raise RP2RuntimeError(f"Internal error: out-transaction crypto_fee != 0 or fiat_fee != 0: {out_transaction}")
 
             fiat_out_no_fee: RP2Decimal
             # The fiat_fee is paid in the InTransaction, unless the InTransaction is fiat (which is ignored in RP2):
             # in this case the fiat_fee is paid in the OutTransaction
             if not self.is_native_fiat(in_transaction.asset):
                 if not in_transaction.fiat_in_no_fee or not in_transaction.fiat_in_with_fee or not out_transaction.fiat_out_no_fee:
-                    raise Exception(f"Internal error: swap transactions have incomplete fiat data: {in_transaction}//{out_transaction}")
+                    raise RP2RuntimeError(f"Internal error: swap transactions have incomplete fiat data: {in_transaction}//{out_transaction}")
                 fiat_in_no_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_in_no_fee)
                 fiat_in_with_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_in_with_fee)
                 fiat_out_no_fee = RP2Decimal(out_transaction.fiat_out_no_fee)
@@ -383,7 +388,7 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 # InTransaction is fiat, so it is ignored in RP2: however any fiat_fee must be applied to the OutTransaction to avoid losing it
                 if not in_transaction.fiat_fee or not out_transaction.fiat_out_no_fee:
-                    raise Exception(f"Internal error: swap transactions have incomplete fiat data: {in_transaction} // {out_transaction}")
+                    raise RP2RuntimeError(f"Internal error: swap transactions have incomplete fiat data: {in_transaction} // {out_transaction}")
                 fiat_out_no_fee = RP2Decimal(out_transaction.fiat_out_no_fee)
                 fiat_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_fee) if in_transaction.fiat_fee else ZERO
                 transaction_list[swap_pair.out_transaction.out_transaction_index] = OutTransaction(
@@ -656,7 +661,7 @@ class InputPlugin(AbstractInputPlugin):
         spot_price_string: str
 
         if not self.is_native_fiat(transaction[_NATIVE_AMOUNT][_CURRENCY]):
-            raise Exception(f"Internal error: native amount is not denominated in {self.native_fiat} {json.dumps(transaction)}")
+            raise RP2RuntimeError(f"Internal error: native amount is not denominated in {self.native_fiat} {json.dumps(transaction)}")
 
         raw_data: str = json.dumps(transaction)
         if not transaction_type in {_BUY, _SELL, _TRADE}:
@@ -867,4 +872,4 @@ class InputPlugin(AbstractInputPlugin):
 
         # Defensive programming: we shouldn't reach here.
         self.__logger.debug("Reached past raise_for_status() call: %s", json_response["message"])
-        raise Exception(message)
+        raise RP2RuntimeError(message)

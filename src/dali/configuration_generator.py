@@ -16,6 +16,8 @@ from configparser import ConfigParser
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
+from rp2.rp2_error import RP2RuntimeError
+
 from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
@@ -36,13 +38,13 @@ def generate_configuration_file(
 ) -> Any:
 
     if not isinstance(output_dir_path, str):
-        raise Exception(f"Internal error: parameter output_dir_path is not of type string: {repr(output_dir_path)}")
+        raise RP2RuntimeError(f"Internal error: parameter output_dir_path is not of type string: {repr(output_dir_path)}")
     if not isinstance(output_file_prefix, str):
-        raise Exception(f"Internal error: parameter output_file_prefix is not of type string: {repr(output_file_prefix)}")
+        raise RP2RuntimeError(f"Internal error: parameter output_file_prefix is not of type string: {repr(output_file_prefix)}")
     if not isinstance(output_file_name, str):
-        raise Exception(f"Internal error: parameter output_file_name is not of type string: {repr(output_file_name)}")
+        raise RP2RuntimeError(f"Internal error: parameter output_file_name is not of type string: {repr(output_file_name)}")
     if not isinstance(transactions, List):
-        raise Exception(f"Internal error: parameter transactions is not of type List: {repr(transactions)}")
+        raise RP2RuntimeError(f"Internal error: parameter transactions is not of type List: {repr(transactions)}")
 
     output_file_path: Path = Path(output_dir_path) / Path(f"{output_file_prefix}{output_file_name}")
     if Path(output_file_path).exists():
@@ -68,7 +70,7 @@ def generate_configuration_file(
             exchanges.add(transaction.from_exchange)
             exchanges.add(transaction.to_exchange)
         else:
-            raise Exception(f"Internal error: transaction is not a subclass of AbstractTransaction: {transaction}")
+            raise RP2RuntimeError(f"Internal error: transaction is not a subclass of AbstractTransaction: {transaction}")
         assets.add(transaction.asset)
 
     if Keyword.UNKNOWN.value in assets:

@@ -14,7 +14,7 @@
 
 from typing import List, Optional, cast
 
-from rp2.rp2_error import RP2TypeError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError
 
 from dali.abstract_transaction import AbstractTransaction
 from dali.cache import load_from_cache, save_to_cache
@@ -42,17 +42,17 @@ class AbstractInputPlugin:
     def load_from_cache(self) -> Optional[List[AbstractTransaction]]:
         cache_key = self.cache_key()  # pylint: disable=assignment-from-none
         if cache_key is None:
-            raise Exception("Plugin doesn't support load cache")
+            raise RP2RuntimeError("Plugin doesn't support load cache")
         if not isinstance(cache_key, str):
-            raise Exception("Plugin cache_key() doesn't return a string")
+            raise RP2RuntimeError("Plugin cache_key() doesn't return a string")
         return cast(Optional[List[AbstractTransaction]], load_from_cache(cache_key))
 
     def save_to_cache(self, transactions: List[AbstractTransaction]) -> None:
         cache_key = self.cache_key()  # pylint: disable=assignment-from-none
         if cache_key is None:
-            raise Exception("Plugin doesn't support load cache")
+            raise RP2RuntimeError("Plugin doesn't support load cache")
         if not isinstance(cache_key, str):
-            raise Exception("Plugin cache_key() doesn't return a string")
+            raise RP2RuntimeError("Plugin cache_key() doesn't return a string")
         save_to_cache(cache_key, transactions)
 
     @property

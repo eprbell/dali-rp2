@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -87,7 +88,7 @@ class InputPlugin(AbstractInputPlugin):
                 self.__logger.debug("Transaction: %s", raw_data)
 
                 if last_withdrawal_fee is not None and line[self.__TYPE_INDEX] != _WITHDRAWAL:
-                    raise Exception(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
+                    raise RP2RuntimeError(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
 
                 transaction_type: str = line[self.__TYPE_INDEX]
                 if transaction_type == _INTEREST_PAYMENT:
@@ -239,7 +240,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 transaction_type: str = line[column_index[_TYPE]]
                 if transaction_type != "Trade":
-                    raise Exception(f"Internal error: unsupported transaction type: {transaction_type}")
+                    raise RP2RuntimeError(f"Internal error: unsupported transaction type: {transaction_type}")
 
                 trade_id: str = line[column_index[_TRADE_ID]]
                 date: str = line[column_index[_DATE]]

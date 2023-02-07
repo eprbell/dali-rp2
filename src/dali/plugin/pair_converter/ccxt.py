@@ -32,6 +32,7 @@ from ccxt import (
 )
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
@@ -409,7 +410,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         else:
                             self.__logger.info("Maximum number of retries reached. Saving to cache and exiting.")
                         self.save_historical_price_cache()
-                        raise Exception("Server error") from exc_na
+                        raise RP2RuntimeError("Server error") from exc_na
 
                     self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
                     sleep(10)
