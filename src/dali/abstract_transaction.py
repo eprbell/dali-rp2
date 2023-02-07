@@ -18,6 +18,7 @@ from typing import Callable, Dict, List, NamedTuple, Optional, Union
 
 from dateutil.parser import parse
 from prezzemolo.utility import to_string
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.configuration import Keyword, is_internal_field, is_unknown
 
@@ -42,13 +43,13 @@ class AbstractTransaction:
     @classmethod
     def _validate_string_field(cls, name: str, value: str, raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> str:
         if not isinstance(name, str):
-            raise Exception(f"Internal error: parameter name is not a string: {name}")
+            raise RP2RuntimeError(f"Internal error: parameter name is not a string: {name}")
         if not isinstance(value, str):
-            raise Exception(f"Internal error: {name} is not a string: {value}\n{raw_data}")
+            raise RP2RuntimeError(f"Internal error: {name} is not a string: {value}\n{raw_data}")
         if disallow_empty and len(value) == 0:
-            raise Exception(f"Internal error: {name} is empty: {raw_data}")
+            raise RP2RuntimeError(f"Internal error: {name} is empty: {raw_data}")
         if disallow_unknown and is_unknown(value):
-            raise Exception(f"Internal error: {name} is unknown: {raw_data}")
+            raise RP2RuntimeError(f"Internal error: {name} is unknown: {raw_data}")
         return value.strip()
 
     @classmethod
@@ -61,7 +62,7 @@ class AbstractTransaction:
         try:
             float(value)
         except ValueError as exc:
-            raise Exception(f"Internal error parsing {name} as number: {value}\n{raw_data}\n{str(exc)}") from exc
+            raise RP2RuntimeError(f"Internal error parsing {name} as number: {value}\n{raw_data}\n{str(exc)}") from exc
         return value
 
     @classmethod
@@ -69,10 +70,10 @@ class AbstractTransaction:
         value = cls._validate_string_field(name, value, raw_data, disallow_empty=True, disallow_unknown=True)
         try:
             result: datetime = parse(value)
-        except Exception as exc:
-            raise Exception(f"Internal error parsing {name} as datetime: {value}\n{raw_data}\n{str(exc)}") from exc
+        except RP2RuntimeError as exc:
+            raise RP2RuntimeError(f"Internal error parsing {name} as datetime: {value}\n{raw_data}\n{str(exc)}") from exc
         if result.tzinfo is None:
-            raise Exception(f"Internal error: {name} has no timezone info: {value}\n{raw_data}")
+            raise RP2RuntimeError(f"Internal error: {name} has no timezone info: {value}\n{raw_data}")
         if result.microsecond == 0:
             return StringAndDatetime(result.strftime("%Y-%m-%d %H:%M:%S%z"), result)
         return StringAndDatetime(result.strftime("%Y-%m-%d %H:%M:%S.%f%z"), result)
@@ -113,7 +114,7 @@ class AbstractTransaction:
         self.__asset: str = self._validate_string_field(Keyword.ASSET.value, asset, raw_data, disallow_empty=True, disallow_unknown=True)
         self.__notes: Optional[str] = self._validate_optional_string_field(Keyword.NOTES.value, notes, raw_data, disallow_empty=False, disallow_unknown=True)
         if is_spot_price_from_web and not isinstance(is_spot_price_from_web, bool):
-            raise Exception(f"Internal error: {Keyword.IS_SPOT_PRICE_FROM_WEB.value} is not boolean: {is_spot_price_from_web}")
+            raise RP2RuntimeError(f"Internal error: {Keyword.IS_SPOT_PRICE_FROM_WEB.value} is not boolean: {is_spot_price_from_web}")
         self.__is_spot_price_from_web: bool = is_spot_price_from_web if is_spot_price_from_web else False
         self.__fiat_ticker: Optional[str] = self._validate_optional_string_field(
             "fiat_ticker", fiat_ticker, raw_data, disallow_empty=True, disallow_unknown=True
@@ -151,7 +152,7 @@ class AbstractTransaction:
         if not other:
             return False
         if not isinstance(other, AbstractTransaction):
-            raise Exception(f"Internal error: operand has non-AbstractTransaction value {repr(other)}")
+            raise RP2RuntimeError(f"Internal error: operand has non-AbstractTransaction value {repr(other)}")
         result: bool = self.unique_id == other.unique_id and self.plugin == self.plugin and self.asset == self.asset
         return result
 

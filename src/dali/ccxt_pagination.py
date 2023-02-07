@@ -20,6 +20,8 @@
 from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional, Union
 
+from rp2.rp2_error import RP2RuntimeError
+
 _TIMESTAMP: str = "timestamp"
 
 # Time period constants
@@ -104,7 +106,7 @@ class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
     def _get_window(self) -> int:
         if self.__window:
             return self.__window
-        raise Exception("No window defined for iterator.")
+        raise RP2RuntimeError("No window defined for iterator.")
 
     def __iter__(self) -> "CustomDateBasedPaginationDetailsIterator":
         return CustomDateBasedPaginationDetailsIterator(
@@ -200,7 +202,7 @@ class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
     def _get_end_of_window(self) -> int:
         if self.__window:
             return self.__since + self.__window
-        raise Exception("No window defined for iterator.")
+        raise RP2RuntimeError("No window defined for iterator.")
 
     def __next__(self) -> PaginationDetails:
         while not self._is_end_of_data():

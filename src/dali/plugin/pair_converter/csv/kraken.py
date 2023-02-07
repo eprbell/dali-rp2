@@ -29,6 +29,7 @@ from requests.models import Response
 from requests.sessions import Session
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.historical_bar import HistoricalBar
 
@@ -177,7 +178,7 @@ class Kraken:
                         """,
                             error[_MESSAGE],
                         )
-                        raise Exception("Google Drive not authorized")
+                        raise RP2RuntimeError("Google Drive not authorized")
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
 
@@ -188,7 +189,7 @@ class Kraken:
 
         except JSONDecodeError as exc:
             self.__logger.debug("Fetching of kraken csv files failed. Try again later.")
-            raise Exception("JSON decode error") from exc
+            raise RP2RuntimeError("JSON decode error") from exc
 
         return file_response.content
 

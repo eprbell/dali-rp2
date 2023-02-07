@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from ccxt import Exchange, binance
 from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_ccxt_input_plugin import (
     AbstractCcxtInputPlugin,
@@ -191,7 +192,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _client(self) -> binance:
         super_client: Exchange = super()._client
         if not isinstance(super_client, binance):
-            raise Exception("Exchange is not instance of class binance.")
+            raise RP2RuntimeError("Exchange is not instance of class binance.")
         return super_client
 
     def _get_algos(self) -> List[str]:
@@ -439,7 +440,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         earliest_redemption_timestamp = subscription_time + lockperiod_in_ms
 
                     else:
-                        raise Exception(
+                        raise RP2RuntimeError(
                             f"Internal Error: Principal ({original_principal}) minus paid interest ({RP2Decimal(str(total_interest_earned))}) does not equal"
                             f" returned principal ({RP2Decimal(redemption[_AMOUNT])}) on locked savings position ID - {redemption[_POSITION_ID]}."
                         )
@@ -467,7 +468,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         )
 
                     else:
-                        raise Exception(
+                        raise RP2RuntimeError(
                             f"Internal Error: The redemption time ({self._rp2_timestamp_from_ms_epoch(redemption[_TIME])}) is not in the redemption window "
                             f"({self._rp2_timestamp_from_ms_epoch(str(earliest_redemption_timestamp))} + 2 days)."
                         )
@@ -477,7 +478,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     self._logger.debug("Locked Savings positionId %s redeemed successfully.", redemption[_POSITION_ID])
 
                 else:
-                    raise Exception(f"Internal Error: Orphaned Redemption. Please open an issue at {self.ISSUES_URL}.")
+                    raise RP2RuntimeError(f"Internal Error: Orphaned Redemption. Please open an issue at {self.ISSUES_URL}.")
 
             # if we returned the limit, we need to roll the window forward to the last time
             if len(locked_redemptions) < _INTEREST_SIZE_LIMIT:
@@ -768,7 +769,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
                 first_dribblet = [x for x in dust_trades if x[_DIV_TIME] == dust_trades[0][_DIV_TIME]]
                 if len(first_dribblet) == _DUST_TRADE_RECORD_LIMIT:
-                    raise Exception(
+                    raise RP2RuntimeError(
                         f"Internal error: too many assets dusted at the same time: " f"{self._rp2_timestamp_from_ms_epoch(str(dust_trades[0][_DIV_TIME]))}"
                     )
 

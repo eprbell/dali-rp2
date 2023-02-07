@@ -17,7 +17,7 @@ from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 from rp2.rp2_decimal import ZERO, RP2Decimal
-from rp2.rp2_error import RP2TypeError, RP2ValueError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError, RP2ValueError
 
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import AbstractTransaction, AssetAndUniqueId
@@ -55,16 +55,16 @@ def _resolve_fields(
     if_conflict_override_second_parameter: bool = False,
 ) -> str:
     if disallow_two_unknown and is_unknown(value1) and is_unknown(value2):
-        raise Exception(f"Internal error: {name1} and {name2} are both unknown: {transaction1}\n{transaction2}")
+        raise RP2RuntimeError(f"Internal error: {name1} and {name2} are both unknown: {transaction1}\n{transaction2}")
     if value1 and value2 and not is_unknown(value1) and not is_unknown(value2) and value1 != value2:
         if if_conflict_override_second_parameter:
             return value1
         # If values are numeric we need to compare them as numbers, not as strings
         if _is_number(value1) and _is_number(value2):
             if RP2Decimal(value1) != RP2Decimal(value2):
-                raise Exception(f"Internal error: {name1} and {name2} are numeric but have different values: {transaction1}\n{transaction2}")
+                raise RP2RuntimeError(f"Internal error: {name1} and {name2} are numeric but have different values: {transaction1}\n{transaction2}")
         else:
-            raise Exception(f"Internal error: {name1} and {name2} have different values: {transaction1}\n{transaction2}")
+            raise RP2RuntimeError(f"Internal error: {name1} and {name2} have different values: {transaction1}\n{transaction2}")
     if is_unknown(value1):
         return value2
     if is_unknown(value2):
@@ -110,7 +110,7 @@ def _get_pair_conversion_rate(timestamp: datetime, from_asset: str, to_asset: st
             break
 
     if pair_converter is None:
-        raise Exception("No pair converter plugin found")
+        raise RP2RuntimeError("No pair converter plugin found")
 
     return RateAndPairConverter(rate, pair_converter)
 
@@ -120,7 +120,7 @@ def _get_originating_exchange(transaction: AbstractTransaction) -> str:
         return transaction.exchange
     if isinstance(transaction, IntraTransaction):
         return transaction.from_exchange
-    raise Exception(f"Internal error: not a transaction: {transaction}")
+    raise RP2RuntimeError(f"Internal error: not a transaction: {transaction}")
 
 
 def _update_spot_price_from_web(transaction: AbstractTransaction, global_configuration: Dict[str, Any]) -> AbstractTransaction:
@@ -141,7 +141,7 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
             global_configuration=global_configuration,
         )
         if conversion.rate is None:
-            raise Exception(
+            raise RP2RuntimeError(
                 f"Spot price for {transaction.unique_id + ':' if transaction.unique_id else ''}"
                 f"{transaction.timestamp_value}:{transaction.asset}->{global_configuration[Keyword.NATIVE_FIAT.value]}"
                 " not found on any pair converter plugin"
@@ -161,7 +161,7 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
             return OutTransaction(**init_parameters)
         if isinstance(transaction, IntraTransaction):
             return IntraTransaction(**init_parameters)
-        raise Exception(f"Invalid transaction: {transaction}")
+        raise RP2RuntimeError(f"Invalid transaction: {transaction}")
 
     return transaction
 
@@ -182,7 +182,7 @@ def _convert_fiat_fields_to_native_fiat(transaction: AbstractTransaction, global
         global_configuration=global_configuration,
     )
     if conversion.rate is None:
-        raise Exception(f"Conversion rate for {transaction.timestamp_value}:{from_fiat}->{to_fiat} not found on any pair converter plugin")
+        raise RP2RuntimeError(f"Conversion rate for {transaction.timestamp_value}:{from_fiat}->{to_fiat} not found on any pair converter plugin")
 
     init_parameters: Dict[str, Any] = transaction.constructor_parameter_dictionary
     notes: str = f"Fiat conversion {from_fiat}->{to_fiat} using {conversion.pair_converter.name()} plugin; {transaction.notes if transaction.notes else ''}"
@@ -211,7 +211,7 @@ def _convert_fiat_fields_to_native_fiat(transaction: AbstractTransaction, global
     if isinstance(transaction, IntraTransaction):
         return IntraTransaction(**init_parameters)
 
-    raise Exception(f"Invalid transaction: {transaction}")
+    raise RP2RuntimeError(f"Invalid transaction: {transaction}")
 
 
 # This resolves incomplete transactions. An INTRA transaction from an exchange (e.g. Coinbase) to another
@@ -225,7 +225,7 @@ def resolve_transactions(
     read_spot_price_from_web: bool,
 ) -> List[AbstractTransaction]:
     if not isinstance(transactions, List):
-        raise Exception(f"Internal error: parameter 'transactions' is not of type List. {transactions}")
+        raise RP2RuntimeError(f"Internal error: parameter 'transactions' is not of type List. {transactions}")
 
     resolved_transactions: List[AbstractTransaction] = []
     unique_id_2_transactions: Dict[AssetAndUniqueId, List[AbstractTransaction]] = {}
@@ -234,7 +234,7 @@ def resolve_transactions(
     try:
         for transaction in transactions:
             if not isinstance(transaction, AbstractTransaction):
-                raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
+                raise RP2RuntimeError(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
 
             if transaction.fiat_ticker not in {None, global_configuration[Keyword.NATIVE_FIAT.value]}:
                 # Foreign exchanges may have transactions denominated in non-native fiat
@@ -254,7 +254,9 @@ def resolve_transactions(
 
         for transaction_list in unique_id_2_transactions.values():
             if len(transaction_list) > 2:
-                raise Exception(f"Internal error: Attempting to resolve more than two transactions with same {Keyword.UNIQUE_ID.value}: {transaction_list}")
+                raise RP2RuntimeError(
+                    f"Internal error: Attempting to resolve more than two transactions with same {Keyword.UNIQUE_ID.value}: {transaction_list}"
+                )
             if len(transaction_list) == 1:
                 transaction = _apply_transaction_hint(transaction_list[0], global_configuration)
                 if read_spot_price_from_web:
@@ -263,17 +265,19 @@ def resolve_transactions(
                 resolved_transactions.append(transaction)
                 continue
             if len(transaction_list) == 0:
-                raise Exception(f"Internal error: Attempting to resolve zero transactions: {transaction_list}")
+                raise RP2RuntimeError(f"Internal error: Attempting to resolve zero transactions: {transaction_list}")
 
             transaction1: AbstractTransaction = transaction_list[0]
             transaction2: AbstractTransaction = transaction_list[1]
 
             if transaction1.unique_id != transaction2.unique_id:
-                raise Exception(
+                raise RP2RuntimeError(
                     f"Internal error: transaction1.{Keyword.UNIQUE_ID.value} != transaction2.{Keyword.UNIQUE_ID.value}: {transaction1}\n{transaction2}"
                 )
             if transaction1.asset != transaction2.asset:
-                raise Exception(f"Internal error: transaction1.{Keyword.ASSET.value} != transaction2.{Keyword.ASSET.value}: {transaction1}\n{transaction2}")
+                raise RP2RuntimeError(
+                    f"Internal error: transaction1.{Keyword.ASSET.value} != transaction2.{Keyword.ASSET.value}: {transaction1}\n{transaction2}"
+                )
 
             if isinstance(transaction1, InTransaction) and isinstance(transaction2, OutTransaction):
                 transaction = _resolve_in_out_transaction(transaction1, transaction2, None)
@@ -282,7 +286,7 @@ def resolve_transactions(
             elif isinstance(transaction1, IntraTransaction) and isinstance(transaction2, IntraTransaction):
                 transaction = _resolve_intra_intra_transaction(transaction1, transaction2, None)
             else:
-                raise Exception(
+                raise RP2RuntimeError(
                     f"Internal error: attempting to resolve two transactions that aren't Intra/Intra, In/Out or Out/In:\n{transaction1}\n{transaction2}"
                 )
 

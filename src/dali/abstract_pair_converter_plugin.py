@@ -21,7 +21,7 @@ from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
 from rp2.rp2_decimal import ZERO, RP2Decimal
-from rp2.rp2_error import RP2TypeError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
@@ -177,7 +177,7 @@ class AbstractPairConverterPlugin:
 
         except JSONDecodeError as exc:
             LOGGER.info("Fetching of fiat symbols failed. The server might be down. Please try again later.")
-            raise Exception("JSON decode error") from exc
+            raise RP2RuntimeError("JSON decode error") from exc
 
     def _add_fiat_edges_to_graph(self, graph: Dict[str, Dict[str, None]], markets: Dict[str, List[str]]) -> None:
         if not self.__fiat_list:
@@ -259,6 +259,6 @@ class AbstractPairConverterPlugin:
                 if request_count > 4:
                     LOGGER.info("Giving up after 4 tries. Saving to Cache.")
                     self.save_historical_price_cache()
-                    raise Exception("JSON decode error") from exc
+                    raise RP2RuntimeError("JSON decode error") from exc
 
         return result
