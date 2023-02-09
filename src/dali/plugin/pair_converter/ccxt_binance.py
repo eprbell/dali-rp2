@@ -24,13 +24,11 @@ class PairConverterPlugin(CcxtPairConverterPlugin):
         self,
         historical_price_type: str,
         fiat_priority: Optional[str] = None,
-        google_api_key: Optional[str] = None,
     ) -> None:
 
         super().__init__(
             historical_price_type=historical_price_type,
             default_exchange="Binance.com",
             fiat_priority=fiat_priority,
-            google_api_key=google_api_key,
             exchange_locked=True,
         )
