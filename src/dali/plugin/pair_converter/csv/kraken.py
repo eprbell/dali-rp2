@@ -92,10 +92,10 @@ class Kraken:
         bars: Dict[datetime, HistoricalBar] = {}
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.debug(base_file)
+        self.__logger.debug("Attempting to load %s", base_file)
 
         with ZipFile(BytesIO(self._google_file_to_bytes(base_file))) as zipped_ohlcvt:
-            self.__logger.debug(zipped_ohlcvt.namelist())
+            self.__logger.debug("Files found in zipped file - %s", zipped_ohlcvt.namelist())
             all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
 
             if len(all_timespans_for_pair) == 0:

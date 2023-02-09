@@ -31,6 +31,8 @@
   * [Manual Section (CSV)](#manual-section-csv)
 * **[Pair Converter Plugin Sections](#pair-converter-plugin-sections)**
   * [CCXT](#ccxt)
+  * [Binance Locked CCXT](#binance-locked-ccxt)
+  * [Kraken Locked CCXT](#kraken-locked-ccxt)
   * [Historic Crypto](#historic-crypto)
 * **[Builtin Sections](#builtin-sections)**
   * [Transaction Hints Section](#transaction-hints-section)
@@ -418,7 +420,7 @@ google_api_key = <em>&lt;google_api_key&gt;</em>
 
 Where:
 * `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
-* `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Binance.com is used. If you would like an exchange added please open an issue.
+* `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Kraken(US) is used. If you would like an exchange added please open an issue. The current available exchanges are "Binance.com", "Gate", "Huobi" and "Kraken".
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
 
@@ -436,7 +438,55 @@ Then, it will route the price through a fiat conversion to get the final price:
 Be aware that:
 * Exchange rates for fiat transactions are based on the daily rate and not minute or hourly rates.
 * If a market for the conversion exists on the exchange where the asset was purchased, no routing takes place. The plugin retrieves the price for the time period.
-* The router uses the exchange listed in the transaction data to build the graph to calculate the route. If no exchange is listed, the current default is Binance.com.
+* The router uses the exchange listed in the transaction data to build the graph to calculate the route. If no exchange is listed, the current default is Kraken(US).
+* `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
+* Some exchanges, in particular Binance.com, might not be available in certain territories.
+
+
+### Binance Locked CCXT
+This plugin makes use of the CCXT plugin, but locks all routes to Binance.com.
+
+Initialize this plugin section as follows:
+<pre>
+[dali.plugin.pair_converter.ccxt</em>]
+historical_price_type = <em>&lt;historical_price_type&gt;</em>
+fiat_priority = <em>&lt;fiat_priority&gt;</em>
+</pre>
+
+Where:
+* `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
+* `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
+
+The Binance Locked CCXT plugin still makes use of fiat exchange rate routing. Pricing will resolve to any major fiat currency even if it doesn't have a market (ie. not used to trade with) on Binance.com.
+
+Be aware that:
+* Exchange rates for fiat transactions are based on the daily rate and not minute or hourly rates.
+* The router only uses Binance.com and the fiat exchange rates to build the graph to calculate the route.
+* `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
+* Binance.com might not be available in certain territories.
+
+
+### Kraken Locked CCXT
+This plugin makes use of the CCXT plugin, but locks all routes to Kraken(US).
+
+Initialize this plugin section as follows:
+<pre>
+[dali.plugin.pair_converter.ccxt</em>]
+historical_price_type = <em>&lt;historical_price_type&gt;</em>
+fiat_priority = <em>&lt;fiat_priority&gt;</em>
+google_api_key = <em>&lt;google_api_key&gt;</em>
+</pre>
+
+Where:
+* `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
+* `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
+* `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
+
+The Kraken Locked CCXT plugin still makes use of fiat exchange rate routing. Pricing will resolve to any major fiat currency even if it doesn't have a market (ie. not used to trade with) on Kraken.
+
+Be aware that:
+* Exchange rates for fiat transactions are based on the daily rate and not minute or hourly rates.
+* The router only uses Kraken and the fiat exchange rates to build the graph to calculate the route.
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 
 
