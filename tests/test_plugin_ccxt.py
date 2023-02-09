@@ -27,8 +27,8 @@ from dali.plugin.pair_converter.ccxt import PairConverterPlugin
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 
 # Default exchange
-TEST_EXCHANGE: str = "Binance.com"
-ALT_EXCHANGE: str = "Kraken"
+TEST_EXCHANGE: str = "Kraken"
+ALT_EXCHANGE: str = "Binance.com"
 LOCKED_EXCHANGE: str = "Kraken"
 FIAT_EXHANGE: str = "fiat"
 TEST_GRAPH: Dict[str, List[str]] = {
@@ -39,16 +39,16 @@ TEST_GRAPH: Dict[str, List[str]] = {
     "USD": ["JPY"],
 }
 TEST_MARKETS: Dict[str, List[str]] = {
-    "BTCUSDT": [TEST_EXCHANGE],
-    "BTCGBP": [TEST_EXCHANGE],
-    "BETHETH": [TEST_EXCHANGE],
-    "ETHUSDT": [TEST_EXCHANGE],
-    "USDTUSD": [ALT_EXCHANGE],
+    "BTCUSDT": [ALT_EXCHANGE],
+    "BTCGBP": [ALT_EXCHANGE],
+    "BETHETH": [ALT_EXCHANGE],
+    "ETHUSDT": [ALT_EXCHANGE],
+    "USDTUSD": [TEST_EXCHANGE],
     "USDJPY": [FIAT_EXHANGE],
 }
 LOCKED_MARKETS: Dict[str, List[str]] = {
-    "BTCUSDT": [ALT_EXCHANGE],
-    "USDTUSD": [ALT_EXCHANGE],
+    "BTCUSDT": [TEST_EXCHANGE],
+    "USDTUSD": [TEST_EXCHANGE],
 }
 
 # BTCUSDT conversion
@@ -113,24 +113,25 @@ _GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
 
 class TestCcxtPlugin:
     def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any) -> None:
-        exchange = binance(
+        exchange = kraken(
             {
                 "apiKey": "key",
                 "secret": "secret",
             }
         )
-        alt_exchange = kraken(
+        alt_exchange = binance(
             {
                 "apiKey": "key",
                 "secret": "secret",
             }
         )
+
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
 
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
         mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"kraken": kraken_csv})
-        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
             [
                 BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
                 BAR_OPEN,  # (O)pen price, float
@@ -141,7 +142,7 @@ class TestCcxtPlugin:
             ],
         ]
 
-        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 USDTUSD_TIMESTAMP,  # UTC timestamp in milliseconds, integer
                 USDTUSD_OPEN,  # (O)pen price, float
@@ -245,13 +246,13 @@ class TestCcxtPlugin:
     def test_no_fiat_pair(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
 
-        exchange = binance(
+        exchange = kraken(
             {
                 "apiKey": "key",
                 "secret": "secret",
             }
         )
-        alt_exchange = kraken(
+        alt_exchange = binance(
             {
                 "apiKey": "key",
                 "secret": "secret",
@@ -287,8 +288,8 @@ class TestCcxtPlugin:
 
             return result
 
-        mocker.patch.object(exchange, "fetchOHLCV").side_effect = no_fiat_fetch_ohlcv
-        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
+        mocker.patch.object(alt_exchange, "fetchOHLCV").side_effect = no_fiat_fetch_ohlcv
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 USDTUSD_TIMESTAMP,  # UTC timestamp in milliseconds, integer
                 USDTUSD_OPEN,  # (O)pen price, float
@@ -313,8 +314,14 @@ class TestCcxtPlugin:
 
     # Test to make sure the default stable coin is not used with a fiat market that does exist on the exchange
     def test_nonusd_fiat_pair(self, mocker: Any) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        exchange = binance(
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange="Binance.com")
+        alt_exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+        exchange = kraken(
             {
                 "apiKey": "key",
                 "secret": "secret",
@@ -322,6 +329,16 @@ class TestCcxtPlugin:
         )
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
         mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+            [
+                BAR_TIMESTAMP,  # UTC timestamp in milliseconds, integer
+                BAR_OPEN,  # (O)pen price, float
+                BAR_HIGH,  # (H)ighest price, float
+                BAR_LOW,  # (L)owest price, float
+                BAR_CLOSE,  # (C)losing price, float
+                BAR_VOLUME,  # (V)olume (in terms of the base currency), float
+            ],
+        ]
+        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
             [
                 BTCGBP_TIMESTAMP,  # UTC timestamp in milliseconds, integer
                 BTCGBP_OPEN,  # (O)pen price, float
@@ -331,7 +348,7 @@ class TestCcxtPlugin:
                 BTCGBP_VOLUME,  # (V)olume (in terms of the base currency), float
             ],
         ]
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange})
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: TEST_GRAPH})
 
         data = plugin.get_historic_bar_from_native_source(BTCGBP_TIMESTAMP, "BTC", "GBP", TEST_EXCHANGE)
@@ -390,20 +407,22 @@ class TestCcxtPlugin:
             mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
 
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
-        exchange = binance(
+        exchange = kraken(
             {
                 "apiKey": "key",
                 "secret": "secret",
             }
         )
-        alt_exchange = kraken(
+        alt_exchange = binance(
             {
                 "apiKey": "key",
                 "secret": "secret",
             }
         )
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
-        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
+        modified_markets = TEST_MARKETS
+        modified_markets["BTCUSDT"] = [ALT_EXCHANGE]
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: modified_markets})
+        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
             [
                 KRAKEN_TIMESTAMP,  # Match the timestamp to assure correct price look up
                 BAR_OPEN,  # (O)pen price, float
@@ -414,7 +433,7 @@ class TestCcxtPlugin:
             ],
         ]
 
-        mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
+        mocker.patch.object(exchange, "fetchOHLCV").return_value = [
             [
                 KRAKEN_TIMESTAMP,  # UTC timestamp in milliseconds, integer
                 USDTUSD_OPEN,  # (O)pen price, float
@@ -439,6 +458,7 @@ class TestCcxtPlugin:
 
     def test_locked_exchange(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange=LOCKED_EXCHANGE, exchange_locked=True)
+        # Name is changed to exchange_instance to avoid conflicts with the side effect function `add_exchange_side_effect`
         exchange_instance = kraken(
             {
                 "apiKey": "key",
