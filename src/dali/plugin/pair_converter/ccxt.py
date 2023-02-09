@@ -65,7 +65,7 @@ _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
-_DEFAULT_EXCHANGE: str = "Binance.com"
+_DEFAULT_EXCHANGE: str = _KRAKEN
 _EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken}
 
 # Delay in fractional seconds before making a request to avoid too many request errors
