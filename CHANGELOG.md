@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## 0.6.3
+* added CCXT pair converter subclasses that are fixed to one exchange (Kraken, Binance)
+* added fiat deposit support to Bitbank plugin
+* small fixes and improvements
+
 ## 0.6.2
 * added Kraken CSV price importer
 * various fixes to CCXT-based plugins
