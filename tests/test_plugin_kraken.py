@@ -21,6 +21,7 @@ from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 from dali.plugin.input.rest.kraken import InputPlugin
+from dali.configuration import Keyword
 
 
 def test_kraken(mocker) -> None:
@@ -136,7 +137,7 @@ def test_kraken(mocker) -> None:
     expect_result = [
         InTransaction(
             plugin='kraken_REST',
-            unique_id='__unknown',
+            unique_id=Keyword.UNKNOWN.value,
             raw_data="{"
                          "'aclass': 'currency', "
                          "'amount': '8.0906135700', "
@@ -149,11 +150,11 @@ def test_kraken(mocker) -> None:
                          "'subtype': ''"
                      "}",
             timestamp='2014-06-27 09:20:22+0000',
-            asset='LTC', exchange='kraken', holder='tester', transaction_type='Buy',
+            asset='LTC', exchange='kraken', holder='tester', transaction_type=Keyword.BUY.value,
             spot_price='43.80001', crypto_in='8.09061357', fiat_fee=None, fiat_in_no_fee='499.2', fiat_in_with_fee='500.00000',
             notes='buy_trade'),
         OutTransaction(plugin='kraken_REST',
-                       unique_id='__unknown',
+                       unique_id=Keyword.UNKNOWN.value,
                        raw_data="{"
                                     "'aclass': 'currency', "
                                     "'amount': '-3.0000000000', "
@@ -166,12 +167,12 @@ def test_kraken(mocker) -> None:
                                     "'subtype': ''"
                                 "}",
                        timestamp='2014-07-23 13:27:26+0000',
-                       asset='LTC', exchange='kraken', holder='tester', transaction_type='Sell',
+                       asset='LTC', exchange='kraken', holder='tester', transaction_type=Keyword.SELL.value,
                        spot_price='0.01133800', crypto_out_no_fee='3.0', crypto_fee='0.0000000000',
                        crypto_out_with_fee='3.0', fiat_out_no_fee='0.03392556', fiat_fee=None,
                        notes='sell_trade'),
         IntraTransaction(plugin='kraken_REST',
-                         unique_id='__unknown',
+                         unique_id=Keyword.UNKNOWN.value,
                          raw_data="{"
                                       "'aclass': 'currency', "
                                       "'amount': '3.0000000000', "
@@ -184,12 +185,12 @@ def test_kraken(mocker) -> None:
                                       "'subtype': ''"
                                   "}",
                          timestamp='2014-07-23 08:35:21+0000', asset='LTC',
-                         from_exchange='__unknown', from_holder='__unknown',
+                         from_exchange=Keyword.UNKNOWN.value, from_holder=Keyword.UNKNOWN.value,
                          to_exchange='kraken', to_holder='tester',
                          spot_price='0', crypto_sent=Keyword.UNKNOWN.value, crypto_received='3.0',
                          notes='deposit'),
         IntraTransaction(plugin='kraken_REST',
-                         unique_id='__unknown',
+                         unique_id=Keyword.UNKNOWN.value,
                          raw_data="{"
                                       "'aclass': 'currency', "
                                       "'amount': '9.4149333100', "
@@ -204,7 +205,7 @@ def test_kraken(mocker) -> None:
                          timestamp='2014-07-31 13:09:01+0000',
                          asset='LTC',
                          from_exchange='kraken', from_holder='tester',
-                         to_exchange='__unknown', to_holder='__unknown',
+                         to_exchange=Keyword.UNKNOWN.value, to_holder=Keyword.UNKNOWN.value,
                          spot_price='0', crypto_sent='9.41493331', crypto_received=Keyword.UNKNOWN.value,
                          notes='withdrawal')
     ]

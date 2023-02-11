@@ -99,14 +99,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         # We will have a default start time of July 27th, 2011 since Kraken Exchange officially launched on July 28th.
         super().__init__(account_holder, datetime(2011, 7, 27, 0, 0, 0, 0), native_fiat, thread_count)
-        self.__username = username
+        self.__username: Union[str, None] = username
         self.__logger: logging.Logger = create_logger(f"{self.__EXCHANGE_NAME}")
         self.__timezone = pytz.timezone('UTC')
         self._initialize_client()
         self._client.load_markets()
-        self.baseId_to_base = {value[_BASE_ID]: value[_BASE] for key, value in self._client.markets_by_id.items()}
+        self.baseId_to_base: Dict[str, str] = {value[_BASE_ID]: value[_BASE] for key, value in self._client.markets_by_id.items()}
         self.baseId_to_base.update({'BSV': 'BSV'})
-        self.use_cache = use_cache
+        self.use_cache: bool = use_cache
 
     def exchange_name(self) -> str:
         return self.__EXCHANGE_NAME
@@ -159,7 +159,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             trade_history.update(self._process_trade_history(index))
             index += _TRADE_RECORD_LIMIT
 
-        index = 0
+        index: int = 0
         count: int = int(self._client.private_post_ledgers(params={_OFFSET: index})[_RESULT][_COUNT])
         ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         while index < count:
@@ -176,9 +176,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def load(self) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
 
-        result = {'in': [], 'out': [], 'intra': []}
+        result: Dict[str, List[AbstractTransaction]] = {'in': [], 'out': [], 'intra': []}
 
-        unhandled_types = dict()
+        unhandled_types: Dict[str, str] = {}
         for key, value in ledger.items():
             if value[_TYPE] == _WITHDRAWAL or value[_TYPE] == _DEPOSIT:
                 result[_INTRA].append(key)
@@ -198,10 +198,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 # 'credit not implemented'
                 pass
             elif value[_TYPE] == _STAKING:
-                # 'credit not implemented'
+                # 'staking not implemented'
                 pass
             elif value[_TYPE] == _SALE:
-                # 'credit not implemented'
+                # 'sale not implemented'
                 pass
             else:
                 unhandled_types.update({value[_TYPE]: key})
@@ -212,16 +212,18 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _compute_tx_set(self, trade_history, ledger, processed_transactions) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
-        transactions = processed_transactions[_IN] + processed_transactions[_OUT] + processed_transactions[_INTRA]
+        transactions: List[AbstractTransaction] = processed_transactions[_IN] + \
+                                                  processed_transactions[_OUT] + \
+                                                  processed_transactions[_INTRA]
         for key in transactions:
-            record = ledger[key]
+            record: Dict[str, str] = ledger[key]
             timestamp_value: str = self._rp2_timestamp_from_ms_epoch(float(record[_TIMESTAMP])*_MS_IN_SECOND)
 
-            is_fiat_asset = record[_ASSET] in _FIAT_SET or 'USD' in record[_ASSET]
+            is_fiat_asset: bool = record[_ASSET] in _FIAT_SET or 'USD' in record[_ASSET]
 
-            amount = abs(float(record[_AMOUNT]))
-            asset = self.baseId_to_base[record[_ASSET]]
-            kwargs = {
+            amount: float = abs(float(record[_AMOUNT]))
+            asset: str = self.baseId_to_base[record[_ASSET]]
+            kwargs: Dict[str, str] = {
                 'unique_id': Keyword.UNKNOWN.value,
                 'plugin': self.__PLUGIN_NAME,
                 'raw_data': str(record),
@@ -232,8 +234,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
             }
 
             if record[_TYPE] == _WITHDRAWAL or record[_TYPE] == _DEPOSIT:
-                is_deposit = record[_TYPE] == _DEPOSIT
-                is_withdrawal = record[_TYPE] == _WITHDRAWAL
+                is_deposit: bool = record[_TYPE] == _DEPOSIT
+                is_withdrawal: bool = record[_TYPE] == _WITHDRAWAL
 
                 # Intra
                 kwargs.update(
@@ -304,18 +306,18 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 # 'credit not implemented'
                 pass
             elif record[_TYPE] == _STAKING:
-                # 'credit not implemented'
+                # 'staking not implemented'
                 pass
             elif record[_TYPE] == _SALE:
-                # 'credit not implemented'`
+                # 'sale not implemented'`
                 pass
             else:
-                raise BaseException(f"Unimplemented=record_type{record[_TYPE]}")
+                raise Exception(f"Unimplemented=record_type{record[_TYPE]}")
         return result
 
-    def _process_trade_history(self, index: int = 0):
-        result = dict()
-        params = {_OFFSET: index}
+    def _process_trade_history(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
+        result: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
+        params: Dict[str, Union[str, int]] = {_OFFSET: index}
         response = self._safe_api_call(
                     self._client.private_post_tradeshistory,
                     # self._client.fetch_my_trades, # UNIFIED CCXT API
@@ -360,15 +362,15 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #     },
         # }
 
-        trade_history = response[_RESULT][_TRADES]
+        trade_history: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = response[_RESULT][_TRADES]
 
-        for key,value in trade_history.items():
+        for key, value in trade_history.items():
             result.update({key: value})
         return result
 
-    def _process_ledger(self, index: int = 0):
-        result = dict()
-        params = {_OFFSET: index}
+    def _process_ledger(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
+        result: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
+        params: Dict[str, Union[str, int]]  = {_OFFSET: index}
         response = self._safe_api_call(
                     self._client.private_post_ledgers,
                     # self._client.fetch_ledger, # UNIFIED CCXT API
@@ -399,8 +401,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #     },
         # }
 
-        ledger = response[_RESULT][_LEDGER]
+        ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = response[_RESULT][_LEDGER]
 
-        for key,value in ledger.items():
+        for key, value in ledger.items():
             result.update({key: value})
         return result
