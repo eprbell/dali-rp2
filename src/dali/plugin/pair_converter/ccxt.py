@@ -343,7 +343,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
-        if csv_pricing is not None and not self.__csv_read_flag.get(exchange, False):
+        if csv_pricing is not None and not self.__csv_read_flag.get((exchange + from_asset + to_asset), False):
             csv_signature: Signature = signature(csv_pricing)
 
             # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
@@ -367,7 +367,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.save_historical_price_cache()
                 self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
                 historical_bar = self._get_bar_from_cache(key)
-                self.__csv_read_flag[exchange] = True
+                self.__csv_read_flag[(exchange + from_asset + to_asset)] = True
                 if historical_bar is not None:
                     self.__logger.debug(
                         "Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange

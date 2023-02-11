@@ -21,7 +21,7 @@ from io import BytesIO
 from itertools import repeat
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 from zipfile import ZipFile
 
 import requests
@@ -93,40 +93,42 @@ class Kraken:
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
         self.__logger.debug("Attempting to load %s", base_file)
+        file_bytes = self._google_file_to_bytes(base_file)
 
-        with ZipFile(BytesIO(self._google_file_to_bytes(base_file))) as zipped_ohlcvt:
-            self.__logger.debug("Files found in zipped file - %s", zipped_ohlcvt.namelist())
-            all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
+        if file_bytes:
+            with ZipFile(BytesIO(file_bytes)) as zipped_ohlcvt:
+                self.__logger.debug("Files found in zipped file - %s", zipped_ohlcvt.namelist())
+                all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
+                if len(all_timespans_for_pair) == 0:
+                    self.__logger.debug("Market not found in Kraken files. Skipping file read.")
+                    return bars
+                with ThreadPool(self.__THREAD_COUNT) as pool:
+                    processing_result_list: List[Dict[int, List[HistoricalBar]]] = pool.starmap(
+                        self._process_file, zip(all_timespans_for_pair, repeat(zipped_ohlcvt))
+                    )
 
-            if len(all_timespans_for_pair) == 0:
-                self.__logger.debug("Market not found in Kraken files. Skipping file read.")
-                return bars
+            # Sort the bars by duration, largest duration first
+            sorted_bars: Iterable[Dict[int, List[HistoricalBar]]] = reversed(sorted(processing_result_list, key=lambda x: list(x.keys())[0]))
 
-            with ThreadPool(self.__THREAD_COUNT) as pool:
-                processing_result_list: List[Dict[int, List[HistoricalBar]]] = pool.starmap(
-                    self._process_file, zip(all_timespans_for_pair, repeat(zipped_ohlcvt))
-                )
+            timed_bars: Dict[datetime, HistoricalBar] = {}
 
-        # Sort the bars by duration, largest duration first
-        sorted_bars: Iterable[Dict[int, List[HistoricalBar]]] = reversed(sorted(processing_result_list, key=lambda x: list(x.keys())[0]))
+            # Start with longest duration and replace it with smaller durations
+            for duration_bars in sorted_bars:
+                bars_for_duration = list(duration_bars.values())[0]
+                for hbar in bars_for_duration:
+                    # create keys for every minute starting with longest duration
+                    start_epoch: int = int(hbar.timestamp.timestamp())
+                    end_epoch: int = int((hbar.timestamp + timedelta(minutes=list(duration_bars.keys())[0])).timestamp())
+                    while start_epoch < end_epoch:
+                        timed_bars[datetime.fromtimestamp(start_epoch, timezone.utc)] = hbar
+                        start_epoch += 60
 
-        timed_bars: Dict[datetime, HistoricalBar] = {}
+            return timed_bars
 
-        # Start with longest duration and replace it with smaller durations
-        for duration_bars in sorted_bars:
-            bars_for_duration = list(duration_bars.values())[0]
-            for hbar in bars_for_duration:
-                # create keys for every minute starting with longest duration
-                start_epoch: int = int(hbar.timestamp.timestamp())
-                end_epoch: int = int((hbar.timestamp + timedelta(minutes=list(duration_bars.keys())[0])).timestamp())
-                while start_epoch < end_epoch:
-                    timed_bars[datetime.fromtimestamp(start_epoch, timezone.utc)] = hbar
-                    start_epoch += 60
-
-        return timed_bars
+        return bars
 
     # isolated in order to be mocked
-    def _google_file_to_bytes(self, file_name: str) -> bytes:
+    def _google_file_to_bytes(self, file_name: str) -> Optional[bytes]:
         params: Dict[str, Any] = {
             _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = '{file_name}'",
             _API_KEY: self.__google_api_key,
@@ -179,6 +181,9 @@ class Kraken:
                             error[_MESSAGE],
                         )
                         raise RP2RuntimeError("Google Drive not authorized")
+            elif not data.get(_FILES):
+                self.__logger.debug("The file '%s' was not found on the Kraken Google Drive.")
+                return None
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
 
