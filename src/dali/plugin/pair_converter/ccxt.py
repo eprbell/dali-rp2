@@ -83,8 +83,10 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "ATDUSDT": _GATE,
     "BSVUSDT": _GATE,
     "BOBAUSD": _GATE,
+    "BUSDUSDT": _BINANCE,
     "EDGUSDT": _GATE,
     "ETHWUSD": _KRAKEN,
+    "NEXOUSDT": _BINANCE,
     "SGBUSD": _KRAKEN,
     "SOLOUSDT": _HUOBI,
     "USDTUSD": _KRAKEN,
@@ -94,8 +96,10 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "ATD": "USDT",
     "BOBA": "USD",
     "BSV": "USDT",
+    "BUSD": "USDT",
     "EDG": "USDT",
     "ETHW": "USD",
+    "NEXO": "USDT",
     "SGB": "USD",
     "SOLO": "USDT",
     "USDT": "USD",
@@ -240,8 +244,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
             exchange = self.__default_exchange
 
-        # Caching of exchanges
-        if exchange not in self.__exchanges:
+        # The exchange could have been added as an alt if so markets wouldn't have been built
+        if exchange not in self.__exchanges or exchange not in self.__exchange_markets:
             if self.__exchange_locked:
                 self._add_exchange_to_memcache(self.__default_exchange)
             elif exchange in _EXCHANGE_DICT:
@@ -446,6 +450,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
             # Cache the exchange so that we can pull prices from it later
             if alt_exchange_name not in self.__exchanges:
+                self.__logger.debug("Added Alternative Exchange: %s", alt_exchange_name)
                 alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
                 self.__exchanges[alt_exchange_name] = alt_exchange
 
@@ -455,9 +460,13 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 current_graph[base_asset] = {quote_asset: None}
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
-        # initializes the cctx exchange instance which is used to get the historical data
-        # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
-        current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+
+        if exchange not in self.__exchanges:
+            # initializes the cctx exchange instance which is used to get the historical data
+            # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
+            current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+        else:
+            current_exchange = self.__exchanges[exchange]
 
         # key: market, value: exchanges where the market is available in order of priority
         current_markets: Dict[str, List[str]] = {}
