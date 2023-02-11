@@ -81,6 +81,8 @@ _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "ATDUSDT": _GATE,
+    "BETHETH": _BINANCE,
+    "BNBUSDT": _BINANCE,
     "BSVUSDT": _GATE,
     "BOBAUSD": _GATE,
     "BUSDUSDT": _BINANCE,
@@ -94,6 +96,8 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
 
 _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "ATD": "USDT",
+    "BETH": "ETH",
+    "BNB": "USDT",
     "BOBA": "USD",
     "BSV": "USDT",
     "BUSD": "USDT",
