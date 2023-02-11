@@ -108,8 +108,6 @@ KRAKEN_VOLUME: RP2Decimal = RP2Decimal("1")
 
 _MS_IN_SECOND: int = 1000
 
-_GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
-
 
 class TestCcxtPlugin:
     def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any) -> None:

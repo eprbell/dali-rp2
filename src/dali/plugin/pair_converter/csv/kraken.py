@@ -35,6 +35,7 @@ from dali.historical_bar import HistoricalBar
 
 # Google Drive parameters
 _ACCESS_NOT_CONFIGURED: str = "accessNotConfigured"
+_BAD_REQUEST: str = "badRequest"
 _ERROR: str = "error"
 _ERRORS: str = "errors"
 _FILES: str = "files"
@@ -92,7 +93,7 @@ class Kraken:
         bars: Dict[datetime, HistoricalBar] = {}
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.debug("Attempting to load %s", base_file)
+        self.__logger.info("Attempting to load %s from Kraken Google Drive.", base_file)
         file_bytes = self._google_file_to_bytes(base_file)
 
         if file_bytes:
@@ -150,7 +151,33 @@ class Kraken:
             #  ]
             # }
 
-            ## Error Response
+            ## Error Response - Key is invalid
+            # {
+            #  'error': {
+            #    'code': 400, 
+            #    'message': 'API key not valid. Please pass a valid API key.', 
+            #    'errors': [
+            #      {
+            #        'message': 'API key not valid. Please pass a valid API key.', 
+            #        'domain': 'global',
+            #        'reason': 'badRequest'
+            #      }
+            #    ], 
+            #    'status': 'INVALID_ARGUMENT',
+            #    'details': [
+            #      {
+            #        '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            #        'reason': 'API_KEY_INVALID',
+            #        'domain': 'googleapis.com',
+            #        'metadata': {
+            #          'service': 'drive.googleapis.com'
+            #        }
+            #      }
+            #    ]
+            #  }
+            #} from https://www.googleapis.com/drive/v3/files?q=...
+
+            ## Error Response - Key is valid but Google Drive API is specifically not configured
             # {
             #  'error': {
             #   'errors': [
@@ -174,14 +201,19 @@ class Kraken:
                 for error in errors:
                     if error[_REASON] == _ACCESS_NOT_CONFIGURED:
                         self.__logger.error(
-                            """
-                            Access not granted to Google Drive API. You must grant authorization to the Google
-                            Drive API for your API key. Follow the link in the message for more details. Message:\n%s
-                        """,
+                            "Access not granted to Google Drive API. You must grant authorization to the Google"
+                            "Drive API for your API key. Follow the link in the message for more details. Message:\n%s",
                             error[_MESSAGE],
                         )
                         raise RP2RuntimeError("Google Drive not authorized")
-            elif not data.get(_FILES):
+                    if error[_REASON] == _BAD_REQUEST:
+                        self.__logger.error(
+                            "Google API key is invalid. Please check that you have entered the key correctly and try again."
+                            "If the problem persists, you can leave the field blank to use the REST API.\n%s",
+                            error[_MESSAGE],
+                        )
+                        raise RP2RuntimeError("Google Drive key invalid")
+            if not data.get(_FILES):
                 self.__logger.debug("The file '%s' was not found on the Kraken Google Drive.")
                 return None
 
