@@ -229,8 +229,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
             amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
             asset: str = self.base_id_to_base[record[_ASSET]]
             kwargs: Dict[str, str] = {
-                'unique_id': Keyword.UNKNOWN.value,
                 'plugin': self.__PLUGIN_NAME,
+                'unique_id': Keyword.UNKNOWN.value,
                 'raw_data': str(record),
                 'timestamp': str(timestamp_value),
                 'spot_price': '0',
@@ -254,7 +254,23 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         'crypto_received': str(amount) if is_deposit else Keyword.UNKNOWN.value,
                     }
                 )
-                result.append(IntraTransaction(**kwargs))
+                result.append(
+                    IntraTransaction(
+                        plugin=kwargs[Keyword.PLUGIN.value],
+                        unique_id=kwargs[Keyword.UNIQUE_ID.value],
+                        raw_data=kwargs[Keyword.RAW_DATA.value],
+                        timestamp=kwargs[Keyword.TIMESTAMP.value],
+                        asset=kwargs[Keyword.ASSET.value],
+                        from_exchange=kwargs[Keyword.FROM_EXCHANGE.value],
+                        from_holder=kwargs[Keyword.FROM_HOLDER.value],
+                        to_exchange=kwargs[Keyword.TO_EXCHANGE.value],
+                        to_holder=kwargs[Keyword.TO_HOLDER.value],
+                        spot_price=kwargs[Keyword.SPOT_PRICE.value],
+                        crypto_sent=kwargs[Keyword.CRYPTO_SENT.value],
+                        crypto_received=kwargs[Keyword.CRYPTO_RECEIVED.value],
+                        notes=kwargs[Keyword.NOTES.value],
+                    )
+                )
                 continue
 
             kwargs.update({
@@ -277,7 +293,25 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             trade_history[record[_REFID]][_FEE])),
                         'fiat_in_with_fee': trade_history[record[_REFID]][_COST],
                     })
-                    result.append(InTransaction(**kwargs))
+                    result.append(
+                        InTransaction(
+                            plugin=kwargs[Keyword.PLUGIN.value],
+                            unique_id=kwargs[Keyword.UNIQUE_ID.value],
+                            raw_data=kwargs[Keyword.RAW_DATA.value],
+                            timestamp=kwargs[Keyword.TIMESTAMP.value],
+                            asset=kwargs[Keyword.ASSET.value],
+                            exchange=kwargs[Keyword.EXCHANGE.value],
+                            holder=kwargs[Keyword.HOLDER.value],
+                            transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
+                            spot_price=kwargs[Keyword.SPOT_PRICE.value],
+                            crypto_in=kwargs[Keyword.CRYPTO_IN.value],
+                            crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
+                            fiat_in_no_fee=kwargs[Keyword.FIAT_IN_NO_FEE.value],
+                            fiat_in_with_fee=kwargs[Keyword.FIAT_IN_WITH_FEE.value],
+                            fiat_fee=kwargs[Keyword.FIAT_FEE.value],
+                            notes=kwargs[Keyword.NOTES.value],
+                        )
+                    )
                 else:
                     kwargs.update({
                         'crypto_out_no_fee': str(amount),
@@ -286,7 +320,26 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             trade_history[record[_REFID]][_FEE])),
                         'is_spot_price_from_web': False,
                     })
-                    result.append(OutTransaction(**kwargs))
+                    result.append(
+                        OutTransaction(
+                            plugin=kwargs[Keyword.PLUGIN.value],
+                            unique_id=kwargs[Keyword.UNIQUE_ID.value],
+                            raw_data=kwargs[Keyword.RAW_DATA.value],
+                            timestamp=kwargs[Keyword.TIMESTAMP.value],
+                            asset=kwargs[Keyword.ASSET.value],
+                            exchange=kwargs[Keyword.EXCHANGE.value],
+                            holder=kwargs[Keyword.HOLDER.value],
+                            transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
+                            spot_price=kwargs[Keyword.SPOT_PRICE.value],
+                            crypto_out_no_fee=kwargs[Keyword.CRYPTO_OUT_NO_FEE.value],
+                            crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
+                            crypto_out_with_fee=kwargs[Keyword.CRYPTO_OUT_WITH_FEE.value],
+                            fiat_out_no_fee=kwargs[Keyword.FIAT_OUT_NO_FEE.value],
+                            fiat_fee=kwargs[Keyword.FIAT_FEE.value],
+                            notes=kwargs[Keyword.NOTES.value],
+                            is_spot_price_from_web=kwargs[Keyword.IS_SPOT_PRICE_FROM_WEB.value],
+                        )
+                    )
             elif record[_TYPE] == _MARGIN or record[_TYPE] == _ROLLOVER:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
                 kwargs.update({
@@ -297,7 +350,26 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         trade_history[record[_REFID]][_FEE])),
                     'is_spot_price_from_web': False,
                 })
-                result.append(OutTransaction(**kwargs))
+                result.append(
+                    OutTransaction(
+                        plugin=kwargs[Keyword.PLUGIN.value],
+                        unique_id=kwargs[Keyword.UNIQUE_ID.value],
+                        raw_data=kwargs[Keyword.RAW_DATA.value],
+                        timestamp=kwargs[Keyword.TIMESTAMP.value],
+                        asset=kwargs[Keyword.ASSET.value],
+                        exchange=kwargs[Keyword.EXCHANGE.value],
+                        holder=kwargs[Keyword.HOLDER.value],
+                        transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
+                        spot_price=kwargs[Keyword.SPOT_PRICE.value],
+                        crypto_out_no_fee=kwargs[Keyword.CRYPTO_OUT_NO_FEE.value],
+                        crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
+                        crypto_out_with_fee=kwargs[Keyword.CRYPTO_OUT_WITH_FEE.value],
+                        fiat_out_no_fee=kwargs[Keyword.FIAT_OUT_NO_FEE.value],
+                        fiat_fee=kwargs[Keyword.FIAT_FEE.value],
+                        notes=kwargs[Keyword.NOTES.value],
+                        is_spot_price_from_web=kwargs[Keyword.IS_SPOT_PRICE_FROM_WEB.value],
+                    )
+                )
             elif record[_TYPE] == _TRANSFER:
                 kwargs.update({
                     'transaction_type': Keyword.BUY.value,
@@ -305,7 +377,25 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     'fiat_in_no_fee': '0',
                     'fiat_in_with_fee': '0',
                 })
-                result.append(InTransaction(**kwargs))
+                result.append(
+                    InTransaction(
+                        plugin=kwargs[Keyword.PLUGIN.value],
+                        unique_id=kwargs[Keyword.UNIQUE_ID.value],
+                        raw_data=kwargs[Keyword.RAW_DATA.value],
+                        timestamp=kwargs[Keyword.TIMESTAMP.value],
+                        asset=kwargs[Keyword.ASSET.value],
+                        exchange=kwargs[Keyword.EXCHANGE.value],
+                        holder=kwargs[Keyword.HOLDER.value],
+                        transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
+                        spot_price=kwargs[Keyword.SPOT_PRICE.value],
+                        crypto_in=kwargs[Keyword.CRYPTO_IN.value],
+                        crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
+                        fiat_in_no_fee=kwargs[Keyword.FIAT_IN_NO_FEE.value],
+                        fiat_in_with_fee=kwargs[Keyword.FIAT_IN_WITH_FEE.value],
+                        fiat_fee=kwargs[Keyword.FIAT_FEE.value],
+                        notes=kwargs[Keyword.NOTES.value],
+                    )
+                )
             elif record[_TYPE] == _SETTLED:
                 # ignorable in terms of in/out/intra
                 pass
