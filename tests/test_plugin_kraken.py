@@ -151,7 +151,7 @@ def test_kraken(mocker) -> None:
                      "}",
             timestamp='2014-06-27 09:20:22+0000',
             asset='LTC', exchange='kraken', holder='tester', transaction_type=Keyword.BUY.value,
-            spot_price='43.80001', crypto_in='8.09061357', fiat_fee=None, fiat_in_no_fee='499.2', fiat_in_with_fee='500.00000',
+            spot_price='43.80001', crypto_in='8.0906135700', fiat_fee=None, fiat_in_no_fee='499.20000', fiat_in_with_fee='500.00000',
             notes='buy_trade'),
         OutTransaction(plugin='kraken_REST',
                        unique_id=Keyword.UNKNOWN.value,
@@ -168,8 +168,8 @@ def test_kraken(mocker) -> None:
                                 "}",
                        timestamp='2014-07-23 13:27:26+0000',
                        asset='LTC', exchange='kraken', holder='tester', transaction_type=Keyword.SELL.value,
-                       spot_price='0.01133800', crypto_out_no_fee='3.0', crypto_fee='0.0000000000',
-                       crypto_out_with_fee='3.0', fiat_out_no_fee='0.03392556', fiat_fee=None,
+                       spot_price='0.01133800', crypto_out_no_fee='3.0000000000', crypto_fee='0.0000000000',
+                       crypto_out_with_fee='3.0000000000', fiat_out_no_fee='0.03392556', fiat_fee=None,
                        notes='sell_trade'),
         IntraTransaction(plugin='kraken_REST',
                          unique_id=Keyword.UNKNOWN.value,
@@ -187,7 +187,7 @@ def test_kraken(mocker) -> None:
                          timestamp='2014-07-23 08:35:21+0000', asset='LTC',
                          from_exchange=Keyword.UNKNOWN.value, from_holder=Keyword.UNKNOWN.value,
                          to_exchange='kraken', to_holder='tester',
-                         spot_price='0', crypto_sent=Keyword.UNKNOWN.value, crypto_received='3.0',
+                         spot_price='0', crypto_sent=Keyword.UNKNOWN.value, crypto_received='3.0000000000',
                          notes='deposit'),
         IntraTransaction(plugin='kraken_REST',
                          unique_id=Keyword.UNKNOWN.value,
@@ -206,7 +206,7 @@ def test_kraken(mocker) -> None:
                          asset='LTC',
                          from_exchange='kraken', from_holder='tester',
                          to_exchange=Keyword.UNKNOWN.value, to_holder=Keyword.UNKNOWN.value,
-                         spot_price='0', crypto_sent='9.41493331', crypto_received=Keyword.UNKNOWN.value,
+                         spot_price='0', crypto_sent='9.4149333100', crypto_received=Keyword.UNKNOWN.value,
                          notes='withdrawal')
     ]
 

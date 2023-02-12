@@ -41,6 +41,8 @@ from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 from dali.configuration import Keyword, _FIAT_SET
 from dali.cache import load_from_cache, save_to_cache
+from rp2.rp2_decimal import RP2Decimal, ZERO
+from rp2.rp2_error import RP2RuntimeError
 
 
 # keywords
@@ -99,7 +101,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         # We will have a default start time of July 27th, 2011 since Kraken Exchange officially launched on July 28th.
         super().__init__(account_holder, datetime(2011, 7, 27, 0, 0, 0, 0), native_fiat, thread_count)
-        self.__username: Union[str, None] = username
+        self.__username: Optional[str] = username
         self.__logger: logging.Logger = create_logger(f"{self.__EXCHANGE_NAME}")
         self.__timezone = pytz.timezone('UTC')
         self._initialize_client()
@@ -127,7 +129,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _client(self) -> kraken:
         super_client: Exchange = super()._client
         if not isinstance(super_client, kraken):
-            raise Exception("Exchange is not instance of class kraken.")
+            raise RP2RuntimeError("Exchange is not instance of class kraken.")
         return super_client
 
     def _get_process_deposits_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
@@ -159,8 +161,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
             trade_history.update(self._process_trade_history(index))
             index += _TRADE_RECORD_LIMIT
 
-        index: int = 0
-        count: int = int(self._client.private_post_ledgers(params={_OFFSET: index})[_RESULT][_COUNT])
+        # reset index and count for next API call
+        index = 0
+        count = int(self._client.private_post_ledgers(params={_OFFSET: index})[_RESULT][_COUNT])
         ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         while index < count:
             ledger.update(self._process_ledger(index))
@@ -183,7 +186,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             if value[_TYPE] == _WITHDRAWAL or value[_TYPE] == _DEPOSIT:
                 result[_INTRA].append(key)
             elif value[_TYPE] == _TRADE and 'USD' not in value[_ASSET]:
-                if float(value[_AMOUNT]) > 0: result[_IN].append(key)
+                if RP2Decimal(value[_AMOUNT]) > ZERO: result[_IN].append(key)
                 else: result[_OUT].append(key)
             elif value[_TYPE] == _MARGIN:
                 result[_OUT].append(key)
@@ -217,11 +220,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
                                                   processed_transactions[_INTRA]
         for key in transactions:
             record: Dict[str, str] = ledger[key]
-            timestamp_value: str = self._rp2_timestamp_from_ms_epoch(float(record[_TIMESTAMP])*_MS_IN_SECOND)
+            self.__logger.debug("Ledger record: %s", record)
+
+            timestamp_value: str = self._rp2_timestamp_from_ms_epoch(str(RP2Decimal(record[_TIMESTAMP])*RP2Decimal(_MS_IN_SECOND)))
 
             is_fiat_asset: bool = record[_ASSET] in _FIAT_SET or 'USD' in record[_ASSET]
 
-            amount: float = abs(float(record[_AMOUNT]))
+            amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
             asset: str = self.baseId_to_base[record[_ASSET]]
             kwargs: Dict[str, str] = {
                 'unique_id': Keyword.UNKNOWN.value,
@@ -255,19 +260,20 @@ class InputPlugin(AbstractCcxtInputPlugin):
             kwargs.update({
                 'exchange': self.__EXCHANGE_NAME,
                 'holder': self.account_holder,
-                'transaction_type': Keyword.BUY.value if float(record[_AMOUNT]) > 0 else Keyword.SELL.value,
+                'transaction_type': Keyword.BUY.value if RP2Decimal(record[_AMOUNT]) > ZERO else Keyword.SELL.value,
                 'crypto_fee': '0' if is_fiat_asset else record[_FEE],
                 'fiat_fee': record[_FEE] if is_fiat_asset else None,
             })
 
             if record[_TYPE] == _TRADE and 'USD' not in record[_ASSET]:
+                self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
                 kwargs.update({
                     'spot_price': trade_history[record[_REFID]][_PRICE],
                 })
-                if float(record[_AMOUNT]) > 0:
+                if RP2Decimal(record[_AMOUNT]) > ZERO:
                     kwargs.update({
                         'crypto_in': str(amount),
-                        'fiat_in_no_fee': str(float(trade_history[record[_REFID]][_COST]) - float(
+                        'fiat_in_no_fee': str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
                             trade_history[record[_REFID]][_FEE])),
                         'fiat_in_with_fee': trade_history[record[_REFID]][_COST],
                     })
@@ -275,18 +281,19 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 else:
                     kwargs.update({
                         'crypto_out_no_fee': str(amount),
-                        'crypto_out_with_fee': str(amount + float(record[_FEE])),
-                        'fiat_out_no_fee': str(float(trade_history[record[_REFID]][_COST]) - float(
+                        'crypto_out_with_fee': str(amount + RP2Decimal(record[_FEE])),
+                        'fiat_out_no_fee': str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
                             trade_history[record[_REFID]][_FEE])),
                         'is_spot_price_from_web': False,
                     })
                     result.append(OutTransaction(**kwargs))
             elif record[_TYPE] == _MARGIN or record[_TYPE] == _ROLLOVER:
+                self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
                 kwargs.update({
                     'transaction_type': Keyword.SELL.value,
                     'crypto_out_no_fee': str(amount),
-                    'crypto_out_with_fee': str(amount + float(record[_FEE])),
-                    'fiat_out_no_fee': str(float(trade_history[record[_REFID]][_COST]) - float(
+                    'crypto_out_with_fee': str(amount + RP2Decimal(record[_FEE])),
+                    'fiat_out_no_fee': str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
                         trade_history[record[_REFID]][_FEE])),
                     'is_spot_price_from_web': False,
                 })
@@ -312,7 +319,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 # 'sale not implemented'`
                 pass
             else:
-                raise Exception(f"Unimplemented=record_type{record[_TYPE]}")
+                raise RP2RuntimeError(f"Unimplemented=record_type{record[_TYPE]}")
         return result
 
     def _process_trade_history(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
