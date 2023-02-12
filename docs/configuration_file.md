@@ -161,8 +161,8 @@ Note: the `thread_count` parameter is optional and denotes the number of paralle
 This plugin is REST-based and requires setting up API Keys in your Kraken account settings.
 
 **IMPORTANT NOTE**:
-* when setting up API key/secret/passphrase, only use read permissions (DaLI does NOT need write permissions);
-* store your API key, secret and passphrase safely and NEVER share it with anyone!
+* when setting up API key/secret, only use read permissions (DaLI does NOT need write permissions);
+* store your API key and secret safely and NEVER share it with anyone!
 
 Initialize this plugin section as follows:
 <pre>

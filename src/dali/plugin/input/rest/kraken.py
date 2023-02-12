@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Binance.com REST plugin links:
+# Kraken.com REST plugin links:
 # REST API: https://docs.kraken.com/rest/
 # Authentication: https://docs.kraken.com/rest/#section/Authentication
 # Endpoint: https://api.kraken.com
@@ -106,8 +106,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self.__timezone = pytz.timezone('UTC')
         self._initialize_client()
         self._client.load_markets()
-        self.baseId_to_base: Dict[str, str] = {value[_BASE_ID]: value[_BASE] for key, value in self._client.markets_by_id.items()}
-        self.baseId_to_base.update({'BSV': 'BSV'})
+        self.base_id_to_base: Dict[str, str] = {value[_BASE_ID]: value[_BASE] for key, value in self._client.markets_by_id.items()}
+        self.base_id_to_base.update({'BSV': 'BSV'})
         self.use_cache: bool = use_cache
 
     def exchange_name(self) -> str:
@@ -227,7 +227,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             is_fiat_asset: bool = record[_ASSET] in _FIAT_SET or 'USD' in record[_ASSET]
 
             amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
-            asset: str = self.baseId_to_base[record[_ASSET]]
+            asset: str = self.base_id_to_base[record[_ASSET]]
             kwargs: Dict[str, str] = {
                 'unique_id': Keyword.UNKNOWN.value,
                 'plugin': self.__PLUGIN_NAME,
