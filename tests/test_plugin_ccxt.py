@@ -471,7 +471,7 @@ class TestCcxtPlugin:
         )
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
 
-        mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
+        mocker.patch.object(kraken_csv, "get_historical_bars_for_pair").return_value = {}
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {LOCKED_EXCHANGE: kraken_csv})
         mocker.patch.object(exchange_instance, "fetchOHLCV").return_value = [
             [

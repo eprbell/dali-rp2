@@ -266,6 +266,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         # TO BE IMPLEMENTED - bypass routing if conversion can be done with one market on the exchange
         if market_symbol in current_markets and (exchange in current_markets[market_symbol]):
+            self.__logger.debug("Found market - %s on single exchange, skipping routing.", market_symbol)
             result = self.find_historical_bar(from_asset, to_asset, timestamp, exchange)
             return result
         # else:
@@ -347,36 +348,39 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
-        if csv_pricing is not None and not self.__csv_read_flag.get((exchange + from_asset + to_asset), False):
-            csv_signature: Signature = signature(csv_pricing)
-
-            # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
-            if _GOOGLE_API_KEY in csv_signature.parameters:
-                if self.__google_api_key is not None:
-                    csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing(self.__google_api_key))
-                else:
-                    self.__logger.info(
-                        "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
-                    )
-            else:
-                csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing())
-
-            if csv_reader:
-                csv_bars: Dict[datetime, HistoricalBar] = csv_reader.get_historical_bars_for_pair(from_asset, to_asset)
-                for epoch, csv_bar in csv_bars.items():
-                    self._add_bar_to_cache(
-                        key=AssetPairAndTimestamp(epoch, from_asset, to_asset, exchange),
-                        historical_bar=csv_bar,
-                    )
-                self.save_historical_price_cache()
-                self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
-                historical_bar = self._get_bar_from_cache(key)
+        if not self.__csv_read_flag.get(exchange + from_asset + to_asset):
+            if self.__exchange_csv_reader.get(exchange):
+                csv_reader = self.__exchange_csv_reader[exchange]
+            elif csv_pricing is not None:
                 self.__csv_read_flag[(exchange + from_asset + to_asset)] = True
-                if historical_bar is not None:
-                    self.__logger.debug(
-                        "Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange
-                    )
-                    return historical_bar
+                csv_signature: Signature = signature(csv_pricing)
+
+                # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
+                if _GOOGLE_API_KEY in csv_signature.parameters:
+                    if self.__google_api_key is not None:
+                        csv_reader = csv_pricing(self.__google_api_key)
+                    else:
+                        self.__logger.info(
+                            "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
+                        )
+                else:
+                    csv_reader = csv_pricing()
+
+        if csv_reader:
+            csv_bars: Dict[datetime, HistoricalBar] = csv_reader.get_historical_bars_for_pair(from_asset, to_asset)
+            for epoch, csv_bar in csv_bars.items():
+                self._add_bar_to_cache(
+                    key=AssetPairAndTimestamp(epoch, from_asset, to_asset, exchange),
+                    historical_bar=csv_bar,
+                )
+            self.save_historical_price_cache()
+            self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
+            historical_bar = self._get_bar_from_cache(key)
+            self.__csv_read_flag[(exchange + from_asset + to_asset)] = True
+            self.__exchange_csv_reader[exchange] = csv_reader
+            if historical_bar is not None:
+                self.__logger.debug("Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange)
+                return historical_bar
 
         while retry_count < len(_TIME_GRANULARITY):
 

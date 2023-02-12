@@ -18,7 +18,6 @@ import logging
 from csv import reader
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
-from itertools import repeat
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
 from typing import Any, Dict, Iterable, List, Optional
@@ -68,7 +67,7 @@ class Kraken:
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __TIMEOUT: int = 30
-    __THREAD_COUNT: int = 6
+    __THREAD_COUNT: int = 3
 
     __TIMESTAMP_INDEX: int = 0
     __OPEN: int = 1
@@ -103,9 +102,15 @@ class Kraken:
                 if len(all_timespans_for_pair) == 0:
                     self.__logger.debug("Market not found in Kraken files. Skipping file read.")
                     return bars
+
+                csv_files: Dict[str, str] = {}
+                for file_name in all_timespans_for_pair:
+                    self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
+                    csv_files[file_name] = zipped_ohlcvt.read(file_name).decode(encoding="utf-8")
+
                 with ThreadPool(self.__THREAD_COUNT) as pool:
                     processing_result_list: List[Dict[int, List[HistoricalBar]]] = pool.starmap(
-                        self._process_file, zip(all_timespans_for_pair, repeat(zipped_ohlcvt))
+                        self._process_file, zip(list(csv_files.keys()), list(csv_files.values()))
                     )
 
             # Sort the bars by duration, largest duration first
@@ -154,15 +159,15 @@ class Kraken:
             ## Error Response - Key is invalid
             # {
             #  'error': {
-            #    'code': 400, 
-            #    'message': 'API key not valid. Please pass a valid API key.', 
+            #    'code': 400,
+            #    'message': 'API key not valid. Please pass a valid API key.',
             #    'errors': [
             #      {
-            #        'message': 'API key not valid. Please pass a valid API key.', 
+            #        'message': 'API key not valid. Please pass a valid API key.',
             #        'domain': 'global',
             #        'reason': 'badRequest'
             #      }
-            #    ], 
+            #    ],
             #    'status': 'INVALID_ARGUMENT',
             #    'details': [
             #      {
@@ -175,7 +180,7 @@ class Kraken:
             #      }
             #    ]
             #  }
-            #} from https://www.googleapis.com/drive/v3/files?q=...
+            # } from https://www.googleapis.com/drive/v3/files?q=...
 
             ## Error Response - Key is valid but Google Drive API is specifically not configured
             # {
@@ -230,10 +235,9 @@ class Kraken:
 
         return file_response.content
 
-    def _process_file(self, file_name: str, zip_file: ZipFile) -> Dict[int, List[HistoricalBar]]:
+    def _process_file(self, file_name: str, csv_file: str) -> Dict[int, List[HistoricalBar]]:
         bars: List[HistoricalBar] = []
-        self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
-        csv_file: str = zip_file.read(file_name).decode(encoding="utf-8")
+
         duration_in_minutes: str = file_name.split("_", 1)[1].strip(".csv")
 
         lines = reader(csv_file.splitlines())
