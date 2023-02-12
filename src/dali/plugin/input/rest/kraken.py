@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Kraken.com REST plugin links:
+# Kraken REST plugin links:
 # REST API: https://docs.kraken.com/rest/
 # Authentication: https://docs.kraken.com/rest/#section/Authentication
 # Endpoint: https://api.kraken.com
