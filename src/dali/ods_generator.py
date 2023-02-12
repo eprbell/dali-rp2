@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import ezodf
-from rp2.rp2_error import RP2TypeError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError
 
 from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import (
@@ -162,7 +162,7 @@ def generate_input_file(
     row_index: int = 0
     for transaction in transactions:
         if not isinstance(transaction, AbstractTransaction):
-            raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
+            raise RP2RuntimeError(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
         if transaction.asset == global_configuration[Keyword.NATIVE_FIAT.value]:
             continue
         table_type: str = _TRANSACTION_CLASS_TO_TABLE[transaction.__class__]
