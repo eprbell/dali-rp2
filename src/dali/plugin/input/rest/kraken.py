@@ -92,7 +92,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
         api_key: str,
         api_secret: str,
         native_fiat: str,
-        username: Optional[str] = None,
         thread_count: Optional[int] = __DEFAULT_THREAD_COUNT,
         use_cache: Optional[bool] = True,
     ) -> None:
@@ -101,7 +100,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         # We will have a default start time of July 27th, 2011 since Kraken Exchange officially launched on July 28th.
         super().__init__(account_holder, datetime(2011, 7, 27, 0, 0, 0, 0), native_fiat, thread_count)
-        self.__username: Optional[str] = username
         self.__logger: logging.Logger = create_logger(f"{self.__EXCHANGE_NAME}")
         self.__timezone = pytz.timezone('UTC')
         self._initialize_client()
@@ -222,7 +220,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             record: Dict[str, str] = ledger[key]
             self.__logger.debug("Ledger record: %s", record)
 
-            timestamp_value: str = self._rp2_timestamp_from_ms_epoch(str(RP2Decimal(record[_TIMESTAMP])*RP2Decimal(_MS_IN_SECOND)))
+            timestamp_value: str = self._rp2_timestamp_from_seconds_epoch(record[_TIMESTAMP])
 
             is_fiat_asset: bool = record[_ASSET] in _FIAT_SET or 'USD' in record[_ASSET]
 

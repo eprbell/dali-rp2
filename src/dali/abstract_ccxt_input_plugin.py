@@ -147,8 +147,12 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     @staticmethod
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
-        rp2_time = datetime.fromtimestamp((float(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
+        epoch_seconds, epoch_ms = divmod(float(epoch_timestamp), _MS_IN_SECOND)
+        return AbstractCcxtInputPlugin._rp2_timestamp_from_seconds_epoch(str(epoch_seconds))
 
+    @staticmethod
+    def _rp2_timestamp_from_seconds_epoch(epoch_timestamp: str) -> str:
+        rp2_time = datetime.fromtimestamp((float(epoch_timestamp)), timezone.utc)
         return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
     # Parses the symbol (eg. 'BTC/USD') into base and quote assets, and formats notes for the transactions
