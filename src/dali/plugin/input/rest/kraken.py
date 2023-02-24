@@ -23,13 +23,12 @@
 import pytz
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Set
 
 from ccxt import Exchange, kraken
 
 from dali.abstract_ccxt_input_plugin import (
     AbstractCcxtInputPlugin,
-    _MS_IN_SECOND,
 )
 from dali.ccxt_pagination import (
     AbstractPaginationDetailSet,
@@ -77,6 +76,11 @@ _SALE: str = 'sale'
 
 # Record Limits
 _TRADE_RECORD_LIMIT: int = 50
+
+KRAKEN_FIAT_SET: Set[str] = {'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'USD',
+                'USDC', 'USDT', 'ZAUD', 'ZCAD', 'ZEUR', 'ZGBP', 'ZJPY', 'ZUSD'}
+
+KRAKEN_FIAT_LIST = list(set(list(KRAKEN_FIAT_SET) + list(_FIAT_SET)))
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
@@ -176,47 +180,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def load(self) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
+        return self._compute_tx_set(trade_history, ledger)
 
-        result: Dict[str, List[AbstractTransaction]] = {'in': [], 'out': [], 'intra': []}
-
-        unhandled_types: Dict[str, str] = {}
-        for key, value in ledger.items():
-            if value[_TYPE] == _WITHDRAWAL or value[_TYPE] == _DEPOSIT:
-                result[_INTRA].append(key)
-            elif value[_TYPE] == _TRADE and 'USD' not in value[_ASSET]:
-                if RP2Decimal(value[_AMOUNT]) > ZERO: result[_IN].append(key)
-                else: result[_OUT].append(key)
-            elif value[_TYPE] == _MARGIN:
-                result[_OUT].append(key)
-            elif value[_TYPE] == _ROLLOVER:
-                result[_OUT].append(key)
-            elif value[_TYPE] == _TRANSFER:
-                result[_IN].append(key)
-            elif value[_TYPE] == _SETTLED:
-                # ignorable in terms of in/out/intra
-                pass
-            elif value[_TYPE] == _CREDIT:
-                # 'credit not implemented'
-                pass
-            elif value[_TYPE] == _STAKING:
-                # 'staking not implemented'
-                pass
-            elif value[_TYPE] == _SALE:
-                # 'sale not implemented'
-                pass
-            else:
-                unhandled_types.update({value[_TYPE]: key})
-        self.__logger.debug(f"unhandled types of the ledger={unhandled_types}")
-
-        return self._compute_tx_set(trade_history, ledger, result)
-
-    def _compute_tx_set(self, trade_history, ledger, processed_transactions) -> List[AbstractTransaction]:
+    def _compute_tx_set(self, trade_history, ledger) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
-        transactions: List[AbstractTransaction] = processed_transactions[_IN] + \
-                                                  processed_transactions[_OUT] + \
-                                                  processed_transactions[_INTRA]
-        for key in transactions:
+        unhandled_types: Dict[str, str] = {}
+        for key in ledger:
             record: Dict[str, str] = ledger[key]
             self.__logger.debug("Ledger record: %s", record)
 
@@ -226,174 +196,150 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
             asset: str = self.base_id_to_base[record[_ASSET]]
-            kwargs: Dict[str, str] = {
-                'plugin': self.__PLUGIN_NAME,
-                'unique_id': Keyword.UNKNOWN.value,
-                'raw_data': str(record),
-                'timestamp': str(timestamp_value),
-                'spot_price': '0',
-                'asset': asset,
-                'notes': key,
-            }
+            raw_data = str(record)
 
             if record[_TYPE] == _WITHDRAWAL or record[_TYPE] == _DEPOSIT:
                 is_deposit: bool = record[_TYPE] == _DEPOSIT
                 is_withdrawal: bool = record[_TYPE] == _WITHDRAWAL
+                spot_price: str = '0'
 
-                # Intra
-                kwargs.update(
-                    {
-                        'unique_id': Keyword.UNKNOWN.value,
-                        'from_exchange': self.__EXCHANGE_NAME if is_withdrawal else Keyword.UNKNOWN.value,
-                        'from_holder': self.account_holder if is_withdrawal else Keyword.UNKNOWN.value,
-                        'to_exchange': self.__EXCHANGE_NAME if is_deposit else Keyword.UNKNOWN.value,
-                        'to_holder': self.account_holder if is_deposit else Keyword.UNKNOWN.value,
-                        'crypto_sent': Keyword.UNKNOWN.value if is_deposit else str(amount),
-                        'crypto_received': str(amount) if is_deposit else Keyword.UNKNOWN.value,
-                    }
-                )
                 result.append(
                     IntraTransaction(
-                        plugin=kwargs[Keyword.PLUGIN.value],
-                        unique_id=kwargs[Keyword.UNIQUE_ID.value],
-                        raw_data=kwargs[Keyword.RAW_DATA.value],
-                        timestamp=kwargs[Keyword.TIMESTAMP.value],
-                        asset=kwargs[Keyword.ASSET.value],
-                        from_exchange=kwargs[Keyword.FROM_EXCHANGE.value],
-                        from_holder=kwargs[Keyword.FROM_HOLDER.value],
-                        to_exchange=kwargs[Keyword.TO_EXCHANGE.value],
-                        to_holder=kwargs[Keyword.TO_HOLDER.value],
-                        spot_price=kwargs[Keyword.SPOT_PRICE.value],
-                        crypto_sent=kwargs[Keyword.CRYPTO_SENT.value],
-                        crypto_received=kwargs[Keyword.CRYPTO_RECEIVED.value],
-                        notes=kwargs[Keyword.NOTES.value],
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset,
+                        from_exchange=self.__EXCHANGE_NAME if is_withdrawal else Keyword.UNKNOWN.value,
+                        from_holder=self.account_holder if is_withdrawal else Keyword.UNKNOWN.value,
+                        to_exchange=self.__EXCHANGE_NAME if is_deposit else Keyword.UNKNOWN.value,
+                        to_holder=self.account_holder if is_deposit else Keyword.UNKNOWN.value,
+                        spot_price=spot_price,
+                        crypto_sent=Keyword.UNKNOWN.value if is_deposit else str(amount),
+                        crypto_received=str(amount) if is_deposit else Keyword.UNKNOWN.value,
+                        notes=key,
                     )
                 )
                 continue
 
-            kwargs.update({
-                'exchange': self.__EXCHANGE_NAME,
-                'holder': self.account_holder,
-                'transaction_type': Keyword.BUY.value if RP2Decimal(record[_AMOUNT]) > ZERO else Keyword.SELL.value,
-                'crypto_fee': '0' if is_fiat_asset else record[_FEE],
-                'fiat_fee': record[_FEE] if is_fiat_asset else None,
-            })
+            crypto_fee: str = '0' if is_fiat_asset else record[_FEE]
+            fiat_fee: str = record[_FEE] if is_fiat_asset else None
 
             if record[_TYPE] == _TRADE and 'USD' not in record[_ASSET]:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
-                kwargs.update({
-                    'spot_price': trade_history[record[_REFID]][_PRICE],
-                })
+
+                spot_price: str = trade_history[record[_REFID]][_PRICE]
+                transaction_type: str = Keyword.BUY.value if RP2Decimal(record[_AMOUNT]) > ZERO else Keyword.SELL.value
+
                 if RP2Decimal(record[_AMOUNT]) > ZERO:
-                    kwargs.update({
-                        'crypto_in': str(amount),
-                        'fiat_in_no_fee': str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                            trade_history[record[_REFID]][_FEE])),
-                        'fiat_in_with_fee': trade_history[record[_REFID]][_COST],
-                    })
+                    crypto_in = str(amount)
+                    fiat_in_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
+                        trade_history[record[_REFID]][_FEE]))
+                    fiat_in_with_fee: str = trade_history[record[_REFID]][_COST]
                     result.append(
                         InTransaction(
-                            plugin=kwargs[Keyword.PLUGIN.value],
-                            unique_id=kwargs[Keyword.UNIQUE_ID.value],
-                            raw_data=kwargs[Keyword.RAW_DATA.value],
-                            timestamp=kwargs[Keyword.TIMESTAMP.value],
-                            asset=kwargs[Keyword.ASSET.value],
-                            exchange=kwargs[Keyword.EXCHANGE.value],
-                            holder=kwargs[Keyword.HOLDER.value],
-                            transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
-                            spot_price=kwargs[Keyword.SPOT_PRICE.value],
-                            crypto_in=kwargs[Keyword.CRYPTO_IN.value],
-                            crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
-                            fiat_in_no_fee=kwargs[Keyword.FIAT_IN_NO_FEE.value],
-                            fiat_in_with_fee=kwargs[Keyword.FIAT_IN_WITH_FEE.value],
-                            fiat_fee=kwargs[Keyword.FIAT_FEE.value],
-                            notes=kwargs[Keyword.NOTES.value],
+                            plugin=self.__PLUGIN_NAME,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=timestamp_value,
+                            asset=asset,
+                            exchange=self.__EXCHANGE_NAME,
+                            holder=self.account_holder,
+                            transaction_type=transaction_type,
+                            spot_price=spot_price,
+                            crypto_in=crypto_in,
+                            crypto_fee=crypto_fee,
+                            fiat_in_no_fee=fiat_in_no_fee,
+                            fiat_in_with_fee=fiat_in_with_fee,
+                            fiat_fee=fiat_fee,
+                            notes=key,
                         )
                     )
                 else:
-                    kwargs.update({
-                        'crypto_out_no_fee': str(amount),
-                        'crypto_out_with_fee': str(amount + RP2Decimal(record[_FEE])),
-                        'fiat_out_no_fee': str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                            trade_history[record[_REFID]][_FEE])),
-                        'is_spot_price_from_web': False,
-                    })
+                    crypto_out_no_fee: str = str(amount)
+                    crypto_out_with_fee: str = str(amount + RP2Decimal(record[_FEE]))
+                    fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
+                        trade_history[record[_REFID]][_FEE]))
+                    is_spot_price_from_web: bool = False
+
                     result.append(
                         OutTransaction(
-                            plugin=kwargs[Keyword.PLUGIN.value],
-                            unique_id=kwargs[Keyword.UNIQUE_ID.value],
-                            raw_data=kwargs[Keyword.RAW_DATA.value],
-                            timestamp=kwargs[Keyword.TIMESTAMP.value],
-                            asset=kwargs[Keyword.ASSET.value],
-                            exchange=kwargs[Keyword.EXCHANGE.value],
-                            holder=kwargs[Keyword.HOLDER.value],
-                            transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
-                            spot_price=kwargs[Keyword.SPOT_PRICE.value],
-                            crypto_out_no_fee=kwargs[Keyword.CRYPTO_OUT_NO_FEE.value],
-                            crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
-                            crypto_out_with_fee=kwargs[Keyword.CRYPTO_OUT_WITH_FEE.value],
-                            fiat_out_no_fee=kwargs[Keyword.FIAT_OUT_NO_FEE.value],
-                            fiat_fee=kwargs[Keyword.FIAT_FEE.value],
-                            notes=kwargs[Keyword.NOTES.value],
-                            is_spot_price_from_web=kwargs[Keyword.IS_SPOT_PRICE_FROM_WEB.value],
+                            plugin=self.__PLUGIN_NAME,
+                            unique_id=Keyword.UNKNOWN.value,
+                            raw_data=raw_data,
+                            timestamp=timestamp_value,
+                            asset=asset,
+                            exchange=self.__EXCHANGE_NAME,
+                            holder=self.account_holder,
+                            transaction_type=transaction_type,
+                            spot_price=spot_price,
+                            crypto_out_no_fee=crypto_out_no_fee,
+                            crypto_fee=crypto_fee,
+                            crypto_out_with_fee=crypto_out_with_fee,
+                            fiat_out_no_fee=fiat_out_no_fee,
+                            fiat_fee=fiat_fee,
+                            notes=key,
+                            is_spot_price_from_web=is_spot_price_from_web,
                         )
                     )
             elif record[_TYPE] == _MARGIN or record[_TYPE] == _ROLLOVER:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
-                kwargs.update({
-                    'transaction_type': Keyword.SELL.value,
-                    'crypto_out_no_fee': str(amount),
-                    'crypto_out_with_fee': str(amount + RP2Decimal(record[_FEE])),
-                    'fiat_out_no_fee': str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                        trade_history[record[_REFID]][_FEE])),
-                    'is_spot_price_from_web': False,
-                })
+
+                spot_price: str = '0'
+                crypto_out_no_fee: str = str(amount)
+                crypto_out_with_fee: str = str(amount + RP2Decimal(record[_FEE]))
+                fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
+                    trade_history[record[_REFID]][_FEE]))
+                is_spot_price_from_web: bool = False
+
                 result.append(
                     OutTransaction(
-                        plugin=kwargs[Keyword.PLUGIN.value],
-                        unique_id=kwargs[Keyword.UNIQUE_ID.value],
-                        raw_data=kwargs[Keyword.RAW_DATA.value],
-                        timestamp=kwargs[Keyword.TIMESTAMP.value],
-                        asset=kwargs[Keyword.ASSET.value],
-                        exchange=kwargs[Keyword.EXCHANGE.value],
-                        holder=kwargs[Keyword.HOLDER.value],
-                        transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
-                        spot_price=kwargs[Keyword.SPOT_PRICE.value],
-                        crypto_out_no_fee=kwargs[Keyword.CRYPTO_OUT_NO_FEE.value],
-                        crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
-                        crypto_out_with_fee=kwargs[Keyword.CRYPTO_OUT_WITH_FEE.value],
-                        fiat_out_no_fee=kwargs[Keyword.FIAT_OUT_NO_FEE.value],
-                        fiat_fee=kwargs[Keyword.FIAT_FEE.value],
-                        notes=kwargs[Keyword.NOTES.value],
-                        is_spot_price_from_web=kwargs[Keyword.IS_SPOT_PRICE_FROM_WEB.value],
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.SELL.value,
+                        spot_price=spot_price,
+                        crypto_out_no_fee=crypto_out_no_fee,
+                        crypto_fee=crypto_fee,
+                        crypto_out_with_fee=crypto_out_with_fee,
+                        fiat_out_no_fee=fiat_out_no_fee,
+                        fiat_fee=fiat_fee,
+                        notes=key,
+                        is_spot_price_from_web=is_spot_price_from_web,
                     )
                 )
             elif record[_TYPE] == _TRANSFER:
-                kwargs.update({
-                    'transaction_type': Keyword.BUY.value,
-                    'crypto_in': str(amount),
-                    'fiat_in_no_fee': '0',
-                    'fiat_in_with_fee': '0',
-                })
+                spot_price: str = '0'
+                crypto_in: str = str(amount)
+                fiat_in_no_fee: str = '0'
+                fiat_in_with_fee: str = '0'
+
                 result.append(
                     InTransaction(
-                        plugin=kwargs[Keyword.PLUGIN.value],
-                        unique_id=kwargs[Keyword.UNIQUE_ID.value],
-                        raw_data=kwargs[Keyword.RAW_DATA.value],
-                        timestamp=kwargs[Keyword.TIMESTAMP.value],
-                        asset=kwargs[Keyword.ASSET.value],
-                        exchange=kwargs[Keyword.EXCHANGE.value],
-                        holder=kwargs[Keyword.HOLDER.value],
-                        transaction_type=kwargs[Keyword.TRANSACTION_TYPE.value],
-                        spot_price=kwargs[Keyword.SPOT_PRICE.value],
-                        crypto_in=kwargs[Keyword.CRYPTO_IN.value],
-                        crypto_fee=kwargs[Keyword.CRYPTO_FEE.value],
-                        fiat_in_no_fee=kwargs[Keyword.FIAT_IN_NO_FEE.value],
-                        fiat_in_with_fee=kwargs[Keyword.FIAT_IN_WITH_FEE.value],
-                        fiat_fee=kwargs[Keyword.FIAT_FEE.value],
-                        notes=kwargs[Keyword.NOTES.value],
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.BUY.value,
+                        spot_price=spot_price,
+                        crypto_in=crypto_in,
+                        crypto_fee=crypto_fee,
+                        fiat_in_no_fee=fiat_in_no_fee,
+                        fiat_in_with_fee=fiat_in_with_fee,
+                        fiat_fee=fiat_fee,
+                        notes=key,
                     )
                 )
+            elif record[_TYPE] == _TRADE and record[_ASSET] in KRAKEN_FIAT_LIST:
+                # FIAT ledger entries with trade type ignored currently
+                pass
             elif record[_TYPE] == _SETTLED:
                 # ignorable in terms of in/out/intra
                 pass
@@ -407,7 +353,11 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 # 'sale not implemented'`
                 pass
             else:
-                raise RP2RuntimeError(f"Unimplemented=record_type{record[_TYPE]}")
+                unhandled_types.update({record[_TYPE]: key})
+                raise RP2RuntimeError(f"Unimplemented: record_type={record[_TYPE]}")
+
+            self._logger.debug(f"unhandled types of the ledger={unhandled_types}")
+
         return result
 
     def _process_trade_history(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
