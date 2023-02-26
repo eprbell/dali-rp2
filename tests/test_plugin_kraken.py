@@ -212,4 +212,3 @@ def test_kraken(mocker) -> None:
     ]
 
     assert str(actual_result) == str(expect_result)
-

@@ -78,7 +78,7 @@ _SALE: str = 'sale'
 _TRADE_RECORD_LIMIT: int = 50
 
 KRAKEN_FIAT_SET: Set[str] = {'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'USD',
-                'USDC', 'USDT', 'ZAUD', 'ZCAD', 'ZEUR', 'ZGBP', 'ZJPY', 'ZUSD'}
+                             'USDC', 'USDT', 'ZAUD', 'ZCAD', 'ZEUR', 'ZGBP', 'ZJPY', 'ZUSD'}
 
 KRAKEN_FIAT_LIST = list(set(list(KRAKEN_FIAT_SET) + list(_FIAT_SET)))
 
@@ -192,7 +192,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             timestamp_value: str = self._rp2_timestamp_from_seconds_epoch(record[_TIMESTAMP])
 
-            is_fiat_asset: bool = record[_ASSET] in _FIAT_SET or 'USD' in record[_ASSET]
+            is_fiat_asset: bool = record[_ASSET] in KRAKEN_FIAT_LIST
 
             amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
             asset: str = self.base_id_to_base[record[_ASSET]]
@@ -225,7 +225,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             crypto_fee: str = '0' if is_fiat_asset else record[_FEE]
             fiat_fee: str = record[_FEE] if is_fiat_asset else None
 
-            if record[_TYPE] == _TRADE and 'USD' not in record[_ASSET]:
+            if record[_TYPE] == _TRADE and not is_fiat_asset:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
 
                 spot_price: str = trade_history[record[_REFID]][_PRICE]
@@ -337,7 +337,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         notes=key,
                     )
                 )
-            elif record[_TYPE] == _TRADE and record[_ASSET] in KRAKEN_FIAT_LIST:
+            elif record[_TYPE] == _TRADE and is_fiat_asset:
                 # FIAT ledger entries with trade type ignored currently
                 pass
             elif record[_TYPE] == _SETTLED:
@@ -359,6 +359,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
             self._logger.debug(f"unhandled types of the ledger={unhandled_types}")
 
         return result
+
+    def _process_implicit_api(self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction],
+                              intra_transactions: List[IntraTransaction]) -> None:
+        pass
 
     def _process_trade_history(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
         result: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
