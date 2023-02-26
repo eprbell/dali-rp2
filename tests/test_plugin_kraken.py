@@ -24,7 +24,7 @@ from dali.out_transaction import OutTransaction
 from dali.plugin.input.rest.kraken import InputPlugin
 
 
-@pytest.mark.skip(reason="Failing parent project CI")
+# @pytest.mark.skip(reason="Failing parent project CI")
 def test_kraken(mocker) -> None:
     """
     This tests withdraw, deposit, buy and a sell.
