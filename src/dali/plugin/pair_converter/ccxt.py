@@ -248,7 +248,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
             exchange = self.__default_exchange
 
-        # The exchange could have been added as an alt if so markets wouldn't have been built
+        # The exchange could have been added as an alt; if so markets wouldn't have been built
         if exchange not in self.__exchanges or exchange not in self.__exchange_markets:
             if self.__exchange_locked:
                 self._add_exchange_to_memcache(self.__default_exchange)
