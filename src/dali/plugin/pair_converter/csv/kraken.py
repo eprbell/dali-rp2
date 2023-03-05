@@ -18,10 +18,9 @@ import logging
 from csv import reader
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
-from itertools import repeat
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 from zipfile import ZipFile
 
 import requests
@@ -35,6 +34,7 @@ from dali.historical_bar import HistoricalBar
 
 # Google Drive parameters
 _ACCESS_NOT_CONFIGURED: str = "accessNotConfigured"
+_BAD_REQUEST: str = "badRequest"
 _ERROR: str = "error"
 _ERRORS: str = "errors"
 _FILES: str = "files"
@@ -67,7 +67,7 @@ class Kraken:
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __TIMEOUT: int = 30
-    __THREAD_COUNT: int = 6
+    __THREAD_COUNT: int = 3
 
     __TIMESTAMP_INDEX: int = 0
     __OPEN: int = 1
@@ -92,41 +92,49 @@ class Kraken:
         bars: Dict[datetime, HistoricalBar] = {}
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.debug("Attempting to load %s", base_file)
+        self.__logger.info("Attempting to load %s from Kraken Google Drive.", base_file)
+        file_bytes = self._google_file_to_bytes(base_file)
 
-        with ZipFile(BytesIO(self._google_file_to_bytes(base_file))) as zipped_ohlcvt:
-            self.__logger.debug("Files found in zipped file - %s", zipped_ohlcvt.namelist())
-            all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
+        if file_bytes:
+            with ZipFile(BytesIO(file_bytes)) as zipped_ohlcvt:
+                self.__logger.debug("Files found in zipped file - %s", zipped_ohlcvt.namelist())
+                all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
+                if len(all_timespans_for_pair) == 0:
+                    self.__logger.debug("Market not found in Kraken files. Skipping file read.")
+                    return bars
 
-            if len(all_timespans_for_pair) == 0:
-                self.__logger.debug("Market not found in Kraken files. Skipping file read.")
-                return bars
+                csv_files: Dict[str, str] = {}
+                for file_name in all_timespans_for_pair:
+                    self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
+                    csv_files[file_name] = zipped_ohlcvt.read(file_name).decode(encoding="utf-8")
 
-            with ThreadPool(self.__THREAD_COUNT) as pool:
-                processing_result_list: List[Dict[int, List[HistoricalBar]]] = pool.starmap(
-                    self._process_file, zip(all_timespans_for_pair, repeat(zipped_ohlcvt))
-                )
+                with ThreadPool(self.__THREAD_COUNT) as pool:
+                    processing_result_list: List[Dict[int, List[HistoricalBar]]] = pool.starmap(
+                        self._process_file, zip(list(csv_files.keys()), list(csv_files.values()))
+                    )
 
-        # Sort the bars by duration, largest duration first
-        sorted_bars: Iterable[Dict[int, List[HistoricalBar]]] = reversed(sorted(processing_result_list, key=lambda x: list(x.keys())[0]))
+            # Sort the bars by duration, largest duration first
+            sorted_bars: Iterable[Dict[int, List[HistoricalBar]]] = reversed(sorted(processing_result_list, key=lambda x: list(x.keys())[0]))
 
-        timed_bars: Dict[datetime, HistoricalBar] = {}
+            timed_bars: Dict[datetime, HistoricalBar] = {}
 
-        # Start with longest duration and replace it with smaller durations
-        for duration_bars in sorted_bars:
-            bars_for_duration = list(duration_bars.values())[0]
-            for hbar in bars_for_duration:
-                # create keys for every minute starting with longest duration
-                start_epoch: int = int(hbar.timestamp.timestamp())
-                end_epoch: int = int((hbar.timestamp + timedelta(minutes=list(duration_bars.keys())[0])).timestamp())
-                while start_epoch < end_epoch:
-                    timed_bars[datetime.fromtimestamp(start_epoch, timezone.utc)] = hbar
-                    start_epoch += 60
+            # Start with longest duration and replace it with smaller durations
+            for duration_bars in sorted_bars:
+                bars_for_duration = list(duration_bars.values())[0]
+                for hbar in bars_for_duration:
+                    # create keys for every minute starting with longest duration
+                    start_epoch: int = int(hbar.timestamp.timestamp())
+                    end_epoch: int = int((hbar.timestamp + timedelta(minutes=list(duration_bars.keys())[0])).timestamp())
+                    while start_epoch < end_epoch:
+                        timed_bars[datetime.fromtimestamp(start_epoch, timezone.utc)] = hbar
+                        start_epoch += 60
 
-        return timed_bars
+            return timed_bars
+
+        return bars
 
     # isolated in order to be mocked
-    def _google_file_to_bytes(self, file_name: str) -> bytes:
+    def _google_file_to_bytes(self, file_name: str) -> Optional[bytes]:
         params: Dict[str, Any] = {
             _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = '{file_name}'",
             _API_KEY: self.__google_api_key,
@@ -148,7 +156,33 @@ class Kraken:
             #  ]
             # }
 
-            ## Error Response
+            ## Error Response - Key is invalid
+            # {
+            #  'error': {
+            #    'code': 400,
+            #    'message': 'API key not valid. Please pass a valid API key.',
+            #    'errors': [
+            #      {
+            #        'message': 'API key not valid. Please pass a valid API key.',
+            #        'domain': 'global',
+            #        'reason': 'badRequest'
+            #      }
+            #    ],
+            #    'status': 'INVALID_ARGUMENT',
+            #    'details': [
+            #      {
+            #        '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+            #        'reason': 'API_KEY_INVALID',
+            #        'domain': 'googleapis.com',
+            #        'metadata': {
+            #          'service': 'drive.googleapis.com'
+            #        }
+            #      }
+            #    ]
+            #  }
+            # } from https://www.googleapis.com/drive/v3/files?q=...
+
+            ## Error Response - Key is valid but Google Drive API is specifically not configured
             # {
             #  'error': {
             #   'errors': [
@@ -172,13 +206,21 @@ class Kraken:
                 for error in errors:
                     if error[_REASON] == _ACCESS_NOT_CONFIGURED:
                         self.__logger.error(
-                            """
-                            Access not granted to Google Drive API. You must grant authorization to the Google
-                            Drive API for your API key. Follow the link in the message for more details. Message:\n%s
-                        """,
+                            "Access not granted to Google Drive API. You must grant authorization to the Google"
+                            "Drive API for your API key. Follow the link in the message for more details. Message:\n%s",
                             error[_MESSAGE],
                         )
                         raise RP2RuntimeError("Google Drive not authorized")
+                    if error[_REASON] == _BAD_REQUEST:
+                        self.__logger.error(
+                            "Google API key is invalid. Please check that you have entered the key correctly and try again."
+                            "If the problem persists, you can leave the field blank to use the REST API.\n%s",
+                            error[_MESSAGE],
+                        )
+                        raise RP2RuntimeError("Google Drive key invalid")
+            if not data.get(_FILES):
+                self.__logger.debug("The file '%s' was not found on the Kraken Google Drive.")
+                return None
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
 
@@ -193,10 +235,9 @@ class Kraken:
 
         return file_response.content
 
-    def _process_file(self, file_name: str, zip_file: ZipFile) -> Dict[int, List[HistoricalBar]]:
+    def _process_file(self, file_name: str, csv_file: str) -> Dict[int, List[HistoricalBar]]:
         bars: List[HistoricalBar] = []
-        self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
-        csv_file: str = zip_file.read(file_name).decode(encoding="utf-8")
+
         duration_in_minutes: str = file_name.split("_", 1)[1].strip(".csv")
 
         lines = reader(csv_file.splitlines())
