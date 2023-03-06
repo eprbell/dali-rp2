@@ -398,12 +398,15 @@ class TestCcxtPlugin:
     def test_kraken_csv(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
 
-        cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
+        cache_path = os.path.join(CACHE_DIR, "Test-" + plugin.cache_key())
         if os.path.exists(cache_path):
             os.remove(cache_path)
 
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
+        mocker.patch.object(kraken_csv, "cache_key").return_value = "Test-" + kraken_csv.cache_key()
         mocker.patch.object(kraken_csv, "_Kraken__CACHE_DIRECTORY", "input/kraken_test")
+        if not os.path.exists("input/kraken_test"):
+            os.makedirs("input/kraken_test")
         with open("input/USD_OHLCVT_test.zip", "rb") as file:
             mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
 
