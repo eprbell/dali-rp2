@@ -149,7 +149,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         default_exchange: Optional[str] = None,
         fiat_priority: Optional[str] = None,
         google_api_key: Optional[str] = None,
-        exchange_locked: bool = False,
+        exchange_locked: Optional[bool] = None,
     ) -> None:
 
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
@@ -158,7 +158,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
         self.__google_api_key: Optional[str] = google_api_key
-        self.__exchange_locked: bool = exchange_locked
+        self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
 
         # TO BE IMPLEMENTED - graph and vertex classes to make this more understandable
         # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924056308
@@ -247,7 +247,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
             exchange = self.__default_exchange
 
-        # The exchange could have been added as an alt if so markets wouldn't have been built
+        # The exchange could have been added as an alt; if so markets wouldn't have been built
         if exchange not in self.__exchanges or exchange not in self.__exchange_markets:
             if self.__exchange_locked:
                 self._add_exchange_to_memcache(self.__default_exchange)
