@@ -40,6 +40,7 @@ class TestODSOutputDiff(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.output_dir = OUTPUT_PATH / Path(__file__[:-3]).name
         shutil.rmtree(cls.output_dir, ignore_errors=True)
+        shutil.rmtree(CACHE_PATH, ignore_errors=True)
 
         cls._generate(cls.output_dir, "test", "test_config")
 
