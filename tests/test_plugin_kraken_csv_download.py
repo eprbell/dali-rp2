@@ -41,8 +41,6 @@ class TestKrakenCsvDownload:
             except RP2RuntimeError:
                 pass
 
-        mocker.patch.object(kraken_csv, "cache_key").return_value = "Test-" + kraken_csv.cache_key()
-
         cache_path = path.join(CACHE_DIR, kraken_csv.cache_key())
         if path.exists(cache_path):
             remove(cache_path)

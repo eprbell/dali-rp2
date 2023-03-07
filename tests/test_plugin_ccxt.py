@@ -162,14 +162,12 @@ class TestCcxtPlugin:
 
     def test_historical_prices(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        mocker.patch.object(plugin, "cache_key").return_value = "Test-" + plugin.cache_key()
         cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
         if os.path.exists(cache_path):
             os.remove(cache_path)
 
         # Reinstantiate plugin now that cache is gone
         plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        mocker.patch.object(plugin, "cache_key").return_value = "Test-" + plugin.cache_key()
         self.__btcusdt_mock(plugin, mocker)
 
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
