@@ -1,0 +1,164 @@
+# Copyright 2023 eprbell
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import logging
+from typing import List, Optional, cast
+
+from rp2.logger import create_logger
+from rp2.ods_parser import parse_ods, open_ods
+from rp2.input_data import InputData
+from rp2.configuration import Configuration
+from rp2.abstract_country import AbstractCountry
+from rp2.plugin.country import us, jp
+from rp2.in_transaction import InTransaction as RP2InTransaction
+from rp2.intra_transaction import IntraTransaction as RP2IntraTransaction
+from rp2.out_transaction import OutTransaction as RP2OutTransaction
+from datetime import date, datetime
+
+from dali.abstract_input_plugin import AbstractInputPlugin
+from dali.abstract_transaction import AbstractTransaction
+from dali.in_transaction import InTransaction
+from dali.intra_transaction import IntraTransaction
+from dali.out_transaction import OutTransaction
+
+MIN_DATE: date = date(1970, 1, 1)
+MAX_DATE: date = date(9999, 12, 31)
+
+
+class InputPlugin(AbstractInputPlugin):
+    __RP2_INPUT: str = "RP2 Input .ods"
+
+    def __init__(
+        self,
+        configuration_path: str,
+        input_file: str,
+        country: Optional[str],
+        from_date: Optional[str] = None,
+        to_date: Optional[str] = None,
+        native_fiat: Optional[str] = None,
+    ) -> None:
+        super().__init__(account_holder="", native_fiat=native_fiat)
+        self.__configuration_path: str = configuration_path
+        self.__input_file: str = input_file
+        self.__logger: logging.Logger = create_logger(self.__RP2_INPUT)
+
+        # set the country if provided
+        if country:
+            if country.lower() == 'us':
+                self.__country = us.US()
+            elif country.lower() == 'jp':
+                self.__country = jp.JP()
+            else:
+                ValueError(f'The country code {country} is not a valid country code supported by RP2')
+        # otherwise default to us
+        else:
+            self.__country = us.US()
+
+        # validate the country
+        AbstractCountry.type_check("country", self.__country)
+
+        # use from_date if provided
+        if from_date:
+            self.__from_date: date = datetime.fromisoformat(from_date).date()
+        else:
+            self.__from_date = MIN_DATE
+
+        # use to_date if provided
+        if to_date:
+            self.__to_date: date = datetime.fromisoformat(to_date).date()
+        else:
+            self.__to_date = MAX_DATE
+
+    def load(self) -> List[AbstractTransaction]:
+        result: List[AbstractTransaction] = []
+
+        configuration: Configuration = Configuration(
+            configuration_path=self.__configuration_path,
+            country=self.__country,
+            from_date=self.__from_date,
+            to_date=self.__to_date,
+        )
+
+        input_file_handle: object = open_ods(configuration=configuration, input_file_path=self.__input_file)
+        assets = sorted(list(configuration.assets))
+
+        for asset in assets:
+            self.__logger.info("Processing %s", asset)
+
+            input_data: InputData = parse_ods(
+                configuration=configuration,
+                asset=asset,
+                input_file_handle=input_file_handle
+            )
+            self.__logger.debug("InputData object: %s", input_data)
+            for asset_entry in input_data.unfiltered_in_transaction_set:
+                transaction: RP2InTransaction = cast(RP2InTransaction, asset_entry)
+                result.append(InTransaction(
+                    plugin=self.__RP2_INPUT,
+                    unique_id=transaction.unique_id,
+                    raw_data=str(transaction),
+                    timestamp=str(transaction.timestamp),
+                    asset=transaction.asset,
+                    exchange=transaction.exchange,
+                    holder=transaction.holder,
+                    transaction_type=transaction.transaction_type.value,
+                    spot_price=str(transaction.spot_price),
+                    crypto_in=str(transaction.crypto_in),
+                    crypto_fee=str(transaction.crypto_fee) if transaction.crypto_fee else None,
+                    fiat_in_no_fee=str(transaction.fiat_in_no_fee) if transaction.fiat_in_no_fee else None,
+                    fiat_in_with_fee=str(transaction.fiat_in_with_fee) if transaction.fiat_in_with_fee else None,
+                    fiat_fee=str(transaction.fiat_fee) if transaction.fiat_fee else None,
+                    notes=str(transaction.notes) if transaction.notes else None
+                ))
+
+            for asset_transfer in input_data.unfiltered_intra_transaction_set:
+                transaction: RP2IntraTransaction = cast(RP2IntraTransaction, asset_transfer)
+                result.append(
+                    IntraTransaction(
+                        plugin=self.__RP2_INPUT,
+                        unique_id=transaction.unique_id,
+                        raw_data=str(transaction),
+                        timestamp=str(transaction.timestamp),
+                        asset=transaction.asset,
+                        from_exchange=transaction.from_exchange,
+                        from_holder=transaction.from_holder,
+                        to_exchange=transaction.to_exchange,
+                        to_holder=transaction.to_holder,
+                        spot_price=str(transaction.spot_price) if transaction.spot_price else None,
+                        crypto_sent=str(transaction.crypto_sent),
+                        crypto_received=str(transaction.crypto_received),
+                        notes=str(transaction.notes) if transaction.notes else None
+                    ))
+
+            for asset_exit in input_data.unfiltered_out_transaction_set:
+                transaction: RP2OutTransaction = cast(RP2OutTransaction, asset_exit)
+                result.append(
+                    OutTransaction(
+                        plugin=self.__RP2_INPUT,
+                        unique_id=transaction.unique_id,
+                        raw_data=str(transaction),
+                        timestamp=str(transaction.timestamp),
+                        asset=transaction.asset,
+                        exchange=transaction.exchange,
+                        holder=transaction.holder,
+                        transaction_type=transaction.transaction_type.value,
+                        spot_price=str(transaction.spot_price),
+                        crypto_out_no_fee=str(transaction.crypto_out_no_fee),
+                        crypto_fee=str(transaction.crypto_fee),
+                        crypto_out_with_fee=str(transaction.crypto_out_with_fee),
+                        fiat_out_no_fee=str(transaction.fiat_out_no_fee) if transaction.fiat_out_no_fee else None,
+                        fiat_fee=str(transaction.fiat_fee) if transaction.fiat_fee else None,
+                        notes=str(transaction.notes) if transaction.notes else None
+                    ))
+        return result
