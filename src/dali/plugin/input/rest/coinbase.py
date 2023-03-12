@@ -42,10 +42,14 @@ from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
 # Native format keywords
+_ADVANCED_TRADE_FILL: str = "advanced_trade_fill"
 _AMOUNT: str = "amount"
 _BALANCE: str = "balance"
 _BUY: str = "buy"
+_CARDBUYBACK: str = "cardbuyback"
+_CARDSPEND: str = "cardspend"
 _CODE: str = "code"
+_COMMISSION: str = "commission"
 _CREATED_AT: str = "created_at"
 _CURRENCY: str = "currency"
 _DETAILS: str = "details"
@@ -55,6 +59,7 @@ _EXCHANGE_WITHDRAWAL: str = "exchange_withdrawal"
 _FEE: str = "fee"
 _FIAT_DEPOSIT: str = "fiat_deposit"
 _FIAT_WITHDRAWAL: str = "fiat_withdrawal"
+_FILL_PRICE: str = "fill_price"
 _FROM: str = "from"
 _HASH: str = "hash"
 _ID: str = "id"
@@ -415,11 +420,14 @@ class InputPlugin(AbstractInputPlugin):
                 )
 
     def _is_credit_card_spend(self, transaction: Any) -> bool:
-        return (
+
+        return (  # type: ignore
             transaction[_TYPE] is None
             and _TO in transaction
             and _EMAIL in transaction[_TO]
             and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
+        ) or (
+            transaction[_TYPE] == _CARDSPEND
         )
 
     def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
@@ -466,13 +474,21 @@ class InputPlugin(AbstractInputPlugin):
                     id_2_buy=id_2_buy,
                     id_2_sell=id_2_sell,
                 )
+            elif transaction_type in {_ADVANCED_TRADE_FILL}:
+                self._process_advanced_trade_fill(
+                    transaction=transaction,
+                    currency=currency,
+                    in_transaction_list=in_transaction_list,
+                    out_transaction_list=out_transaction_list,
+                )
             elif transaction_type in {_INTEREST}:
                 self._process_gain(transaction, currency, Keyword.INTEREST, in_transaction_list)
             elif transaction_type in {_STAKING_REWARD}:
                 self._process_gain(transaction, currency, Keyword.STAKING, in_transaction_list)
             elif transaction_type in {_INFLATION_REWARD}:
                 self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list)
-            elif transaction_type in {_FIAT_DEPOSIT}:
+            elif transaction_type in {_FIAT_DEPOSIT, _CARDBUYBACK}:
+                # _CARDBUYBACK is a credit card refund
                 self._process_fiat_deposit(transaction, currency, in_transaction_list)
             elif transaction_type in {_FIAT_WITHDRAWAL}:
                 self._process_fiat_withdrawal(transaction, currency, out_transaction_list)
@@ -742,6 +758,81 @@ class InputPlugin(AbstractInputPlugin):
             if transaction_type == _TRADE:
                 out_transaction_2_trade_id[out_transaction] = transaction[_TRADE][_ID]
                 trade_id_2_out_transaction[transaction[_TRADE][_ID]] = out_transaction
+
+    def _process_advanced_trade_fill(
+        self,
+        transaction: Any,
+        currency: str,
+        in_transaction_list: List[InTransaction],
+        out_transaction_list: List[OutTransaction],
+    ) -> None:
+        transaction_type: str = transaction[_TYPE]
+        native_amount: RP2Decimal = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
+        crypto_amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
+        fiat_fee: RP2Decimal = ZERO
+        spot_price: RP2Decimal
+
+        if not self.is_native_fiat(transaction[_NATIVE_AMOUNT][_CURRENCY]):
+            raise RP2RuntimeError(f"Internal error: native amount is not denominated in {self.native_fiat} {json.dumps(transaction)}")
+
+        raw_data: str = json.dumps(transaction)
+        if not transaction_type in {_ADVANCED_TRADE_FILL}:
+            self.__logger.error("Unsupported transaction type for fill (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
+            return
+
+        if native_amount >= ZERO:
+            raw_data = f"{raw_data}"
+            fiat_fee = RP2Decimal(transaction[transaction_type][_COMMISSION])
+            spot_price = RP2Decimal(transaction[transaction_type][_FILL_PRICE])
+
+            fiat_in_no_fee: Optional[str] = None
+            fiat_in_with_fee: Optional[str] = None
+            if native_amount >= self.__MINIMUM_FIAT_PRECISION:
+                fiat_in_no_fee = str(native_amount - fiat_fee)
+                fiat_in_with_fee = str(native_amount)
+
+            in_transaction: InTransaction = InTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=raw_data,
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type=Keyword.BUY.name,
+                spot_price=str(spot_price),
+                crypto_in=str(crypto_amount),
+                crypto_fee=None,
+                fiat_in_no_fee=fiat_in_no_fee,
+                fiat_in_with_fee=fiat_in_with_fee,
+                fiat_fee=str(fiat_fee),
+                notes=None,
+            )
+            in_transaction_list.append(in_transaction)
+
+        elif native_amount < ZERO:
+            raw_data = f"{raw_data}"
+            fiat_fee = RP2Decimal(transaction[transaction_type][_COMMISSION])
+            spot_price = RP2Decimal(transaction[transaction_type][_FILL_PRICE])
+
+            out_transaction: OutTransaction = OutTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=raw_data,
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type=Keyword.SELL.name,
+                spot_price=str(spot_price),
+                crypto_out_no_fee=str(-crypto_amount - fiat_fee / spot_price),
+                crypto_fee=str(fiat_fee / spot_price),
+                crypto_out_with_fee=str(-crypto_amount),
+                fiat_out_no_fee=str(-native_amount),
+                fiat_fee=str(fiat_fee),
+                notes=None,
+            )
+            out_transaction_list.append(out_transaction)
 
     def _process_gain(
         self, transaction: Any, currency: str, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None
