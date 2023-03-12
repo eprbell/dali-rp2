@@ -33,12 +33,14 @@ class TestRP2InputOds:
         return plugin.load()
 
     def test_all_transactions_found(self):
-        assert len(self.get_result()) == 6
+        assert len(self.get_result()) == 9
 
     def test_in_transactions(self) -> None:
         # Buy BTC transaction 1
         btc_transaction_in_1: InTransaction = self.get_result()[0]  # type: ignore
         assert btc_transaction_in_1.asset == "BTC"
+        assert btc_transaction_in_1.exchange == "FTX"
+        assert btc_transaction_in_1.holder == "Bob"
         assert btc_transaction_in_1.timestamp == "2020-06-28 14:38:40+0000"
         assert btc_transaction_in_1.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(btc_transaction_in_1.spot_price) == RP2Decimal("12000.00")
@@ -51,6 +53,8 @@ class TestRP2InputOds:
         # Buy BTC transaction 2
         btc_transaction_in_2: InTransaction = self.get_result()[1]  # type: ignore
         assert btc_transaction_in_2.asset == "BTC"
+        assert btc_transaction_in_1.exchange == "FTX"
+        assert btc_transaction_in_1.holder == "Bob"
         assert btc_transaction_in_2.timestamp == "2022-01-02 18:11:09+0000"
         assert btc_transaction_in_2.transaction_type == Keyword.BUY.value.capitalize()
         assert RP2Decimal(btc_transaction_in_2.spot_price) == RP2Decimal("35000.00")
@@ -59,6 +63,20 @@ class TestRP2InputOds:
         assert RP2Decimal(btc_transaction_in_2.fiat_in_no_fee) == RP2Decimal("34650.00")
         assert RP2Decimal(btc_transaction_in_2.fiat_in_with_fee) == RP2Decimal("35140.00")
         assert RP2Decimal(btc_transaction_in_2.fiat_fee) == RP2Decimal("490.00")
+
+        # Buy ETH transaction 1
+        eth_transaction_in_1: InTransaction = self.get_result()[6]  # type: ignore
+        assert eth_transaction_in_1.asset == "ETH"
+        assert eth_transaction_in_1.exchange == "Coinbase"
+        assert eth_transaction_in_1.holder == "Bob"
+        assert eth_transaction_in_1.timestamp == "2020-06-03 11:23:00+0000"
+        assert eth_transaction_in_1.transaction_type == Keyword.BUY.value.capitalize()
+        assert RP2Decimal(eth_transaction_in_1.spot_price) == RP2Decimal("244")
+        assert RP2Decimal(eth_transaction_in_1.crypto_in) == RP2Decimal("10")
+        assert eth_transaction_in_1.crypto_fee is None
+        assert RP2Decimal(eth_transaction_in_1.fiat_in_no_fee) == RP2Decimal("2440")
+        assert RP2Decimal(eth_transaction_in_1.fiat_in_with_fee) == RP2Decimal("2465")
+        assert RP2Decimal(eth_transaction_in_1.fiat_fee) == RP2Decimal("25.00")
 
     def test_out_transactions(self) -> None:
         # Sell BTC
