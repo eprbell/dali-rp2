@@ -14,7 +14,7 @@
 
 from enum import Enum
 from typing import Dict, Optional, Set, Union
-
+from rp2.abstract_country import AbstractCountry
 from rp2.rp2_error import RP2ValueError
 
 
@@ -23,6 +23,7 @@ class Keyword(Enum):
     AIRDROP: str = "airdrop"
     ASSET: str = "asset"
     BUY: str = "buy"
+    COUNTRY: str = "country"
     CRYPTO_FEE: str = "crypto_fee"
     CRYPTO_IN: str = "crypto_in"
     CRYPTO_OUT_NO_FEE: str = "crypto_out_no_fee"
@@ -161,7 +162,8 @@ BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
     Keyword.INTRA_HEADER.value,
 }
 
-DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
+DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str], AbstractCountry]] = {
+    Keyword.COUNTRY.value: None,
     Keyword.IN_HEADER.value: {
         Keyword.TIMESTAMP.value: 0,
         Keyword.ASSET.value: 1,

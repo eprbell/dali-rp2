@@ -63,6 +63,7 @@ class _InputPluginHelperArgs(NamedTuple):
 
 
 def dali_main(country: AbstractCountry) -> None:
+    DEFAULT_CONFIGURATION[Keyword.COUNTRY.value] = country
     if "RP2_ENABLE_PROFILER" in os.environ:
         cProfile.runctx("_dali_main_internal(country)", globals(), locals())
     else:

@@ -1,4 +1,4 @@
-# Copyright 2023 eprbell
+# Copyright 2023 jamesbaber1
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,71 +14,41 @@
 
 import logging
 from typing import List, Optional, cast
+from datetime import date
 
 from rp2.logger import create_logger
 from rp2.ods_parser import parse_ods, open_ods
 from rp2.input_data import InputData
-from rp2.configuration import Configuration
-from rp2.abstract_country import AbstractCountry
-from rp2.plugin.country import us, jp
+from rp2.configuration import Configuration, MAX_DATE, MIN_DATE
 from rp2.in_transaction import InTransaction as RP2InTransaction
 from rp2.intra_transaction import IntraTransaction as RP2IntraTransaction
 from rp2.out_transaction import OutTransaction as RP2OutTransaction
-from datetime import date, datetime
 
+from dali.configuration import DEFAULT_CONFIGURATION, Keyword
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
+from rp2.abstract_country import AbstractCountry
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
-MIN_DATE: date = date(1970, 1, 1)
-MAX_DATE: date = date(9999, 12, 31)
-
 
 class InputPlugin(AbstractInputPlugin):
-    __RP2_INPUT: str = "RP2 Input .ods"
+    __RP2_INPUT: str = "RP2 Input"
 
     def __init__(
         self,
         configuration_path: str,
         input_file: str,
-        country: Optional[str],
-        from_date: Optional[str] = None,
-        to_date: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
         super().__init__(account_holder="", native_fiat=native_fiat)
         self.__configuration_path: str = configuration_path
         self.__input_file: str = input_file
         self.__logger: logging.Logger = create_logger(self.__RP2_INPUT)
-
-        # set the country if provided
-        if country:
-            if country.lower() == 'us':
-                self.__country = us.US()
-            elif country.lower() == 'jp':
-                self.__country = jp.JP()
-            else:
-                ValueError(f'The country code {country} is not a valid country code supported by RP2')
-        # otherwise default to us
-        else:
-            self.__country = us.US()
-
-        # validate the country
-        AbstractCountry.type_check("country", self.__country)
-
-        # use from_date if provided
-        if from_date:
-            self.__from_date: date = datetime.fromisoformat(from_date).date()
-        else:
-            self.__from_date = MIN_DATE
-
-        # use to_date if provided
-        if to_date:
-            self.__to_date: date = datetime.fromisoformat(to_date).date()
-        else:
-            self.__to_date = MAX_DATE
+        self.__country: AbstractCountry = DEFAULT_CONFIGURATION[Keyword.COUNTRY.value]
+        self.__from_date: date = MIN_DATE
+        self.__to_date: date = MAX_DATE
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
@@ -104,6 +74,7 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.debug("InputData object: %s", input_data)
             for asset_entry in input_data.unfiltered_in_transaction_set:
                 transaction: RP2InTransaction = cast(RP2InTransaction, asset_entry)
+                self.__logger.debug("Transaction: %s", str(transaction))
                 result.append(InTransaction(
                     plugin=self.__RP2_INPUT,
                     unique_id=transaction.unique_id,
@@ -124,6 +95,7 @@ class InputPlugin(AbstractInputPlugin):
 
             for asset_transfer in input_data.unfiltered_intra_transaction_set:
                 transaction: RP2IntraTransaction = cast(RP2IntraTransaction, asset_transfer)
+                self.__logger.debug("Transaction: %s", str(transaction))
                 result.append(
                     IntraTransaction(
                         plugin=self.__RP2_INPUT,
@@ -143,6 +115,7 @@ class InputPlugin(AbstractInputPlugin):
 
             for asset_exit in input_data.unfiltered_out_transaction_set:
                 transaction: RP2OutTransaction = cast(RP2OutTransaction, asset_exit)
+                self.__logger.debug("Transaction: %s", str(transaction))
                 result.append(
                     OutTransaction(
                         plugin=self.__RP2_INPUT,
