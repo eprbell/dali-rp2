@@ -33,14 +33,23 @@ from dali.abstract_ccxt_input_plugin import (
 from dali.ccxt_pagination import (
     AbstractPaginationDetailSet,
 )
+from dali.cache import (
+    load_from_cache,
+    save_to_cache
+)
+from dali.configuration import (
+    Keyword,
+    _FIAT_SET
+)
+from rp2.rp2_decimal import (
+    RP2Decimal,
+    ZERO
+)
 from rp2.logger import create_logger
 from dali.abstract_transaction import AbstractTransaction
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-from dali.configuration import Keyword, _FIAT_SET
-from dali.cache import load_from_cache, save_to_cache
-from rp2.rp2_decimal import RP2Decimal, ZERO
 from rp2.rp2_error import RP2RuntimeError
 
 
@@ -55,6 +64,8 @@ _TRADES: str = 'trades'
 _OFFSET: str = 'ofs'
 _TYPE: str = 'type'
 _REFID: str = 'refid'
+_PAIR: str = 'pair'
+_QUOTE: str = 'quote'
 _TIMESTAMP: str = 'time'
 _FEE: str = 'fee'
 _ASSET: str = 'asset'
@@ -105,11 +116,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # We will have a default start time of July 27th, 2011 since Kraken Exchange officially launched on July 28th.
         super().__init__(account_holder, datetime(2011, 7, 27, 0, 0, 0, 0), native_fiat, thread_count)
         self.__logger: logging.Logger = create_logger(f"{self.__EXCHANGE_NAME}")
-        self.__timezone = pytz.timezone('UTC')
         self._initialize_client()
         self._client.load_markets()
+        self._client.markets_by_id.update({'BSVUSD': {'id': 'BSVUSD', _BASE_ID: 'BSV', _BASE: 'BSV', _QUOTE: 'USD'}})
         self.base_id_to_base: Dict[str, str] = {value[_BASE_ID]: value[_BASE] for key, value in self._client.markets_by_id.items()}
-        self.base_id_to_base.update({'BSV': 'BSV'})
         self.use_cache: bool = use_cache
 
     def exchange_name(self) -> str:
@@ -195,13 +205,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
             is_fiat_asset: bool = record[_ASSET] in KRAKEN_FIAT_LIST
 
             amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
-            asset: str = self.base_id_to_base[record[_ASSET]]
+            asset_base: str = self.base_id_to_base[record[_ASSET]]
             raw_data = str(record)
 
             if record[_TYPE] == _WITHDRAWAL or record[_TYPE] == _DEPOSIT:
                 is_deposit: bool = record[_TYPE] == _DEPOSIT
                 is_withdrawal: bool = record[_TYPE] == _WITHDRAWAL
-                spot_price: str = '0'
+                spot_price: str = Keyword.UNKNOWN.value
 
                 result.append(
                     IntraTransaction(
@@ -209,7 +219,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         unique_id=Keyword.UNKNOWN.value,
                         raw_data=raw_data,
                         timestamp=timestamp_value,
-                        asset=asset,
+                        asset=asset_base,
                         from_exchange=self.__EXCHANGE_NAME if is_withdrawal else Keyword.UNKNOWN.value,
                         from_holder=self.account_holder if is_withdrawal else Keyword.UNKNOWN.value,
                         to_exchange=self.__EXCHANGE_NAME if is_deposit else Keyword.UNKNOWN.value,
@@ -228,8 +238,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
             if record[_TYPE] == _TRADE and not is_fiat_asset:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
 
-                spot_price: str = trade_history[record[_REFID]][_PRICE]
+                asset_quote: str = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]][_QUOTE]
+                is_quote_asset_fiat: bool = asset_quote in KRAKEN_FIAT_LIST
+
+                spot_price: str = trade_history[record[_REFID]][_PRICE] if is_quote_asset_fiat else Keyword.UNKNOWN.value
                 transaction_type: str = Keyword.BUY.value if RP2Decimal(record[_AMOUNT]) > ZERO else Keyword.SELL.value
+
+                unique_id: str = Keyword.UNKNOWN.value if spot_price is Keyword.UNKNOWN.value else key
 
                 if RP2Decimal(record[_AMOUNT]) > ZERO:
                     crypto_in = str(amount)
@@ -239,10 +254,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     result.append(
                         InTransaction(
                             plugin=self.__PLUGIN_NAME,
-                            unique_id=Keyword.UNKNOWN.value,
+                            unique_id=unique_id,
                             raw_data=raw_data,
                             timestamp=timestamp_value,
-                            asset=asset,
+                            asset=asset_base,
                             exchange=self.__EXCHANGE_NAME,
                             holder=self.account_holder,
                             transaction_type=transaction_type,
@@ -260,15 +275,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     crypto_out_with_fee: str = str(amount + RP2Decimal(record[_FEE]))
                     fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
                         trade_history[record[_REFID]][_FEE]))
-                    is_spot_price_from_web: bool = False
 
                     result.append(
                         OutTransaction(
                             plugin=self.__PLUGIN_NAME,
-                            unique_id=Keyword.UNKNOWN.value,
+                            unique_id=unique_id,
                             raw_data=raw_data,
                             timestamp=timestamp_value,
-                            asset=asset,
+                            asset=asset_base,
                             exchange=self.__EXCHANGE_NAME,
                             holder=self.account_holder,
                             transaction_type=transaction_type,
@@ -279,18 +293,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             fiat_out_no_fee=fiat_out_no_fee,
                             fiat_fee=fiat_fee,
                             notes=key,
-                            is_spot_price_from_web=is_spot_price_from_web,
                         )
                     )
             elif record[_TYPE] == _MARGIN or record[_TYPE] == _ROLLOVER:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
 
-                spot_price: str = '0'
+                spot_price: str = Keyword.UNKNOWN.value
                 crypto_out_no_fee: str = str(amount)
                 crypto_out_with_fee: str = str(amount + RP2Decimal(record[_FEE]))
                 fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
                     trade_history[record[_REFID]][_FEE]))
-                is_spot_price_from_web: bool = False
 
                 result.append(
                     OutTransaction(
@@ -298,7 +310,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         unique_id=Keyword.UNKNOWN.value,
                         raw_data=raw_data,
                         timestamp=timestamp_value,
-                        asset=asset,
+                        asset=asset_base,
                         exchange=self.__EXCHANGE_NAME,
                         holder=self.account_holder,
                         transaction_type=Keyword.SELL.value,
@@ -309,11 +321,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         fiat_out_no_fee=fiat_out_no_fee,
                         fiat_fee=fiat_fee,
                         notes=key,
-                        is_spot_price_from_web=is_spot_price_from_web,
                     )
                 )
             elif record[_TYPE] == _TRANSFER:
-                spot_price: str = '0'
+                spot_price: str = Keyword.UNKNOWN.value
                 crypto_in: str = str(amount)
                 fiat_in_no_fee: str = '0'
                 fiat_in_with_fee: str = '0'
@@ -324,7 +335,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         unique_id=Keyword.UNKNOWN.value,
                         raw_data=raw_data,
                         timestamp=timestamp_value,
-                        asset=asset,
+                        asset=asset_base,
                         exchange=self.__EXCHANGE_NAME,
                         holder=self.account_holder,
                         transaction_type=Keyword.BUY.value,
@@ -350,7 +361,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 # 'staking not implemented'
                 pass
             elif record[_TYPE] == _SALE:
-                # 'sale not implemented'`
+                # 'sale not implemented'
                 pass
             else:
                 unhandled_types.update({record[_TYPE]: key})

@@ -147,7 +147,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     @staticmethod
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
-        epoch_seconds, epoch_ms = divmod(float(epoch_timestamp), _MS_IN_SECOND)
+        epoch_seconds, dummy_epoch_ms = divmod(float(epoch_timestamp), _MS_IN_SECOND)
         return AbstractCcxtInputPlugin._rp2_timestamp_from_seconds_epoch(str(epoch_seconds))
 
     @staticmethod
