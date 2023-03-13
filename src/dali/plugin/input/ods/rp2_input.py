@@ -14,7 +14,6 @@
 
 import logging
 from typing import List, Optional, cast
-from datetime import date
 
 from rp2.logger import create_logger
 from rp2.ods_parser import parse_ods, open_ods
@@ -24,10 +23,9 @@ from rp2.in_transaction import InTransaction as RP2InTransaction
 from rp2.intra_transaction import IntraTransaction as RP2IntraTransaction
 from rp2.out_transaction import OutTransaction as RP2OutTransaction
 
-from dali.configuration import DEFAULT_CONFIGURATION, Keyword
+from dali import configuration as config
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
-from rp2.abstract_country import AbstractCountry
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
@@ -46,18 +44,15 @@ class InputPlugin(AbstractInputPlugin):
         self.__configuration_path: str = configuration_path
         self.__input_file: str = input_file
         self.__logger: logging.Logger = create_logger(self.__RP2_INPUT)
-        self.__country: AbstractCountry = DEFAULT_CONFIGURATION[Keyword.COUNTRY.value]
-        self.__from_date: date = MIN_DATE
-        self.__to_date: date = MAX_DATE
 
     def load(self) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         configuration: Configuration = Configuration(
             configuration_path=self.__configuration_path,
-            country=self.__country,
-            from_date=self.__from_date,
-            to_date=self.__to_date,
+            country=config.COUNTRY,
+            from_date=MIN_DATE,
+            to_date=MAX_DATE,
         )
 
         input_file_handle: object = open_ods(configuration=configuration, input_file_path=self.__input_file)

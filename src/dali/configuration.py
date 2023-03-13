@@ -23,7 +23,6 @@ class Keyword(Enum):
     AIRDROP: str = "airdrop"
     ASSET: str = "asset"
     BUY: str = "buy"
-    COUNTRY: str = "country"
     CRYPTO_FEE: str = "crypto_fee"
     CRYPTO_IN: str = "crypto_in"
     CRYPTO_OUT_NO_FEE: str = "crypto_out_no_fee"
@@ -162,8 +161,7 @@ BUILTIN_CONFIGURATION_SECTIONS: Set[str] = {
     Keyword.INTRA_HEADER.value,
 }
 
-DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str], AbstractCountry]] = {
-    Keyword.COUNTRY.value: None,
+DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
     Keyword.IN_HEADER.value: {
         Keyword.TIMESTAMP.value: 0,
         Keyword.ASSET.value: 1,
@@ -208,6 +206,8 @@ DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str], AbstractC
         Keyword.NOTES.value: 13,
     },
 }
+
+COUNTRY: AbstractCountry = None
 
 
 def is_builtin_section_name(section_name: str) -> bool:

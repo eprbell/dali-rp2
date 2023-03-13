@@ -39,6 +39,7 @@ from dali.configuration import (
     is_transaction_type_valid,
     is_unknown,
 )
+from dali import configuration
 from dali.configuration_generator import generate_configuration_file
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
@@ -63,7 +64,7 @@ class _InputPluginHelperArgs(NamedTuple):
 
 
 def dali_main(country: AbstractCountry) -> None:
-    DEFAULT_CONFIGURATION[Keyword.COUNTRY.value] = country
+    configuration.COUNTRY = country
     if "RP2_ENABLE_PROFILER" in os.environ:
         cProfile.runctx("_dali_main_internal(country)", globals(), locals())
     else:

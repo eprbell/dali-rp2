@@ -13,7 +13,8 @@
 # limitations under the License.
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
-from dali.configuration import Keyword, DEFAULT_CONFIGURATION
+from dali import configuration
+from dali.configuration import Keyword
 from dali.plugin.country.us import US
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
@@ -24,7 +25,7 @@ from dali.plugin.input.ods.rp2_input import InputPlugin
 class TestRP2InputOds:
     @staticmethod
     def get_result():
-        DEFAULT_CONFIGURATION[Keyword.COUNTRY.value] = US()
+        configuration.COUNTRY = US()
         plugin = InputPlugin(
             configuration_path='input/test_ods_rp2_input.ini',
             input_file='input/test_ods_rp2_input.ods',
