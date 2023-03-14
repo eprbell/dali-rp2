@@ -207,7 +207,7 @@ DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
     },
 }
 
-COUNTRY: AbstractCountry = None
+COUNTRY: Optional[AbstractCountry] = None
 
 
 def is_builtin_section_name(section_name: str) -> bool:
