@@ -402,7 +402,7 @@ class TestCcxtPlugin:
 
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
         mocker.patch.object(kraken_csv, "cache_key").return_value = "Test-" + kraken_csv.cache_key()
-        mocker.patch.object(kraken_csv, "_Kraken__CACHE_DIRECTORY", "input/kraken_test")
+        mocker.patch.object(kraken_csv, "_Kraken__CACHE_DIRECTORY", "output/kraken_test")
         if not os.path.exists("output/kraken_test"):
             os.makedirs("output/kraken_test")
         with open("input/USD_OHLCVT_test.zip", "rb") as file:
