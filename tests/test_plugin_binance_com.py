@@ -20,6 +20,8 @@ from typing import Any, Dict, List, Union
 
 from ccxt import Exchange
 from dateutil import parser
+
+from rp2.plugin.country.us import US
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.configuration import Keyword
@@ -91,7 +93,7 @@ class TestBinance:
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
         mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # 1 crypto Transfer
         assert len(result) == 1
@@ -232,7 +234,7 @@ class TestBinance:
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
         mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # One Sell of quote asset (using BNB) +
         # One Buy of base asset (using BNB) +
@@ -509,7 +511,7 @@ class TestBinance:
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
         mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # One Eth staking transaction +
         # One BUSD savings transaction +
@@ -699,7 +701,7 @@ class TestBinance:
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
         mocker.patch.object(plugin, "_process_deposits").return_value = None
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # 1 EUR deposit +
         # 1 EUR sell (priced in native fiat) +
@@ -872,7 +874,7 @@ class TestBinance:
         mocker.patch.object(plugin, "_process_deposits").return_value = None
         mocker.patch.object(plugin, "_process_implicit_api").return_value = None
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # 1 crypto Transfer
         assert len(result) == 1

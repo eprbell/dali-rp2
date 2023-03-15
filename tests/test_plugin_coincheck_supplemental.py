@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from rp2.plugin.country.us import US
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.configuration import Keyword
@@ -27,7 +28,7 @@ class TestCoincheck:
             native_fiat="USD",
         )
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # 1 0.005 BTC purchase
         assert len(result) == 1

@@ -38,8 +38,9 @@ import logging
 from csv import reader
 from datetime import datetime
 from typing import List, Optional
-
 import dateutil
+
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
@@ -82,7 +83,7 @@ class InputPlugin(AbstractInputPlugin):
         self.__csv_file: str = csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__LEDGER}/{self.__account_nickname}/{self.account_holder}")
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         with open(self.__csv_file, encoding="utf-8") as csv_file:

@@ -14,6 +14,7 @@
 
 from typing import List, Optional, cast
 
+from rp2.abstract_country import AbstractCountry
 from rp2.rp2_error import RP2RuntimeError, RP2TypeError
 
 from dali.abstract_transaction import AbstractTransaction
@@ -36,7 +37,7 @@ class AbstractInputPlugin:
     def cache_key(self) -> Optional[str]:
         return None
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def load_from_cache(self) -> Optional[List[AbstractTransaction]]:

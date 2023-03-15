@@ -14,6 +14,7 @@
 
 from typing import Any, Dict, List
 
+from rp2.plugin.country.us import US
 from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
 
@@ -144,7 +145,7 @@ class TestTrade:
         mocker.patch.object(plugin, "_InputPlugin__get_buys").return_value = []
         mocker.patch.object(plugin, "_InputPlugin__get_sells").return_value = []
 
-        result = plugin.load()
+        result = plugin.load(US())
         assert len(result) == 2
 
         out_transaction: OutTransaction = result[0]  # type: ignore

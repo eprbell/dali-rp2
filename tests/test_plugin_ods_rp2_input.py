@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import List
+import unittest
 
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.plugin.country.us import US
 
-from dali import configuration
 from dali.configuration import Keyword
 from dali.abstract_transaction import AbstractTransaction
 from dali.in_transaction import InTransaction
@@ -25,23 +25,25 @@ from dali.intra_transaction import IntraTransaction
 from dali.plugin.input.ods.rp2_input import InputPlugin
 
 
-class TestRP2InputOds:
-    @staticmethod
-    def get_result() -> List[AbstractTransaction]:
-        configuration.COUNTRY = US()
+class TestRP2InputOds(unittest.TestCase):
+
+    transactions: List[AbstractTransaction]
+
+    @classmethod
+    def setUpClass(cls) -> None:
         plugin = InputPlugin(
             configuration_path='input/test_ods_rp2_input.ini',
             input_file='input/test_ods_rp2_input.ods',
             native_fiat="USD"
         )
-        return plugin.load()
+        cls.transactions = plugin.load(US())
 
     def test_all_transactions_found(self) -> None:
-        assert len(self.get_result()) == 9
+        assert len(self.transactions) == 9
 
     def test_in_transactions(self) -> None:
         # Buy BTC transaction 1
-        btc_transaction_in_1: InTransaction = self.get_result()[0]  # type: ignore
+        btc_transaction_in_1: InTransaction = self.transactions[0]  # type: ignore
         assert btc_transaction_in_1.asset == "BTC"
         assert btc_transaction_in_1.exchange == "FTX"
         assert btc_transaction_in_1.holder == "Bob"
@@ -55,7 +57,7 @@ class TestRP2InputOds:
         assert RP2Decimal(str(btc_transaction_in_1.fiat_fee)) == RP2Decimal("10.00")
 
         # Buy BTC transaction 2
-        btc_transaction_in_2: InTransaction = self.get_result()[1]  # type: ignore
+        btc_transaction_in_2: InTransaction = self.transactions[1]  # type: ignore
         assert btc_transaction_in_2.asset == "BTC"
         assert btc_transaction_in_1.exchange == "FTX"
         assert btc_transaction_in_1.holder == "Bob"
@@ -69,7 +71,7 @@ class TestRP2InputOds:
         assert RP2Decimal(str(btc_transaction_in_2.fiat_fee)) == RP2Decimal("490.00")
 
         # Buy ETH transaction 1
-        eth_transaction_in_1: InTransaction = self.get_result()[6]  # type: ignore
+        eth_transaction_in_1: InTransaction = self.transactions[6]  # type: ignore
         assert eth_transaction_in_1.asset == "ETH"
         assert eth_transaction_in_1.exchange == "Coinbase"
         assert eth_transaction_in_1.holder == "Bob"
@@ -84,7 +86,7 @@ class TestRP2InputOds:
 
     def test_out_transactions(self) -> None:
         # Sell BTC
-        btc_transaction_out_1: OutTransaction = self.get_result()[5]  # type: ignore
+        btc_transaction_out_1: OutTransaction = self.transactions[5]  # type: ignore
         assert btc_transaction_out_1.asset == "BTC"
         assert btc_transaction_out_1.timestamp == "2022-02-09 11:45:34-0800"
         assert btc_transaction_out_1.transaction_type == Keyword.GIFT.value.capitalize()
@@ -96,7 +98,7 @@ class TestRP2InputOds:
 
     def test_intra_transactions(self) -> None:
         # BTC transfer 1
-        btc_transaction_intra_1: IntraTransaction = self.get_result()[2]  # type: ignore
+        btc_transaction_intra_1: IntraTransaction = self.transactions[2]  # type: ignore
         assert btc_transaction_intra_1.asset == "BTC"
         assert btc_transaction_intra_1.timestamp == "2022-01-14 03:23:38-0800"
         assert RP2Decimal(str(btc_transaction_intra_1.spot_price)) == RP2Decimal("41952.11")
@@ -108,7 +110,7 @@ class TestRP2InputOds:
         assert RP2Decimal(str(btc_transaction_intra_1.crypto_received)) == RP2Decimal("0.20")
 
         # BTC transfer 2
-        btc_transaction_intra_2: IntraTransaction = self.get_result()[3]  # type: ignore
+        btc_transaction_intra_2: IntraTransaction = self.transactions[3]  # type: ignore
         assert btc_transaction_intra_2.asset == "BTC"
         assert btc_transaction_intra_2.timestamp == "2022-01-18 15:27:18+0000"
         assert RP2Decimal(str(btc_transaction_intra_2.spot_price)) == RP2Decimal("41736.81")
@@ -120,7 +122,7 @@ class TestRP2InputOds:
         assert RP2Decimal(str(btc_transaction_intra_2.crypto_received)) == RP2Decimal("0.10")
 
         # BTC transfer 3
-        btc_transaction_intra_3: IntraTransaction = self.get_result()[4]  # type: ignore
+        btc_transaction_intra_3: IntraTransaction = self.transactions[4]  # type: ignore
         assert btc_transaction_intra_3.asset == "BTC"
         assert btc_transaction_intra_3.timestamp == "2022-01-25 02:58:40-0800"
         assert RP2Decimal(str(btc_transaction_intra_3.spot_price)) == RP2Decimal("36463.4")

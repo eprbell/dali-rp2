@@ -20,6 +20,8 @@ from datetime import datetime
 from typing import List, Optional
 
 import pytz
+
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 
@@ -62,7 +64,7 @@ class InputPlugin(AbstractInputPlugin):
 
         self.__logger: logging.Logger = create_logger(f"{self.__TREZOR_OLD}/{currency}/{self.__account_nickname}/{self.account_holder}")
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         with open(self.__csv_file, encoding="utf-8") as csv_file:

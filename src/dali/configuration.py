@@ -14,7 +14,6 @@
 
 from enum import Enum
 from typing import Dict, Optional, Set, Union
-from rp2.abstract_country import AbstractCountry
 from rp2.rp2_error import RP2ValueError
 
 
@@ -206,8 +205,6 @@ DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
         Keyword.NOTES.value: 13,
     },
 }
-
-COUNTRY: Optional[AbstractCountry] = None
 
 
 def is_builtin_section_name(section_name: str) -> bool:

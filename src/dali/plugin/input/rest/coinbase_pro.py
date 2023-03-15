@@ -31,6 +31,8 @@ from requests import PreparedRequest
 from requests.auth import AuthBase
 from requests.models import Response
 from requests.sessions import Session
+
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
@@ -146,7 +148,7 @@ class InputPlugin(AbstractInputPlugin):
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
         process_account_result_list: List[Optional[_ProcessAccountResult]]
         accounts = self.__get_accounts()

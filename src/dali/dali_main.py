@@ -39,7 +39,6 @@ from dali.configuration import (
     is_transaction_type_valid,
     is_unknown,
 )
-from dali import configuration
 from dali.configuration_generator import generate_configuration_file
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
@@ -60,11 +59,11 @@ _VERSION: str = "0.6.3"
 class _InputPluginHelperArgs(NamedTuple):
     input_plugin: AbstractInputPlugin
     package_name: str
+    country: AbstractCountry
     use_cache: bool
 
 
 def dali_main(country: AbstractCountry) -> None:
-    configuration.COUNTRY = country
     if "RP2_ENABLE_PROFILER" in os.environ:
         cProfile.runctx("_dali_main_internal(country)", globals(), locals())
     else:
@@ -148,7 +147,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
                     LOGGER.error("Plugin '%s' has no 'load' method. Exiting...", normalized_section_name)
                     sys.exit(1)
                 LOGGER.info("Initialized input plugin '%s'", section_name)
-                input_plugin_args_list.append(_InputPluginHelperArgs(input_plugin, section_name, args.use_cache))
+                input_plugin_args_list.append(_InputPluginHelperArgs(input_plugin, section_name, country, args.use_cache))
 
         if not input_plugin_args_list:
             LOGGER.error("No input plugin configuration found in config file. Exiting...")
@@ -186,6 +185,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
 def _input_plugin_helper(args: _InputPluginHelperArgs) -> List[AbstractTransaction]:
     input_plugin: AbstractInputPlugin = args.input_plugin
     package_name: str = args.package_name
+    country: AbstractCountry = args.country
     use_cache: bool = args.use_cache
     plugin_transactions: List[AbstractTransaction]
     if use_cache and input_plugin.cache_key() is not None:
@@ -195,11 +195,11 @@ def _input_plugin_helper(args: _InputPluginHelperArgs) -> List[AbstractTransacti
             plugin_transactions = cache
         else:
             LOGGER.info("Reading crypto data using plugin '%s'", package_name)
-            plugin_transactions = input_plugin.load()
+            plugin_transactions = input_plugin.load(country)
             input_plugin.save_to_cache(plugin_transactions)
     else:
         LOGGER.info("Reading crypto data using plugin '%s'", package_name)
-        plugin_transactions = input_plugin.load()
+        plugin_transactions = input_plugin.load(country)
 
     for transaction in plugin_transactions:
         if not isinstance(transaction, AbstractTransaction):

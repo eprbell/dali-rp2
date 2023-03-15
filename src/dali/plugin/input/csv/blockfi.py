@@ -19,6 +19,7 @@ import logging
 from csv import reader
 from typing import Dict, List, Optional
 
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
@@ -74,7 +75,7 @@ class InputPlugin(AbstractInputPlugin):
         self.__trade_csv_file: Optional[str] = trade_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         last_withdrawal_fee: Optional[RP2Decimal] = None
