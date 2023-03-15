@@ -100,11 +100,11 @@ EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400, timezone.utc)
 
 # Kraken CSV read Test
 KRAKEN_TIMESTAMP: datetime = datetime.fromtimestamp(1601855760, timezone.utc)
-KRAKEN_LOW: RP2Decimal = RP2Decimal("1.0003")
-KRAKEN_HIGH: RP2Decimal = RP2Decimal("1.0003")
-KRAKEN_OPEN: RP2Decimal = RP2Decimal("1.0003")
-KRAKEN_CLOSE: RP2Decimal = RP2Decimal("1.0003")
-KRAKEN_VOLUME: RP2Decimal = RP2Decimal("119.4206493")
+KRAKEN_LOW: RP2Decimal = RP2Decimal("1.5557")
+KRAKEN_HIGH: RP2Decimal = RP2Decimal("1.5556")
+KRAKEN_OPEN: RP2Decimal = RP2Decimal("1.5555")
+KRAKEN_CLOSE: RP2Decimal = RP2Decimal("1.5558")
+KRAKEN_VOLUME: RP2Decimal = RP2Decimal("15.15")
 
 _MS_IN_SECOND: int = 1000
 
@@ -403,8 +403,8 @@ class TestCcxtPlugin:
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
         mocker.patch.object(kraken_csv, "cache_key").return_value = "Test-" + kraken_csv.cache_key()
         mocker.patch.object(kraken_csv, "_Kraken__CACHE_DIRECTORY", "input/kraken_test")
-        if not os.path.exists("input/kraken_test"):
-            os.makedirs("input/kraken_test")
+        if not os.path.exists("output/kraken_test"):
+            os.makedirs("output/kraken_test")
         with open("input/USD_OHLCVT_test.zip", "rb") as file:
             mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
 

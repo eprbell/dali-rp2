@@ -25,7 +25,7 @@ from dali.cache import CACHE_DIR
 from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.csv.kraken import Kraken
 
-_CACHE_DIRECTORY: str = "input/kraken_test"
+_CACHE_DIRECTORY: str = "output/kraken_test"
 
 
 class TestKrakenCsvDownload:
@@ -56,7 +56,7 @@ class TestKrakenCsvDownload:
 
         # Test if proper price was retrieved and file was chunked
         assert test_bar
-        assert test_bar.low == RP2Decimal("1.0003")
+        assert test_bar.low == RP2Decimal("1.778")
         assert "USDTUSD_1594080000_5.csv.gz" in files
 
         test_bar = kraken_csv.find_historical_bar("USDT", "USD", datetime.fromtimestamp(1601683300))
@@ -64,4 +64,4 @@ class TestKrakenCsvDownload:
         # Check if price for longer time span was retrieved even though the timestamp doesn't exist in the csv
         # Also that proper price was retrieved from chunked files in the cache folder
         assert test_bar
-        assert test_bar.low == RP2Decimal("1.0001")
+        assert test_bar.low == RP2Decimal("1.6668")
