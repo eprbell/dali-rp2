@@ -84,7 +84,7 @@ _PAIR_END: str = "end"
 _MAX_MULTIPLIER: int = 500
 
 
-class PairStartEnd(NamedTuple):
+class _PairStartEnd(NamedTuple):
     end: int
     start: int
 
@@ -117,7 +117,7 @@ class Kraken:
         self.__google_api_key: str = google_api_key
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
-        self.__cached_pairs: Dict[str, PairStartEnd] = {}
+        self.__cached_pairs: Dict[str, _PairStartEnd] = {}
         self.__cache_loaded: bool = False
 
         if not path.exists(self.__CACHE_DIRECTORY):
@@ -127,7 +127,7 @@ class Kraken:
         return self.__CACHE_KEY
 
     def __load_cache(self) -> None:
-        result = cast(Dict[str, PairStartEnd], load_from_cache(self.cache_key()))
+        result = cast(Dict[str, _PairStartEnd], load_from_cache(self.cache_key()))
         self.__cached_pairs = result if result is not None else {}
 
     def __split_process(self, csv_file: str, chunk_size: int = _CHUNK_SIZE) -> Generator[Tuple[str, List[List[str]]], None, None]:
@@ -179,7 +179,7 @@ class Kraken:
                     csv_writer.writerow(row)
 
         if pair_start:
-            self.__cached_pairs[pair_duration] = PairStartEnd(start=pair_start, end=pair_end)
+            self.__cached_pairs[pair_duration] = _PairStartEnd(start=pair_start, end=pair_end)
 
     def _retrieve_cached_bar(self, base_asset: str, quote_asset: str, timestamp: int) -> Optional[HistoricalBar]:
         pair_name: str = base_asset + quote_asset
