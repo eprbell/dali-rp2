@@ -166,7 +166,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_csv_reader: Dict[str, Any] = {}
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
-        self.__csv_read_flag: Dict[str, bool] = {}
         if exchange_locked:
             self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
         else:
@@ -348,35 +347,29 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
-        if not self.__csv_read_flag.get(exchange + from_asset + to_asset):
-            if self.__exchange_csv_reader.get(exchange):
-                csv_reader = self.__exchange_csv_reader[exchange]
-            elif csv_pricing is not None:
-                self.__csv_read_flag[(exchange + from_asset + to_asset)] = True
-                csv_signature: Signature = signature(csv_pricing)
+        if self.__exchange_csv_reader.get(exchange):
+            csv_reader = self.__exchange_csv_reader[exchange]
+        elif csv_pricing is not None:
+            csv_signature: Signature = signature(csv_pricing)
 
-                # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
-                if _GOOGLE_API_KEY in csv_signature.parameters:
-                    if self.__google_api_key is not None:
-                        csv_reader = csv_pricing(self.__google_api_key)
-                    else:
-                        self.__logger.info(
-                            "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
-                        )
+            # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
+            if _GOOGLE_API_KEY in csv_signature.parameters:
+                if self.__google_api_key is not None:
+                    csv_reader = csv_pricing(self.__google_api_key)
                 else:
-                    csv_reader = csv_pricing()
+                    self.__logger.info(
+                        "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
+                    )
+            else:
+                csv_reader = csv_pricing()
 
         if csv_reader:
-            csv_bars: Dict[datetime, HistoricalBar] = csv_reader.get_historical_bars_for_pair(from_asset, to_asset)
-            for epoch, csv_bar in csv_bars.items():
-                self._add_bar_to_cache(
-                    key=AssetPairAndTimestamp(epoch, from_asset, to_asset, exchange),
-                    historical_bar=csv_bar,
-                )
-            self.save_historical_price_cache()
-            self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
+            csv_bar: Optional[HistoricalBar] = csv_reader.find_historical_bar(from_asset, to_asset, timestamp)
+
+            if csv_bar:
+                self._add_bar_to_cache(key=AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange), historical_bar=csv_bar)
+
             historical_bar = self._get_bar_from_cache(key)
-            self.__csv_read_flag[(exchange + from_asset + to_asset)] = True
             self.__exchange_csv_reader[exchange] = csv_reader
             if historical_bar is not None:
                 self.__logger.debug("Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange)

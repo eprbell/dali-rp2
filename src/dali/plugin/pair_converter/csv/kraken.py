@@ -15,12 +15,14 @@
 # Kraken CSV format: (epoch) timestamp, open, high, low, close, volume, trades
 
 import logging
-from csv import reader
+from csv import reader, writer
 from datetime import datetime, timedelta, timezone
+from gzip import open as gopen
 from io import BytesIO
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
-from typing import Any, Dict, Iterable, List, Optional
+from os import makedirs, path
+from typing import Any, Dict, Generator, List, NamedTuple, Optional, Tuple, cast
 from zipfile import ZipFile
 
 import requests
@@ -30,6 +32,7 @@ from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
 
+from dali.cache import load_from_cache, save_to_cache
 from dali.historical_bar import HistoricalBar
 
 # Google Drive parameters
@@ -59,12 +62,39 @@ _CONFIRM: str = "confirm"
 _MEDIA: str = "media"
 _QUERY: str = "q"
 
+# Time periods
 _MS_IN_SECOND: int = 1000
+_SECONDS_IN_DAY: int = 86400
+_CHUNK_SIZE: int = _SECONDS_IN_DAY * 30
+_SECONDS_IN_MINUTE: int = 60
+
+# Time in minutes
+_MINUTE: str = "1"
+_FIVE_MINUTE: str = "5"
+_FIFTEEN_MINUTE: str = "15"
+_ONE_HOUR: str = "60"
+_TWELVE_HOUR: str = "720"
+_ONE_DAY: str = "1440"
+_TIME_GRANULARITY: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _TWELVE_HOUR, _ONE_DAY]
+
+# Chunking variables
+_PAIR_START: str = "start"
+_PAIR_MIDDLE: str = "middle"
+_PAIR_END: str = "end"
+_MAX_MULTIPLIER: int = 500
+
+
+class _PairStartEnd(NamedTuple):
+    end: int
+    start: int
 
 
 class Kraken:
 
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
+
+    __CACHE_DIRECTORY: str = ".dali_cache/kraken/"
+    __CACHE_KEY: str = "Kraken-csv-download"
 
     __TIMEOUT: int = 30
     __THREAD_COUNT: int = 3
@@ -87,9 +117,132 @@ class Kraken:
         self.__google_api_key: str = google_api_key
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
+        self.__cached_pairs: Dict[str, _PairStartEnd] = {}
+        self.__cache_loaded: bool = False
 
-    def get_historical_bars_for_pair(self, base_asset: str, quote_asset: str) -> Dict[datetime, HistoricalBar]:
-        bars: Dict[datetime, HistoricalBar] = {}
+        if not path.exists(self.__CACHE_DIRECTORY):
+            makedirs(self.__CACHE_DIRECTORY)
+
+    def cache_key(self) -> str:
+        return self.__CACHE_KEY
+
+    def __load_cache(self) -> None:
+        result = cast(Dict[str, _PairStartEnd], load_from_cache(self.cache_key()))
+        self.__cached_pairs = result if result is not None else {}
+
+    def __split_process(self, csv_file: str, chunk_size: int = _CHUNK_SIZE) -> Generator[Tuple[str, List[List[str]]], None, None]:
+        chunk: List[List[str]] = []
+
+        lines = reader(csv_file.splitlines())
+        position = _PAIR_START
+        next_timestamp: Optional[int] = None
+
+        for line in lines:
+            if next_timestamp is None:
+                next_timestamp = ((int(line[self.__TIMESTAMP_INDEX]) + chunk_size) // chunk_size) * chunk_size
+
+            if int(line[self.__TIMESTAMP_INDEX]) % chunk_size == 0 or int(line[self.__TIMESTAMP_INDEX]) > next_timestamp:
+                yield position, chunk
+                if position == _PAIR_START:
+                    position = _PAIR_MIDDLE
+                chunk = []
+                next_timestamp += chunk_size
+            chunk.append(line)
+        if chunk:
+            position = _PAIR_END
+            yield position, chunk
+
+    def _split_chunks_size_n(self, file_name: str, csv_file: str, chunk_size: int = _CHUNK_SIZE) -> None:
+
+        pair, duration_in_minutes = file_name.strip(".csv").split("_", 1)
+        chunk_size *= min(int(duration_in_minutes), _MAX_MULTIPLIER)
+        file_timestamp: str
+        pair_start: Optional[int] = None
+        pair_end: int
+        pair_duration: str = pair + duration_in_minutes
+
+        for position, chunk in self.__split_process(csv_file, chunk_size):
+            file_timestamp = str((int(chunk[0][self.__TIMESTAMP_INDEX])) // chunk_size * chunk_size)
+            if position == _PAIR_END:
+                pair_end = int(chunk[-1][self.__TIMESTAMP_INDEX])
+                if pair_start is None:
+                    pair_start = int(chunk[0][self.__TIMESTAMP_INDEX])
+            elif position == _PAIR_START:
+                pair_start = int(chunk[0][self.__TIMESTAMP_INDEX])
+
+            chunk_filename: str = f'{pair}_{file_timestamp}_{duration_in_minutes}.{"csv.gz"}'
+            chunk_filepath: str = path.join(self.__CACHE_DIRECTORY, chunk_filename)
+
+            with gopen(chunk_filepath, "wt", encoding="utf-8", newline="") as chunk_file:
+                csv_writer = writer(chunk_file)
+                for row in chunk:
+                    csv_writer.writerow(row)
+
+        if pair_start:
+            self.__cached_pairs[pair_duration] = _PairStartEnd(start=pair_start, end=pair_end)
+
+    def _retrieve_cached_bar(self, base_asset: str, quote_asset: str, timestamp: int) -> Optional[HistoricalBar]:
+        pair_name: str = base_asset + quote_asset
+
+        retry_count: int = 0
+
+        while retry_count < len(_TIME_GRANULARITY):
+            if (
+                timestamp < self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start
+                or timestamp > self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].end
+            ):
+                self.__logger.debug(
+                    "Out of range - %s < %s or %s > %s",
+                    timestamp,
+                    self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start,
+                    timestamp,
+                    self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].end,
+                )
+                retry_count += 1
+                continue
+
+            duration_chunk_size = _CHUNK_SIZE * min(int(_TIME_GRANULARITY[retry_count]), _MAX_MULTIPLIER)
+            file_timestamp: int = (timestamp // duration_chunk_size) * duration_chunk_size
+
+            # Floor the timestamp to find the price
+            duration_timestamp: int = (timestamp // (int(_TIME_GRANULARITY[retry_count]) * _SECONDS_IN_MINUTE)) * (
+                int(_TIME_GRANULARITY[retry_count]) * _SECONDS_IN_MINUTE
+            )
+
+            file_name: str = f"{base_asset + quote_asset}_{file_timestamp}_{_TIME_GRANULARITY[retry_count]}.csv.gz"
+            file_path: str = path.join(self.__CACHE_DIRECTORY, file_name)
+            self.__logger.debug("Retrieving %s -> %s at %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp)
+            with gopen(file_path, "rt") as file:
+                rows = reader(file)
+                for row in rows:
+                    if int(row[self.__TIMESTAMP_INDEX]) == duration_timestamp:
+                        return HistoricalBar(
+                            duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
+                            timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
+                            open=RP2Decimal(row[self.__OPEN]),
+                            high=RP2Decimal(row[self.__HIGH]),
+                            low=RP2Decimal(row[self.__LOW]),
+                            close=RP2Decimal(row[self.__CLOSE]),
+                            volume=RP2Decimal(row[self.__VOLUME]),
+                        )
+
+            retry_count += 1
+
+        return None
+
+    def find_historical_bar(self, base_asset: str, quote_asset: str, timestamp: datetime) -> Optional[HistoricalBar]:
+        epoch_timestamp = int(timestamp.timestamp())
+        self.__logger.debug("Retrieving bar for %s%s at %s", base_asset, quote_asset, epoch_timestamp)
+
+        if not self.__cache_loaded:
+            self.__logger.debug("Loading cache for Kraken CSV pair converter.")
+            self.__load_cache()
+
+        # Attempt to load smallest duration
+        if self.__cached_pairs.get(base_asset + quote_asset + "1"):
+            self.__logger.debug("Retrieving cached bar for %s, %s at %s", base_asset, quote_asset, epoch_timestamp)
+            return self._retrieve_cached_bar(base_asset, quote_asset, epoch_timestamp)
+
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
         self.__logger.info("Attempting to load %s from Kraken Google Drive.", base_file)
@@ -101,7 +254,7 @@ class Kraken:
                 all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
                 if len(all_timespans_for_pair) == 0:
                     self.__logger.debug("Market not found in Kraken files. Skipping file read.")
-                    return bars
+                    return None
 
                 csv_files: Dict[str, str] = {}
                 for file_name in all_timespans_for_pair:
@@ -109,29 +262,12 @@ class Kraken:
                     csv_files[file_name] = zipped_ohlcvt.read(file_name).decode(encoding="utf-8")
 
                 with ThreadPool(self.__THREAD_COUNT) as pool:
-                    processing_result_list: List[Dict[int, List[HistoricalBar]]] = pool.starmap(
-                        self._process_file, zip(list(csv_files.keys()), list(csv_files.values()))
-                    )
+                    pool.starmap(self._split_chunks_size_n, zip(list(csv_files.keys()), list(csv_files.values())))
 
-            # Sort the bars by duration, largest duration first
-            sorted_bars: Iterable[Dict[int, List[HistoricalBar]]] = reversed(sorted(processing_result_list, key=lambda x: list(x.keys())[0]))
+            save_to_cache(self.cache_key(), self.__cached_pairs)
+            return self._retrieve_cached_bar(base_asset, quote_asset, epoch_timestamp)
 
-            timed_bars: Dict[datetime, HistoricalBar] = {}
-
-            # Start with longest duration and replace it with smaller durations
-            for duration_bars in sorted_bars:
-                bars_for_duration = list(duration_bars.values())[0]
-                for hbar in bars_for_duration:
-                    # create keys for every minute starting with longest duration
-                    start_epoch: int = int(hbar.timestamp.timestamp())
-                    end_epoch: int = int((hbar.timestamp + timedelta(minutes=list(duration_bars.keys())[0])).timestamp())
-                    while start_epoch < end_epoch:
-                        timed_bars[datetime.fromtimestamp(start_epoch, timezone.utc)] = hbar
-                        start_epoch += 60
-
-            return timed_bars
-
-        return bars
+        return None
 
     # isolated in order to be mocked
     def _google_file_to_bytes(self, file_name: str) -> Optional[bytes]:
@@ -234,25 +370,3 @@ class Kraken:
             raise RP2RuntimeError("JSON decode error") from exc
 
         return file_response.content
-
-    def _process_file(self, file_name: str, csv_file: str) -> Dict[int, List[HistoricalBar]]:
-        bars: List[HistoricalBar] = []
-
-        duration_in_minutes: str = file_name.split("_", 1)[1].strip(".csv")
-
-        lines = reader(csv_file.splitlines())
-
-        for line in lines:
-            bars.append(
-                HistoricalBar(
-                    duration=timedelta(minutes=int(duration_in_minutes)),
-                    timestamp=datetime.fromtimestamp(int(line[self.__TIMESTAMP_INDEX]), timezone.utc),
-                    open=RP2Decimal(line[self.__OPEN]),
-                    high=RP2Decimal(line[self.__HIGH]),
-                    low=RP2Decimal(line[self.__LOW]),
-                    close=RP2Decimal(line[self.__CLOSE]),
-                    volume=RP2Decimal(line[self.__VOLUME]),
-                )
-            )
-
-        return {int(duration_in_minutes): bars}
