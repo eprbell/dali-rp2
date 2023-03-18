@@ -14,6 +14,12 @@
 
 # RP2 Change Log
 
+## 0.6.4
+* added new RP2 Input data loader plugin, which can read RP2 input format data back into DaLI
+* improvements to Kraken CSV pair converter plugin: price data files are now downloaded locally and chunked to avoid excessive memory use
+* improvements to Coinbase plugin: added support for advanced_trade_fill, cardspend and cardbuyback
+* various smaller fixes and improvements
+
 ## 0.6.3
 * added CCXT pair converter subclasses that are fixed to one exchange (Kraken, Binance)
 * added fiat deposit support to Bitbank plugin
