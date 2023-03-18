@@ -20,7 +20,6 @@
 # CCXT documentation:
 # https://docs.ccxt.com/en/latest/index.html
 
-import pytz
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Set
@@ -54,44 +53,44 @@ from rp2.rp2_error import RP2RuntimeError
 
 
 # keywords
-_OUT: str = "out"
-_IN: str = "in"
-_INTRA: str = 'intra'
-_RESULT: str = 'result'
-_COUNT: str = 'count'
-_LEDGER: str = 'ledger'
-_TRADES: str = 'trades'
-_OFFSET: str = 'ofs'
-_TYPE: str = 'type'
-_REFID: str = 'refid'
-_PAIR: str = 'pair'
-_QUOTE: str = 'quote'
-_TIMESTAMP: str = 'time'
-_FEE: str = 'fee'
+_AMOUNT: str = 'amount'
 _ASSET: str = 'asset'
 _BASE: str = 'base'
 _BASE_ID: str = 'baseId'
-_AMOUNT: str = 'amount'
 _COST: str = 'cost'
-_PRICE: str = 'price'
-_WITHDRAWAL: str = 'withdrawal'
-_DEPOSIT: str = 'deposit'
-_MARGIN: str = 'margin'
-_TRADE: str = 'trade'
-_ROLLOVER: str = 'rollover'
-_TRANSFER: str = 'transfer'
-_SETTLED: str = 'settled'
+_COUNT: str = 'count'
 _CREDIT: str = 'credit'
-_STAKING: str = 'staking'
+_DEPOSIT: str = 'deposit'
+_FEE: str = 'fee'
+_IN: str = "in"
+_INTRA: str = 'intra'
+_LEDGER: str = 'ledger'
+_MARGIN: str = 'margin'
+_OFFSET: str = 'ofs'
+_OUT: str = "out"
+_PAIR: str = 'pair'
+_PRICE: str = 'price'
+_QUOTE: str = 'quote'
+_REFID: str = 'refid'
+_RESULT: str = 'result'
+_ROLLOVER: str = 'rollover'
 _SALE: str = 'sale'
+_SETTLED: str = 'settled'
+_STAKING: str = 'staking'
+_TIMESTAMP: str = 'time'
+_TRADE: str = 'trade'
+_TRADES: str = 'trades'
+_TRANSFER: str = 'transfer'
+_TYPE: str = 'type'
+_WITHDRAWAL: str = 'withdrawal'
 
 # Record Limits
 _TRADE_RECORD_LIMIT: int = 50
 
-KRAKEN_FIAT_SET: Set[str] = {'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'USD',
+_KRAKEN_FIAT_SET: Set[str] = {'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'USD',
                              'USDC', 'USDT', 'ZAUD', 'ZCAD', 'ZEUR', 'ZGBP', 'ZJPY', 'ZUSD'}
 
-KRAKEN_FIAT_LIST = list(set(list(KRAKEN_FIAT_SET) + list(_FIAT_SET)))
+_KRAKEN_FIAT_LIST = list(set(list(_KRAKEN_FIAT_SET) + list(_FIAT_SET)))
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
@@ -190,9 +189,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def load(self) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
-        return self._compute_tx_set(trade_history, ledger)
+        return self._compute_transaction_set(trade_history, ledger)
 
-    def _compute_tx_set(self, trade_history, ledger) -> List[AbstractTransaction]:
+    def _compute_transaction_set(self, trade_history, ledger) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         unhandled_types: Dict[str, str] = {}
@@ -202,7 +201,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             timestamp_value: str = self._rp2_timestamp_from_seconds_epoch(record[_TIMESTAMP])
 
-            is_fiat_asset: bool = record[_ASSET] in KRAKEN_FIAT_LIST
+            is_fiat_asset: bool = record[_ASSET] in _KRAKEN_FIAT_LIST
 
             amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
             asset_base: str = self.base_id_to_base[record[_ASSET]]
@@ -239,7 +238,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
 
                 asset_quote: str = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]][_QUOTE]
-                is_quote_asset_fiat: bool = asset_quote in KRAKEN_FIAT_LIST
+                is_quote_asset_fiat: bool = asset_quote in _KRAKEN_FIAT_LIST
 
                 spot_price: str = trade_history[record[_REFID]][_PRICE] if is_quote_asset_fiat else Keyword.UNKNOWN.value
                 transaction_type: str = Keyword.BUY.value if RP2Decimal(record[_AMOUNT]) > ZERO else Keyword.SELL.value
@@ -354,20 +353,15 @@ class InputPlugin(AbstractCcxtInputPlugin):
             elif record[_TYPE] == _SETTLED:
                 # ignorable in terms of in/out/intra
                 pass
-            elif record[_TYPE] == _CREDIT:
-                # 'credit not implemented'
-                pass
-            elif record[_TYPE] == _STAKING:
-                # 'staking not implemented'
-                pass
-            elif record[_TYPE] == _SALE:
-                # 'sale not implemented'
-                pass
+            elif record[_TYPE] == _CREDIT or record[_TYPE] == _STAKING or record[_TYPE] == _SALE:
+                self.__logger.error(f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s",
+                                    raw_data, self.ISSUES_URL)
             else:
+                self.__logger.error(f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s",
+                                    raw_data, self.ISSUES_URL)
                 unhandled_types.update({record[_TYPE]: key})
-                raise RP2RuntimeError(f"Unimplemented: record_type={record[_TYPE]}")
 
-            self._logger.debug(f"unhandled types of the ledger={unhandled_types}")
+            self._logger.debug(f"unknown types of the ledger={unhandled_types}")
 
         return result
 
