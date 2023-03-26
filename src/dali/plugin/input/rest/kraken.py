@@ -178,7 +178,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         return result
 
-    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry=None) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
@@ -352,7 +352,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                                     raw_data, self.ISSUES_URL)
                 unhandled_types.update({record[_TYPE]: key})
 
-            self._logger.debug(f"unknown types of the ledger=%s", unhandled_types)
+            self.__logger.debug(f"unknown types of the ledger=%s", unhandled_types)
 
         return result
 
