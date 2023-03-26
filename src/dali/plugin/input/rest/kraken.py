@@ -352,7 +352,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                                     raw_data, self.ISSUES_URL)
                 unhandled_types.update({record[_TYPE]: key})
 
-            self.__logger.debug(f"unknown types of the ledger=%s", unhandled_types)
+            self.__logger.debug(f"unknown types of the ledger=%s", str(unhandled_types))
 
         return result
 
