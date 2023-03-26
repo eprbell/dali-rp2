@@ -25,6 +25,10 @@ from datetime import datetime
 from typing import Dict, List, Optional, Union, Set
 
 from ccxt import Exchange, kraken
+from rp2.logger import create_logger
+from rp2.abstract_country import AbstractCountry
+from rp2.rp2_decimal import RP2Decimal, ZERO
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_ccxt_input_plugin import (
     AbstractCcxtInputPlugin,
@@ -32,25 +36,12 @@ from dali.abstract_ccxt_input_plugin import (
 from dali.ccxt_pagination import (
     AbstractPaginationDetailSet,
 )
-from dali.cache import (
-    load_from_cache,
-    save_to_cache
-)
-from dali.configuration import (
-    Keyword,
-    _FIAT_SET
-)
-from rp2.rp2_decimal import (
-    RP2Decimal,
-    ZERO
-)
-from rp2.logger import create_logger
 from dali.abstract_transaction import AbstractTransaction
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-from rp2.rp2_error import RP2RuntimeError
-
+from dali.configuration import Keyword, _FIAT_SET
+from dali.cache import load_from_cache, save_to_cache
 
 # keywords
 _AMOUNT: str = 'amount'
@@ -187,7 +178,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         return result
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
@@ -361,7 +352,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                                     raw_data, self.ISSUES_URL)
                 unhandled_types.update({record[_TYPE]: key})
 
-            self._logger.debug(f"unknown types of the ledger={unhandled_types}")
+            self._logger.debug(f"unknown types of the ledger=%s", unhandled_types)
 
         return result
 
