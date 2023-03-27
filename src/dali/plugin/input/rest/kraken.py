@@ -21,8 +21,9 @@
 # https://docs.ccxt.com/en/latest/index.html
 
 import logging
+import us
 from datetime import datetime
-from typing import Dict, List, Optional, Union, Set
+from typing import Dict, List, Optional, Union, Set, Tuple, Any
 
 from ccxt import Exchange, kraken
 from rp2.logger import create_logger
@@ -110,7 +111,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self._client.load_markets()
         self._client.markets_by_id.update({'BSVUSD': {'id': 'BSVUSD', _BASE_ID: 'BSV', _BASE: 'BSV', _QUOTE: 'USD'}})
         self.base_id_to_base: Dict[str, str] = {value[_BASE_ID]: value[_BASE] for key, value in self._client.markets_by_id.items()}
-        self.use_cache: bool = use_cache
+        self.use_cache: Optional[bool] = use_cache
 
     def exchange_name(self) -> str:
         return self.__EXCHANGE_NAME
@@ -150,7 +151,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     ) -> None:
         pass
 
-    def _gather_api_data(self):
+    def _gather_api_data(self) -> Tuple[Any, Any]:
         loaded_cache = load_from_cache(self.__CACHE_FILE)
         if self.use_cache and loaded_cache:
             return loaded_cache
@@ -178,11 +179,11 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         return result
 
-    def load(self, country: AbstractCountry=None) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry = us.US()) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
-    def _compute_transaction_set(self, trade_history, ledger) -> List[AbstractTransaction]:
+    def _compute_transaction_set(self, trade_history: Dict[str, Dict[str, Union[str, int, None, List[str]]]], ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]]) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         unhandled_types: Dict[str, str] = {}
@@ -223,7 +224,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 continue
 
             crypto_fee: str = '0' if is_fiat_asset else record[_FEE]
-            fiat_fee: str = record[_FEE] if is_fiat_asset else None
+            fiat_fee: Optional[str] = record[_FEE] if is_fiat_asset else None
 
             if record[_TYPE] == _TRADE and not is_fiat_asset:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
@@ -231,13 +232,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 asset_quote: str = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]][_QUOTE]
                 is_quote_asset_fiat: bool = asset_quote in _KRAKEN_FIAT_LIST
 
-                spot_price: str = trade_history[record[_REFID]][_PRICE] if is_quote_asset_fiat else Keyword.UNKNOWN.value
+                spot_price = trade_history[record[_REFID]][_PRICE] if is_quote_asset_fiat else Keyword.UNKNOWN.value
                 transaction_type: str = Keyword.BUY.value if RP2Decimal(record[_AMOUNT]) > ZERO else Keyword.SELL.value
 
                 unique_id: str = Keyword.UNKNOWN.value if spot_price is Keyword.UNKNOWN.value else key
 
                 if RP2Decimal(record[_AMOUNT]) > ZERO:
-                    crypto_in = str(amount)
+                    crypto_in: str = str(amount)
                     fiat_in_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
                         trade_history[record[_REFID]][_FEE]))
                     fiat_in_with_fee: str = trade_history[record[_REFID]][_COST]
@@ -288,10 +289,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
             elif record[_TYPE] == _MARGIN or record[_TYPE] == _ROLLOVER:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
 
-                spot_price: str = Keyword.UNKNOWN.value
-                crypto_out_no_fee: str = str(amount)
-                crypto_out_with_fee: str = str(amount + RP2Decimal(record[_FEE]))
-                fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
+                spot_price = Keyword.UNKNOWN.value
+                crypto_out_no_fee = str(amount)
+                crypto_out_with_fee = str(amount + RP2Decimal(record[_FEE]))
+                fiat_out_no_fee = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
                     trade_history[record[_REFID]][_FEE]))
 
                 result.append(
@@ -314,10 +315,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
                     )
                 )
             elif record[_TYPE] == _TRANSFER:
-                spot_price: str = Keyword.UNKNOWN.value
-                crypto_in: str = str(amount)
-                fiat_in_no_fee: str = '0'
-                fiat_in_with_fee: str = '0'
+                spot_price = Keyword.UNKNOWN.value
+                crypto_in = str(amount)
+                fiat_in_no_fee = '0'
+                fiat_in_with_fee = '0'
 
                 result.append(
                     InTransaction(
