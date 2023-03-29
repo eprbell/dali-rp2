@@ -151,7 +151,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         pass
 
     def _gather_api_data(self) -> Tuple[Any, Any]:
-        loaded_cache = load_from_cache(self.__CACHE_FILE)
+        loaded_cache: Tuple[Any, Any] = load_from_cache(self.__CACHE_FILE)
         if self.use_cache and loaded_cache:
             return loaded_cache
 
@@ -190,14 +190,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         unhandled_types: Dict[str, str] = {}
         for key in ledger:
-            record: Dict[str, str] = ledger[key]
+            record: Dict[str, Union[str, int, None, List[str]]] = ledger[key]
             self.__logger.debug("Ledger record: %s", record)
 
             timestamp_value: str = self._rp2_timestamp_from_seconds_epoch(record[_TIMESTAMP])
 
             is_fiat_asset: bool = record[_ASSET] in _KRAKEN_FIAT_LIST
 
-            amount: RP2Decimal = abs(RP2Decimal(record[_AMOUNT]))
+            amount: RP2Decimal = RP2Decimal(abs(RP2Decimal(record[_AMOUNT])))
             asset_base: str = self.base_id_to_base[record[_ASSET]]
             raw_data = str(record)
 
@@ -234,16 +234,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 asset_quote: str = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]][_QUOTE]
                 is_quote_asset_fiat: bool = asset_quote in _KRAKEN_FIAT_LIST
 
-                spot_price = trade_history[record[_REFID]][_PRICE] if is_quote_asset_fiat else Keyword.UNKNOWN.value
+                spot_price = str(trade_history[record[_REFID]][_PRICE]) if is_quote_asset_fiat else Keyword.UNKNOWN.value
                 transaction_type: str = Keyword.BUY.value if RP2Decimal(record[_AMOUNT]) > ZERO else Keyword.SELL.value
 
                 unique_id: str = Keyword.UNKNOWN.value if spot_price is Keyword.UNKNOWN.value else key
 
                 if RP2Decimal(record[_AMOUNT]) > ZERO:
                     crypto_in: str = str(amount)
-                    fiat_in_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                        trade_history[record[_REFID]][_FEE]))
-                    fiat_in_with_fee: str = trade_history[record[_REFID]][_COST]
+                    fiat_in_no_fee: str = str(RP2Decimal(str(trade_history[record[_REFID]][_COST])) - RP2Decimal(str(
+                        trade_history[record[_REFID]][_FEE])))
+                    fiat_in_with_fee: str = str(trade_history[record[_REFID]][_COST])
                     result.append(
                         InTransaction(
                             plugin=self.__PLUGIN_NAME,
@@ -266,8 +266,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 else:
                     crypto_out_no_fee: str = str(amount)
                     crypto_out_with_fee: str = str(amount + RP2Decimal(record[_FEE]))
-                    fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                        trade_history[record[_REFID]][_FEE]))
+                    fiat_out_no_fee: str = str(RP2Decimal(str(trade_history[record[_REFID]][_COST])) - RP2Decimal(
+                        str(trade_history[record[_REFID]][_FEE])))
 
                     result.append(
                         OutTransaction(
@@ -294,8 +294,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 spot_price = Keyword.UNKNOWN.value
                 crypto_out_no_fee = str(amount)
                 crypto_out_with_fee = str(amount + RP2Decimal(record[_FEE]))
-                fiat_out_no_fee = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                    trade_history[record[_REFID]][_FEE]))
+                fiat_out_no_fee = str(RP2Decimal(str(trade_history[record[_REFID]][_COST])) - RP2Decimal(
+                    str(trade_history[record[_REFID]][_FEE])))
 
                 result.append(
                     OutTransaction(
@@ -410,7 +410,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #     },
         # }
 
-        trade_history: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = response[_RESULT][_TRADES]
+        trade_history: Dict[str, Any] = response[_RESULT][_TRADES]
 
         for key, value in trade_history.items():
             result.update({key: value})
@@ -449,7 +449,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #     },
         # }
 
-        ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = response[_RESULT][_LEDGER]
+        ledger: Dict[str, Any] = response[_RESULT][_LEDGER]
 
         for key, value in ledger.items():
             result.update({key: value})
