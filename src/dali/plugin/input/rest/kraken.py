@@ -21,7 +21,6 @@
 # https://docs.ccxt.com/en/latest/index.html
 
 import logging
-import us
 from datetime import datetime
 from typing import Dict, List, Optional, Union, Set, Tuple, Any
 
@@ -179,11 +178,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         return result
 
-    def load(self, country: AbstractCountry = us.US()) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry = None) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
-    def _compute_transaction_set(self, trade_history: Dict[str, Dict[str, Union[str, int, None, List[str]]]], ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]]) -> List[AbstractTransaction]:
+    def _compute_transaction_set(self,
+                                 trade_history: Dict[str, Dict[str, Union[str, int, None, List[str]]]],
+                                 ledger: Dict[str, Dict[str, Union[str, int, None, List[str]]]]
+                                 ) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         unhandled_types: Dict[str, str] = {}
