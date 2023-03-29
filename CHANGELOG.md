@@ -14,6 +14,9 @@
 
 # RP2 Change Log
 
+## 0.6.5
+* new Trezor CSV plugin supporting the latest format from Trezor Suite
+
 ## 0.6.4
 * added new RP2 Input data loader plugin, which can read RP2 input format data back into DaLI
 * improvements to Kraken CSV pair converter plugin: price data files are now downloaded locally and chunked to avoid excessive memory use
