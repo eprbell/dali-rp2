@@ -562,7 +562,7 @@ class InputPlugin(AbstractInputPlugin):
             crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else Keyword.UNKNOWN.value
             if amount < ZERO:
                 if ( # pylint: disable=too-many-boolean-expressions
-                    _TO in transaction 
+                    _TO in transaction
                     and transaction[_TO] is not None
                     and _RESOURCE in transaction[_TO]
                     and transaction[_TO][_RESOURCE] == _USER
