@@ -22,7 +22,7 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Union, Set, Tuple, Any
+from typing import Dict, List, Optional, Union, Set, Tuple, Any, Iterable
 
 from ccxt import Exchange, kraken
 from rp2.logger import create_logger
@@ -197,11 +197,11 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             is_fiat_asset: bool = record[_ASSET] in _KRAKEN_FIAT_LIST
 
-            amount: RP2Decimal = RP2Decimal(abs(RP2Decimal(record[_AMOUNT])))
+            amount: RP2Decimal = RP2Decimal(abs(RP2Decimal(str(record[_AMOUNT]))))
             asset_base: str = self.base_id_to_base[record[_ASSET]]
             raw_data = str(record)
 
-            if record[_TYPE] == _WITHDRAWAL or record[_TYPE] == _DEPOSIT:
+            if record[_TYPE] in {_WITHDRAWAL, _DEPOSIT}:
                 is_deposit: bool = record[_TYPE] == _DEPOSIT
                 is_withdrawal: bool = record[_TYPE] == _WITHDRAWAL
                 spot_price: str = Keyword.UNKNOWN.value
@@ -288,7 +288,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             notes=key,
                         )
                     )
-            elif record[_TYPE] == _MARGIN or record[_TYPE] == _ROLLOVER:
+            elif record[_TYPE] in {_MARGIN, _ROLLOVER}:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
 
                 spot_price = Keyword.UNKNOWN.value
@@ -347,9 +347,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
             elif record[_TYPE] == _SETTLED:
                 # ignorable in terms of in/out/intra
                 pass
-            elif record[_TYPE] == _CREDIT or record[_TYPE] == _STAKING or record[_TYPE] == _SALE:
-                self.__logger.error(f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s",
-                                    raw_data, self.ISSUES_URL)
             else:
                 self.__logger.error(f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s",
                                     raw_data, self.ISSUES_URL)
@@ -366,7 +363,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _process_trade_history(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
         result: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         params: Dict[str, Union[str, int]] = {_OFFSET: index}
-        response = self._safe_api_call(
+        response: Iterable[Dict[str, Union[str, float]]] = self._safe_api_call(
                     self._client.private_post_tradeshistory,
                     # self._client.fetch_my_trades, # UNIFIED CCXT API
                     {
@@ -419,7 +416,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _process_ledger(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
         result: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         params: Dict[str, Union[str, int]]  = {_OFFSET: index}
-        response = self._safe_api_call(
+        response: Iterable[Dict[str, Union[str, float]]] = self._safe_api_call(
                     self._client.private_post_ledgers,
                     # self._client.fetch_ledger, # UNIFIED CCXT API
                     # self._client.fetchLedger,  # UNIFIED CCXT API
