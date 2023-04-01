@@ -790,8 +790,8 @@ class InputPlugin(AbstractInputPlugin):
             fiat_in_no_fee: Optional[str] = None
             fiat_in_with_fee: Optional[str] = None
             if native_amount >= self.__MINIMUM_FIAT_PRECISION:
-                fiat_in_no_fee = str(native_amount - fiat_fee)
-                fiat_in_with_fee = str(native_amount)
+                fiat_in_no_fee = str(native_amount)
+                fiat_in_with_fee = str(native_amount + fiat_fee)
 
             in_transaction: InTransaction = InTransaction(
                 plugin=self.__COINBASE,
