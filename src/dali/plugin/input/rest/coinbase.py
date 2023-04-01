@@ -563,6 +563,8 @@ class InputPlugin(AbstractInputPlugin):
             if amount < ZERO:
                 if (
                     _TO in transaction
+                    and transaction[_TO] is not None
+                    and _RESOURCE in transaction[_TO]
                     and transaction[_TO][_RESOURCE] == _USER
                     and transaction_network[_STATUS] == _OFF_BLOCKCHAIN
                     and _SUBTITLE in transaction[_DETAILS]
