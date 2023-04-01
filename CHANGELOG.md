@@ -14,8 +14,9 @@
 
 # RP2 Change Log
 
-## 0.6.6
-* fixed bug in Coinbase data loader: advanced trade buy logic was not accounting for fee correctly
+## 0.6.7
+* Coinbase data loader: fixed bug in advanced trade buy logic was not accounting for fee correctly
+* Coinbase data loader: added support for moving coins into staking pool (#132)
 
 ## 0.6.5
 * new Trezor CSV plugin supporting the latest format from Trezor Suite
