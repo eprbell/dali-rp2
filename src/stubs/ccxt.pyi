@@ -71,8 +71,10 @@ class huobi(Exchange):
 class kraken(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
-    def private_post_ledger(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
-    def private_post_trade_history(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    markets_by_id: Dict[str, Dict[str, str]]
+    def load_markets(self) -> Any: ... # type: ignore
+    def private_post_ledgers(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def private_post_tradeshistory(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def getMarkets(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
 
 class liquid(Exchange):

@@ -363,7 +363,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _process_trade_history(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
         result: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         params: Dict[str, Union[str, int]] = {_OFFSET: index}
-        response: Iterable[Dict[str, Union[str, float]]] = self._safe_api_call(
+        response: Any = self._safe_api_call(
                     self._client.private_post_tradeshistory,
                     # self._client.fetch_my_trades, # UNIFIED CCXT API
                     {
@@ -407,7 +407,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #     },
         # }
 
-        trade_history: Dict[str, Any] = response[_RESULT][_TRADES]
+        trade_history: Any = response[_RESULT][_TRADES]
 
         for key, value in trade_history.items():
             result.update({key: value})
@@ -416,7 +416,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     def _process_ledger(self, index: int = 0) -> Dict[str, Dict[str, Union[str, int, None, List[str]]]]:
         result: Dict[str, Dict[str, Union[str, int, None, List[str]]]] = {}
         params: Dict[str, Union[str, int]]  = {_OFFSET: index}
-        response: Iterable[Dict[str, Union[str, float]]] = self._safe_api_call(
+        response: Any = self._safe_api_call(
                     self._client.private_post_ledgers,
                     # self._client.fetch_ledger, # UNIFIED CCXT API
                     # self._client.fetchLedger,  # UNIFIED CCXT API
@@ -446,7 +446,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #     },
         # }
 
-        ledger: Dict[str, Any] = response[_RESULT][_LEDGER]
+        ledger: Any = response[_RESULT][_LEDGER]
 
         for key, value in ledger.items():
             result.update({key: value})
