@@ -22,7 +22,7 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Union, Set, Tuple, Any, Iterable
+from typing import Dict, List, Optional, Union, Set, Tuple, Any
 
 from ccxt import Exchange, kraken
 from rp2.logger import create_logger
