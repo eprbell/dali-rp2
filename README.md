@@ -59,7 +59,7 @@ Note that DaLI has RP2 as a dependency, so installing DaLI causes RP2 to be inst
 
 **IMPORTANT DISCLAIMER**:
 * DaLI offers no guarantee of correctness (read the [license](https://github.com/eprbell/dali-rp2/tree/main/LICENSE)): always verify results with the help of a tax professional.
-* The author of DaLI and RP2 is not a tax professional, but has used RP2 personally for a few years.
+* The author of DaLI and RP2 is not a tax professional, but has used RP2 and DaLI personally for a few years.
 
 ## License
 DaLI is released under the terms of Apache License Version 2.0. For more information see [LICENSE](https://github.com/eprbell/dali-rp2/tree/main/LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>.
