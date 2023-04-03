@@ -44,7 +44,7 @@ Privacy-focused, free, extensible data loader for RP2 (the crypto tax calculator
 * **[Change Log](#change-log)**
 
 ## Introduction
-[DaLI](https://github.com/eprbell/dali-rp2) (Data Loader Interface) is a data loader and input generator for [RP2](https://github.com/eprbell/rp2), the privacy-focused, free, non-commercial, open-source, community-driven cryptocurrency tax calculator: DaLI removes the need to manually prepare RP2 input files. Just like RP2, DaLI is also free, non-commercial, open-source and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
+[DaLI](https://github.com/eprbell/dali-rp2) (Data Loader Interface) is a data loader and input generator for [RP2](https://github.com/eprbell/rp2), the privacy-focused, free, non-commercial, open-source, community-driven multi-country cryptocurrency tax calculator: DaLI removes the need to manually prepare RP2 input files. Just like RP2, DaLI is also free, non-commercial, open-source and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
 
 It performs the following operations:
 * it reads in crypto transaction information from multiples native sources: CSV files and/or REST-based services;
