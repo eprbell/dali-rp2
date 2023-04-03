@@ -181,7 +181,7 @@ While every commit and push are automatically tested as described, sometimes it'
 
 Logs are stored in the `log` directory. To generate debug logs, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
 ```
-LOG_LEVEL=DEBUG bin/dali_us -s -o output/ config/test_config.ini
+LOG_LEVEL=DEBUG dali_us -s -o output/ config/test_config.ini
 ```
 
 ### Unit Tests
