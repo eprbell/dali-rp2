@@ -321,6 +321,7 @@ The `in_csv_file` contains transactions describing crypto being acquired. Line 1
 * `fiat_in_no_fee` (optional): fiat value of the transaction without fee;
 * `fiat_in_with_fee` (optional): fiat value of the transaction with fee;
 * `fiat_fee` (optional): transaction fee (if it was paid in fiat). This is mutually exclusive with `crypto_fee`;
+* `fiat_ticker` (optional): the 3 letter [ISO 4217 code](https://en.wikipedia.org/wiki/ISO_4217#List_of_ISO_4217_currency_codes) of the fiat currency being used;
 * `notes` (optional): user-provided description of the transaction.
 
 The `out_csv_file` contains transactions describing crypto being disposed of. Line 1 is considered a header line and it's ignored. Subsequent lines have the following format:
@@ -336,6 +337,7 @@ The `out_csv_file` contains transactions describing crypto being disposed of. Li
 * `crypto_out_with_fee` (optional): how much of the given cryptocurrency was sold or sent with the transaction (including fee);
 * `fiat_out_no_fee` (optional): fiat value of the transaction without fee;
 * `fiat_fee` (optional): fiat value of the transaction fee;
+* `fiat_ticker` (optional): the 3 letter [ISO 4217 code](https://en.wikipedia.org/wiki/ISO_4217#List_of_ISO_4217_currency_codes) of the fiat currency being used;
 * `notes` (optional): user-provided description of the transaction.
 
 The `intra_csv_file` contains transactions describing crypto being moved across accounts controlled by the same user (or people filing together). Line 1 is considered a header line and it's ignored. Subsequent lines have the following format:
@@ -349,6 +351,7 @@ The `intra_csv_file` contains transactions describing crypto being moved across 
 * `spot_price` (optional): value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_sent` (optional): how much of the given cryptocurrency was sent with the transaction;
 * `crypto_received` (optional): how much of the given cryptocurrency was received with the transaction;
+* `fiat_ticker` (optional): the 3 letter [ISO 4217 code](https://en.wikipedia.org/wiki/ISO_4217#List_of_ISO_4217_currency_codes) of the fiat currency being used;
 * `notes` (optional): user-provided description of the transaction.
 
 Note that empty (separator) lines are allowed in all three CSV files to increase readability.
