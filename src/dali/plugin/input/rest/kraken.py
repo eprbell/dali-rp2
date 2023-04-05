@@ -26,7 +26,6 @@ from typing import Dict, List, Optional, Union, Set, Tuple, Any
 
 from ccxt import Exchange, kraken
 from rp2.logger import create_logger
-from rp2.abstract_country import AbstractCountry
 from rp2.rp2_decimal import RP2Decimal, ZERO
 from rp2.rp2_error import RP2RuntimeError
 
@@ -109,7 +108,12 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self._initialize_client()
         self._client.load_markets()
         self._client.markets_by_id.update({'BSVUSD': {_ID: 'BSVUSD', _BASE_ID: 'BSV', _BASE: 'BSV', _QUOTE: 'USD'}})
-        self.base_id_to_base: Dict[str, str] = {value[_BASE_ID]: value[_BASE] for key, value in self._client.markets_by_id.items()}
+        self.base_id_to_base: Dict[str, str] = {}
+        for dummy_key, value in self._client.markets_by_id.items():
+            # BUGFIX: Because value comes as a list when in a pytest environment.
+            # Its not obvious why this happens as it is supposed to be a dict.
+            value = value if isinstance(value, dict) else value[0]  # type: ignore
+            self.base_id_to_base.update({value[_BASE_ID]: value[_BASE]})
         self.use_cache: Optional[bool] = use_cache
 
     def exchange_name(self) -> str:
@@ -178,7 +182,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         return result
 
-    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
+    def load(self) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
@@ -229,7 +233,11 @@ class InputPlugin(AbstractCcxtInputPlugin):
             if record[_TYPE] == _TRADE and not is_fiat_asset:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
 
-                asset_quote: str = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]][_QUOTE]
+                # BUGFIX: For some reason in pytest, markets_by_id passes back lists instead of
+                # dicts. It should be dicts. Hence the dummy_bugfix.
+                dummy_bugfix: Dict[str, str] = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]]
+                market: Dict[str, str] = dummy_bugfix if isinstance(dummy_bugfix, dict) else dummy_bugfix[0]  # type: ignore
+                asset_quote: str = market[_QUOTE]
                 is_quote_asset_fiat: bool = asset_quote in _KRAKEN_FIAT_LIST
 
                 spot_price = trade_history[record[_REFID]][_PRICE] if is_quote_asset_fiat else Keyword.UNKNOWN.value
