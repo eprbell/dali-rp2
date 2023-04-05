@@ -1,0 +1,134 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{21de6965-e7a9-45bf-bc35-9aafe37f7ddf}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>src\dali\plugin\country\us.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>MSBuild|.venv|$(MSBuildProjectFullPath)</InterpreterId>
+    <CommandLineArguments>-t 1 -s -o C:\Users\cyates\Documents\rp2-files\cyates\dali-output -p cyates- C:\Users\cyates\Documents\rp2-files\cyates\cyates.ini</CommandLineArguments>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+    <TestFramework>pytest</TestFramework>
+    <UnitTestPattern>test*.py</UnitTestPattern>
+    <UnitTestRootDirectory>tests</UnitTestRootDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="config\test_config.ini" />
+    <Content Include="input\test_ods_rp2_input.ini" />
+    <Content Include="mypy.ini" />
+    <Content Include="src\dali_rp2.egg-info\dependency_links.txt" />
+    <Content Include="src\dali_rp2.egg-info\entry_points.txt" />
+    <Content Include="src\dali_rp2.egg-info\requires.txt" />
+    <Content Include="src\dali_rp2.egg-info\SOURCES.txt" />
+    <Content Include="src\dali_rp2.egg-info\top_level.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="setup.py" />
+    <Compile Include="src\dali\abstract_ccxt_input_plugin.py" />
+    <Compile Include="src\dali\abstract_input_plugin.py" />
+    <Compile Include="src\dali\abstract_pair_converter_plugin.py" />
+    <Compile Include="src\dali\abstract_transaction.py" />
+    <Compile Include="src\dali\cache.py" />
+    <Compile Include="src\dali\ccxt_pagination.py" />
+    <Compile Include="src\dali\configuration.py" />
+    <Compile Include="src\dali\configuration_generator.py" />
+    <Compile Include="src\dali\dali_main.py" />
+    <Compile Include="src\dali\data\__init__.py" />
+    <Compile Include="src\dali\historical_bar.py" />
+    <Compile Include="src\dali\intra_transaction.py" />
+    <Compile Include="src\dali\in_transaction.py" />
+    <Compile Include="src\dali\logger.py" />
+    <Compile Include="src\dali\ods_generator.py" />
+    <Compile Include="src\dali\out_transaction.py" />
+    <Compile Include="src\dali\plugin\country\jp.py" />
+    <Compile Include="src\dali\plugin\country\us.py" />
+    <Compile Include="src\dali\plugin\country\__init__.py" />
+    <Compile Include="src\dali\plugin\input\csv\binance_com_supplemental.py" />
+    <Compile Include="src\dali\plugin\input\csv\bitbank_supplemental.py" />
+    <Compile Include="src\dali\plugin\input\csv\blockfi.py" />
+    <Compile Include="src\dali\plugin\input\csv\coincheck_supplemental.py" />
+    <Compile Include="src\dali\plugin\input\csv\ledger.py" />
+    <Compile Include="src\dali\plugin\input\csv\manual.py" />
+    <Compile Include="src\dali\plugin\input\csv\nexo.py" />
+    <Compile Include="src\dali\plugin\input\csv\pionex.py" />
+    <Compile Include="src\dali\plugin\input\csv\robinhood.py" />
+    <Compile Include="src\dali\plugin\input\csv\trezor.py" />
+    <Compile Include="src\dali\plugin\input\csv\trezor_old.py" />
+    <Compile Include="src\dali\plugin\input\csv\trezor_v2.py" />
+    <Compile Include="src\dali\plugin\input\csv\__init__.py" />
+    <Compile Include="src\dali\plugin\input\ods\rp2_input.py" />
+    <Compile Include="src\dali\plugin\input\ods\__init__.py" />
+    <Compile Include="src\dali\plugin\input\rest\binance_com.py" />
+    <Compile Include="src\dali\plugin\input\rest\bitbank.py" />
+    <Compile Include="src\dali\plugin\input\rest\coinbase.py" />
+    <Compile Include="src\dali\plugin\input\rest\coinbase_pro.py" />
+    <Compile Include="src\dali\plugin\input\rest\__init__.py" />
+    <Compile Include="src\dali\plugin\input\__init__.py" />
+    <Compile Include="src\dali\plugin\pair_converter\ccxt.py" />
+    <Compile Include="src\dali\plugin\pair_converter\ccxt_binance.py" />
+    <Compile Include="src\dali\plugin\pair_converter\ccxt_kraken.py" />
+    <Compile Include="src\dali\plugin\pair_converter\csv\kraken.py" />
+    <Compile Include="src\dali\plugin\pair_converter\csv\__init__.py" />
+    <Compile Include="src\dali\plugin\pair_converter\historic_crypto.py" />
+    <Compile Include="src\dali\plugin\pair_converter\__init__.py" />
+    <Compile Include="src\dali\plugin\__init__.py" />
+    <Compile Include="src\dali\transaction_resolver.py" />
+    <Compile Include="src\dali\__init__.py" />
+    <Compile Include="tests\ods_diff.py" />
+    <Compile Include="tests\test_cache.py" />
+    <Compile Include="tests\test_historical_bar.py" />
+    <Compile Include="tests\test_ods_output_diff.py" />
+    <Compile Include="tests\test_plugin_binance_com.py" />
+    <Compile Include="tests\test_plugin_binance_com_supplemental_csv.py" />
+    <Compile Include="tests\test_plugin_bitbank_supplemental_csv.py" />
+    <Compile Include="tests\test_plugin_ccxt.py" />
+    <Compile Include="tests\test_plugin_coinbase.py" />
+    <Compile Include="tests\test_plugin_coinbase_pro.py" />
+    <Compile Include="tests\test_plugin_coincheck_supplemental.py" />
+    <Compile Include="tests\test_plugin_historic_crypto.py" />
+    <Compile Include="tests\test_plugin_kraken_csv_download.py" />
+    <Compile Include="tests\test_plugin_ods_rp2_input.py" />
+    <Compile Include="tests\test_plugin_pionex.py" />
+    <Compile Include="tests\test_transaction_resolver.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="config" />
+    <Folder Include="input" />
+    <Folder Include="src\" />
+    <Folder Include="src\dali" />
+    <Folder Include="src\dali\data" />
+    <Folder Include="src\dali\plugin" />
+    <Folder Include="src\dali\plugin\country" />
+    <Folder Include="src\dali\plugin\input" />
+    <Folder Include="src\dali\plugin\input\csv" />
+    <Folder Include="src\dali\plugin\input\ods" />
+    <Folder Include="src\dali\plugin\input\rest" />
+    <Folder Include="src\dali\plugin\pair_converter" />
+    <Folder Include="src\dali\plugin\pair_converter\csv" />
+    <Folder Include="src\dali_rp2.egg-info" />
+    <Folder Include="tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include=".venv\">
+      <Id>.venv</Id>
+      <Description>.venv (Python 3.9)</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <Version>3.9</Version>
+      <Architecture>X64</Architecture>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+    </Interpreter>
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
