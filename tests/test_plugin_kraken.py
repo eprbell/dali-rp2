@@ -131,7 +131,7 @@ def test_kraken(mocker: Any) -> None:
             },
         }
     }
-    actual_result = plugin.load()
+    actual_result = plugin.load(country=None)  # type: ignore
 
     assert len(actual_result) == 4
 

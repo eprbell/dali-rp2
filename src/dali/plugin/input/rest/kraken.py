@@ -26,6 +26,7 @@ from typing import Dict, List, Optional, Union, Set, Tuple, Any
 
 from ccxt import Exchange, kraken
 from rp2.logger import create_logger
+from rp2.abstract_country import AbstractCountry
 from rp2.rp2_decimal import RP2Decimal, ZERO
 from rp2.rp2_error import RP2RuntimeError
 
@@ -182,7 +183,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         return result
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
