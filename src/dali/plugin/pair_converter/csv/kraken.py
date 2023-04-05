@@ -202,6 +202,8 @@ class Kraken:
 
         retry_count: int = 0
 
+        should_log = False
+
         while retry_count < len(_TIME_GRANULARITY):
             if (
                 timestamp < self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start
@@ -228,10 +230,15 @@ class Kraken:
             file_name: str = f"{base_asset + quote_asset}_{file_timestamp}_{_TIME_GRANULARITY[retry_count]}.csv.gz"
             file_path: str = path.join(self.__CACHE_DIRECTORY, file_name)
             self.__logger.debug("Retrieving %s -> %s at %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp)
-            with gopen(file_path, "rt") as file:
-                rows = reader(file)
-                for row in rows:
-                    if int(row[self.__TIMESTAMP_INDEX]) == duration_timestamp:
+            try:
+                with gopen(file_path, "rt") as file:
+                    rows = reader(file)
+                    for row in rows:
+                        if int(row[self.__TIMESTAMP_INDEX]) != duration_timestamp:
+                            continue
+                        if should_log:
+                            self.__logger.info(
+                                f"Found File={file_path} for {timestamp} %s", str(datetime.fromtimestamp(timestamp)))
                         return HistoricalBar(
                             duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
                             timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
@@ -241,7 +248,10 @@ class Kraken:
                             close=RP2Decimal(row[self.__CLOSE]),
                             volume=RP2Decimal(row[self.__VOLUME]),
                         )
-
+            except FileNotFoundError:
+                self.__logger.error(f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s",
+                                    self.ISSUES_URL, datetime.fromtimestamp(timestamp))
+                should_log = True
             retry_count += 1
 
         return None
@@ -262,7 +272,7 @@ class Kraken:
 
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.info("Attempting to load %s from Kraken Google Drive.", base_file)
+        self.__logger.info(F"Attempting to load %s from Kraken Google Drive for timestamp={timestamp}.", base_file)
         file_bytes = self._google_file_to_bytes(base_file)
 
         if file_bytes:
