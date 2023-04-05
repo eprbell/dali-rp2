@@ -81,10 +81,14 @@ _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "ATDUSDT": _GATE,
+    "BETHETH": _BINANCE,
+    "BNBUSDT": _BINANCE,
     "BSVUSDT": _GATE,
     "BOBAUSD": _GATE,
+    "BUSDUSDT": _BINANCE,
     "EDGUSDT": _GATE,
     "ETHWUSD": _KRAKEN,
+    "NEXOUSDT": _BINANCE,
     "SGBUSD": _KRAKEN,
     "SOLOUSDT": _HUOBI,
     "USDTUSD": _KRAKEN,
@@ -92,10 +96,14 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
 
 _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "ATD": "USDT",
+    "BETH": "ETH",
+    "BNB": "USDT",
     "BOBA": "USD",
     "BSV": "USDT",
+    "BUSD": "USDT",
     "EDG": "USDT",
     "ETHW": "USD",
+    "NEXO": "USDT",
     "SGB": "USD",
     "SOLO": "USDT",
     "USDT": "USD",
@@ -158,7 +166,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_csv_reader: Dict[str, Any] = {}
         self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
-        self.__csv_read_flag: Dict[str, bool] = {}
         if exchange_locked:
             self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
         else:
@@ -240,8 +247,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
             exchange = self.__default_exchange
 
-        # Caching of exchanges
-        if exchange not in self.__exchanges:
+        # The exchange could have been added as an alt; if so markets wouldn't have been built
+        if exchange not in self.__exchanges or exchange not in self.__exchange_markets:
             if self.__exchange_locked:
                 self._add_exchange_to_memcache(self.__default_exchange)
             elif exchange in _EXCHANGE_DICT:
@@ -258,6 +265,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         # TO BE IMPLEMENTED - bypass routing if conversion can be done with one market on the exchange
         if market_symbol in current_markets and (exchange in current_markets[market_symbol]):
+            self.__logger.debug("Found market - %s on single exchange, skipping routing.", market_symbol)
             result = self.find_historical_bar(from_asset, to_asset, timestamp, exchange)
             return result
         # else:
@@ -339,36 +347,33 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
-        if csv_pricing is not None and not self.__csv_read_flag.get(exchange, False):
+        if self.__exchange_csv_reader.get(exchange):
+            csv_reader = self.__exchange_csv_reader[exchange]
+        elif csv_pricing is not None:
             csv_signature: Signature = signature(csv_pricing)
 
             # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
             if _GOOGLE_API_KEY in csv_signature.parameters:
                 if self.__google_api_key is not None:
-                    csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing(self.__google_api_key))
+                    csv_reader = csv_pricing(self.__google_api_key)
                 else:
                     self.__logger.info(
                         "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
                     )
             else:
-                csv_reader = self.__exchange_csv_reader.get(exchange, csv_pricing())
+                csv_reader = csv_pricing()
 
-            if csv_reader:
-                csv_bars: Dict[datetime, HistoricalBar] = csv_reader.get_historical_bars_for_pair(from_asset, to_asset)
-                for epoch, csv_bar in csv_bars.items():
-                    self._add_bar_to_cache(
-                        key=AssetPairAndTimestamp(epoch, from_asset, to_asset, exchange),
-                        historical_bar=csv_bar,
-                    )
-                self.save_historical_price_cache()
-                self.__logger.debug("Added %s bars to cache for pair %s/%s", len(csv_bars), from_asset, to_asset)
-                historical_bar = self._get_bar_from_cache(key)
-                self.__csv_read_flag[exchange] = True
-                if historical_bar is not None:
-                    self.__logger.debug(
-                        "Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange
-                    )
-                    return historical_bar
+        if csv_reader:
+            csv_bar: Optional[HistoricalBar] = csv_reader.find_historical_bar(from_asset, to_asset, timestamp)
+
+            if csv_bar:
+                self._add_bar_to_cache(key=AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange), historical_bar=csv_bar)
+
+            historical_bar = self._get_bar_from_cache(key)
+            self.__exchange_csv_reader[exchange] = csv_reader
+            if historical_bar is not None:
+                self.__logger.debug("Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange)
+                return historical_bar
 
         while retry_count < len(_TIME_GRANULARITY):
 
@@ -446,6 +451,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
             # Cache the exchange so that we can pull prices from it later
             if alt_exchange_name not in self.__exchanges:
+                self.__logger.debug("Added Alternative Exchange: %s", alt_exchange_name)
                 alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
                 self.__exchanges[alt_exchange_name] = alt_exchange
 
@@ -455,9 +461,13 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 current_graph[base_asset] = {quote_asset: None}
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
-        # initializes the cctx exchange instance which is used to get the historical data
-        # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
-        current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+
+        if exchange not in self.__exchanges:
+            # initializes the cctx exchange instance which is used to get the historical data
+            # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
+            current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+        else:
+            current_exchange = self.__exchanges[exchange]
 
         # key: market, value: exchanges where the market is available in order of priority
         current_markets: Dict[str, List[str]] = {}

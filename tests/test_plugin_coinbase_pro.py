@@ -14,6 +14,7 @@
 
 from typing import Any, Dict, List
 
+from rp2.plugin.country.us import US
 from rp2.rp2_error import RP2RuntimeError
 
 from dali.in_transaction import InTransaction
@@ -110,7 +111,7 @@ class TestSwapFill:
             }
         ]
 
-        result = plugin.load()
+        result = plugin.load(US())
         assert len(result) == 2
 
         in_transaction: InTransaction = result[0]  # type: ignore

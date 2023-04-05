@@ -99,16 +99,14 @@ EUR_USD_RATE: RP2Decimal = RP2Decimal("1.0847")
 EUR_USD_TIMESTAMP: datetime = datetime.fromtimestamp(1585958400, timezone.utc)
 
 # Kraken CSV read Test
-KRAKEN_TIMESTAMP: datetime = datetime.fromtimestamp(1490807100, timezone.utc)
-KRAKEN_LOW: RP2Decimal = RP2Decimal("1")
-KRAKEN_HIGH: RP2Decimal = RP2Decimal("1")
-KRAKEN_OPEN: RP2Decimal = RP2Decimal("1")
-KRAKEN_CLOSE: RP2Decimal = RP2Decimal("1")
-KRAKEN_VOLUME: RP2Decimal = RP2Decimal("1")
+KRAKEN_TIMESTAMP: datetime = datetime.fromtimestamp(1601855760, timezone.utc)
+KRAKEN_LOW: RP2Decimal = RP2Decimal("1.5557")
+KRAKEN_HIGH: RP2Decimal = RP2Decimal("1.5556")
+KRAKEN_OPEN: RP2Decimal = RP2Decimal("1.5555")
+KRAKEN_CLOSE: RP2Decimal = RP2Decimal("1.5558")
+KRAKEN_VOLUME: RP2Decimal = RP2Decimal("15.15")
 
 _MS_IN_SECOND: int = 1000
-
-_GOOGLE_API_KEY: str = "AIzaSyBPZbQdzwVAYQox79GJ8yBkKQQD9ligOf8"
 
 
 class TestCcxtPlugin:
@@ -129,7 +127,7 @@ class TestCcxtPlugin:
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
 
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
-        mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
+        mocker.patch.object(kraken_csv, "find_historical_bar", [])
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"kraken": kraken_csv})
         mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
             [
@@ -398,12 +396,16 @@ class TestCcxtPlugin:
     def test_kraken_csv(self, mocker: Any) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
 
-        cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
+        cache_path = os.path.join(CACHE_DIR, "Test-" + plugin.cache_key())
         if os.path.exists(cache_path):
             os.remove(cache_path)
 
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
-        with open("input/test_kraken_CSV.zip", "rb") as file:
+        mocker.patch.object(kraken_csv, "cache_key").return_value = "Test-" + kraken_csv.cache_key()
+        mocker.patch.object(kraken_csv, "_Kraken__CACHE_DIRECTORY", "output/kraken_test")
+        if not os.path.exists("output/kraken_test"):
+            os.makedirs("output/kraken_test")
+        with open("input/USD_OHLCVT_test.zip", "rb") as file:
             mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
 
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
@@ -473,7 +475,7 @@ class TestCcxtPlugin:
         )
         kraken_csv = KrakenCsvPricing(google_api_key="whatever")
 
-        mocker.patch.object(kraken_csv, "get_historical_bars_for_pair", [])
+        mocker.patch.object(kraken_csv, "find_historical_bar").return_value = None
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {LOCKED_EXCHANGE: kraken_csv})
         mocker.patch.object(exchange_instance, "fetchOHLCV").return_value = [
             [

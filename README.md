@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.6.3
+# DaLI for RP2 v0.6.7
 
 Privacy-focused, free, extensible data loader for RP2 (the crypto tax calculator)
 
@@ -44,12 +44,12 @@ Privacy-focused, free, extensible data loader for RP2 (the crypto tax calculator
 * **[Change Log](#change-log)**
 
 ## Introduction
-[DaLI](https://github.com/eprbell/dali-rp2) (Data Loader Interface) is a data loader and input generator for [RP2](https://github.com/eprbell/rp2), the privacy-focused, free, non-commercial, open-source cryptocurrency tax calculator: DaLI removes the need to manually prepare RP2 input files. Just like RP2, DaLI is also free, non-commercial, open-source and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
+[DaLI](https://github.com/eprbell/dali-rp2) (Data Loader Interface) is a data loader and input generator for [RP2](https://github.com/eprbell/rp2), the privacy-focused, free, non-commercial, open-source, community-driven multi-country cryptocurrency tax calculator: DaLI removes the need to manually prepare RP2 input files. Just like RP2, DaLI is also free, non-commercial, open-source and it prioritizes user privacy by storing crypto transaction data on the user's computer and never sending it anywhere else.
 
 It performs the following operations:
 * it reads in crypto transaction information from multiples native sources: CSV files and/or REST-based services;
 * it analyzes, processes and merges this data;
-* it uses the processed data to generate an ODS input file for RP2 and its respective JSON configuration file.
+* it uses the processed data to generate an ODS input file for RP2 and its respective configuration file.
 
 DaLI has a programmable plugin architecture for [data loaders](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#data-loader-plugin-development) (both CSV and REST-based), [pair converters](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#pair-converter-plugin-development) and [countries](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#country-plugin-development). While some exchanges and wallets are already supported out-of-the-box, more are needed: help us make DaLI a robust open-source, community-driven crypto data loader by [contributing](https://github.com/eprbell/dali-rp2/tree/main/CONTRIBUTING.md#contributing-to-the-repository) plugins for exchanges and wallets! Check [open issues](https://github.com/eprbell/dali-rp2/issues) or open a new one.
 
@@ -59,7 +59,7 @@ Note that DaLI has RP2 as a dependency, so installing DaLI causes RP2 to be inst
 
 **IMPORTANT DISCLAIMER**:
 * DaLI offers no guarantee of correctness (read the [license](https://github.com/eprbell/dali-rp2/tree/main/LICENSE)): always verify results with the help of a tax professional.
-* The author of DaLI and RP2 is not a tax professional, but has used RP2 personally for a few years.
+* The author of DaLI and RP2 is not a tax professional, but has used RP2 and DaLI personally for a few years.
 
 ## License
 DaLI is released under the terms of Apache License Version 2.0. For more information see [LICENSE](https://github.com/eprbell/dali-rp2/tree/main/LICENSE) or <http://www.apache.org/licenses/LICENSE-2.0>.

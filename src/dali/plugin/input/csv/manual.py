@@ -24,6 +24,7 @@ import logging
 from csv import reader
 from typing import List, Optional
 
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 
 from dali.abstract_input_plugin import AbstractInputPlugin
@@ -94,7 +95,7 @@ class InputPlugin(AbstractInputPlugin):
 
         self.__logger: logging.Logger = create_logger(self.__MANUAL)
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         self._load_in_file(result)

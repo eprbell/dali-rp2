@@ -60,13 +60,13 @@ Also check [open issues](https://github.com/eprbell/dali-rp2/issues), or open a 
 Finally read the question on [how to represent transactions for unsupported exchanges and wallets](#how-to-represent-transactions-from-unsupported-exchanges-and-wallets).
 
 ### How to Represent Transactions between Unsupported Exchanges and Wallets?
-The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be used for this purpose.
+The [manual data loader plugin](configuration_file.md#manual-section-csv) or the [RP2 input plugin](configuration_file.md#existing-rp2-input-ods) can be used for this purpose.
 
 ### How to Represent a Transaction from/to a Supported Exchange/Wallet to/from an Unsupported One?
-The [Manual data loader plugin](configuration_file.md#manual-section-csv) can be used for this purpose.
+The [manual data loader plugin](configuration_file.md#manual-section-csv) or the [RP2 input plugin](configuration_file.md#existing-rp2-input-ods) can be used for this purpose.
 
 ### What if the Spot Price Is Missing for Some Transactions?
-In some cases exchange reports don't have spot price information. In such situations spot price information can be retrieved automatically from Coinbase Pro by passing the `-s` option to DaLI. If the transaction belongs to one of the CSV files of the manual plugin, write `__unknown` as its spot price (and also use `-s`). If spot price information is still missing even after using `-s`, read about transaction resolution in the [Manual Plugin](configuration_file.md#manual-section-csv) section of the documentation.
+In some cases exchange reports don't have spot price information. In such situations spot price information can be retrieved automatically from Coinbase Pro by passing the `-s` option to DaLI. If the transaction belongs to one of the CSV files of the manual plugin or to the .ods file of the RP2 input plugin, write `__unknown` as its spot price (and also use `-s`). If spot price information is still missing even after using `-s`, read about transaction resolution in the [Manual Plugin](configuration_file.md#manual-section-csv) section of the documentation.
 
 ### What if I and My Spouse File Taxes Jointly?
 Suppose Alice and Bob are filing together and they both have a Coinbase account and a Trezor wallet each. They can configure 4 plugin sections in the configuration file:

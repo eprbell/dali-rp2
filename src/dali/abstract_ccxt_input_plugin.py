@@ -32,6 +32,7 @@ from ccxt import (
     NetworkError,
     RequestTimeout,
 )
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
@@ -182,7 +183,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
     def _thread_count(self) -> int:
         return self.__thread_count
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
         in_transactions: List[InTransaction] = []
         out_transactions: List[OutTransaction] = []

@@ -23,6 +23,7 @@ import logging
 from csv import reader
 from typing import List, Optional
 
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 
 from dali.abstract_input_plugin import AbstractInputPlugin
@@ -70,7 +71,7 @@ class InputPlugin(AbstractInputPlugin):
         self.__transfers_csv_file: Optional[str] = transfers_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__PIONEX_PLUGIN}/{self.account_holder}")
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         if self.__trades_csv_file:

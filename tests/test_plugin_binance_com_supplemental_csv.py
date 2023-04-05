@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from rp2.plugin.country.us import US
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.configuration import Keyword
@@ -29,7 +30,7 @@ class TestBinanceCsv:
             native_fiat="USD",
         )
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # 1 ETH in transaction for 0.01 ETH +
         # 1 USDT out transaction for 0.01 ETH +
@@ -92,7 +93,7 @@ class TestBinanceCsv:
             native_fiat="USD",
         )
 
-        result = plugin.load()
+        result = plugin.load(US())
 
         # 1 ETH out transaction for 0.1 ETH +
         # 1 BETH in transaction for 0.1 BETH = 2
