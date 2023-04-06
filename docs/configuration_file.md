@@ -597,7 +597,7 @@ fiat_fee = 11
 unique_id = 12
 notes = 13
 
-[in_header]
+[intra_header]
 timestamp = 0
 asset = 1
 from_exchange = 2
