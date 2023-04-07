@@ -28,11 +28,6 @@
     <Content Include="config\test_config.ini" />
     <Content Include="input\test_ods_rp2_input.ini" />
     <Content Include="mypy.ini" />
-    <Content Include="src\dali_rp2.egg-info\dependency_links.txt" />
-    <Content Include="src\dali_rp2.egg-info\entry_points.txt" />
-    <Content Include="src\dali_rp2.egg-info\requires.txt" />
-    <Content Include="src\dali_rp2.egg-info\SOURCES.txt" />
-    <Content Include="src\dali_rp2.egg-info\top_level.txt" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="setup.py" />
@@ -63,24 +58,16 @@
     <Compile Include="src\dali\plugin\input\csv\manual.py" />
     <Compile Include="src\dali\plugin\input\csv\nexo.py" />
     <Compile Include="src\dali\plugin\input\csv\pionex.py" />
-    <Compile Include="src\dali\plugin\input\csv\robinhood.py" />
     <Compile Include="src\dali\plugin\input\csv\trezor.py" />
     <Compile Include="src\dali\plugin\input\csv\trezor_old.py" />
     <Compile Include="src\dali\plugin\input\csv\trezor_v2.py" />
     <Compile Include="src\dali\plugin\input\csv\__init__.py" />
     <Compile Include="src\dali\plugin\input\ods\rp2_input.py" />
     <Compile Include="src\dali\plugin\input\ods\__init__.py" />
-    <Compile Include="src\dali\plugin\input\rest\binance_com.py" />
-    <Compile Include="src\dali\plugin\input\rest\bitbank.py" />
-    <Compile Include="src\dali\plugin\input\rest\coinbase.py" />
-    <Compile Include="src\dali\plugin\input\rest\coinbase_pro.py" />
-    <Compile Include="src\dali\plugin\input\rest\__init__.py" />
     <Compile Include="src\dali\plugin\input\__init__.py" />
     <Compile Include="src\dali\plugin\pair_converter\ccxt.py" />
     <Compile Include="src\dali\plugin\pair_converter\ccxt_binance.py" />
     <Compile Include="src\dali\plugin\pair_converter\ccxt_kraken.py" />
-    <Compile Include="src\dali\plugin\pair_converter\csv\kraken.py" />
-    <Compile Include="src\dali\plugin\pair_converter\csv\__init__.py" />
     <Compile Include="src\dali\plugin\pair_converter\historic_crypto.py" />
     <Compile Include="src\dali\plugin\pair_converter\__init__.py" />
     <Compile Include="src\dali\plugin\__init__.py" />
@@ -114,10 +101,7 @@
     <Folder Include="src\dali\plugin\input" />
     <Folder Include="src\dali\plugin\input\csv" />
     <Folder Include="src\dali\plugin\input\ods" />
-    <Folder Include="src\dali\plugin\input\rest" />
     <Folder Include="src\dali\plugin\pair_converter" />
-    <Folder Include="src\dali\plugin\pair_converter\csv" />
-    <Folder Include="src\dali_rp2.egg-info" />
     <Folder Include="tests" />
   </ItemGroup>
   <ItemGroup>
