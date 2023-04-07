@@ -22,29 +22,18 @@ from io import BytesIO
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
 from os import makedirs, path
-from typing import Any, Dict, Generator, List, NamedTuple, Optional, Tuple, cast, Union
+from typing import Any, Dict, Generator, List, NamedTuple, Optional, Tuple, cast
 from zipfile import ZipFile
 
 import requests
 from requests.models import Response
 from requests.sessions import Session
-
-from ccxt import kraken
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
 
-from dali.plugin.input.rest.kraken import (
-    _BASE,
-    _KRAKEN_FIAT_LIST,
-)
 from dali.cache import load_from_cache, save_to_cache
 from dali.historical_bar import HistoricalBar
-
-# Kraken-Dali base id keys
-_ALTNAME: str = 'altname'
-_PAIRS: str = 'pairs'
-_GOOGLE_ABBR: str = 'google_abbr'
 
 # Google Drive parameters
 _ACCESS_NOT_CONFIGURED: str = "accessNotConfigured"
@@ -103,6 +92,7 @@ class _PairStartEnd(NamedTuple):
 
 class Kraken:
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
+
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __CACHE_DIRECTORY: str = ".dali_cache/kraken/"
@@ -125,14 +115,10 @@ class Kraken:
         self,
         google_api_key: str,
     ) -> None:
+
         self.__google_api_key: str = google_api_key
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
-        self._kraken: kraken = kraken({"enableRateLimit": True})
-        self.dali_base_to_kraken_google_base: Dict[str, Dict[str, Union[List[str], str]]] = {}
-        self.kraken_google_base_to_dali_base: Dict[str, Dict[str, Union[List[str], str]]] = {}
-        self.initialize_markets()
-
         self.__cached_pairs: Dict[str, _PairStartEnd] = {}
         self.__cache_loaded: bool = False
 
@@ -257,7 +243,6 @@ class Kraken:
         return None
 
     def find_historical_bar(self, base_asset: str, quote_asset: str, timestamp: datetime) -> Optional[HistoricalBar]:
-        base_asset = str(self.dali_base_to_kraken_google_base[base_asset][_GOOGLE_ABBR])
         epoch_timestamp = int(timestamp.timestamp())
         self.__logger.debug("Retrieving bar for %s%s at %s", base_asset, quote_asset, epoch_timestamp)
 
@@ -302,21 +287,6 @@ class Kraken:
             _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = '{file_name}'",
             _API_KEY: self.__google_api_key,
         }
-        query_google_result, data = self._query_google_drive(params)
-
-        if not query_google_result:
-            self.__logger.error(f"File name doesn't exist: {file_name} (skipping): data={data}. "
-                                f"Please open an issue at %s", self.ISSUES_URL)
-            return None
-
-        # Downloading the zipfile that contains the 6 files one for each of the standard durations of candles:
-        # 1m, 5m, 15m, 1h, 12h, 24h.
-        params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # _CONFIRM: 1 bypasses large file warning
-        file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
-
-        return file_response.content
-
-    def _query_google_drive(self, params: Dict[str, Any]) -> Tuple[bool, Any]:
         try:
             # Searching the Kraken folder for the specific file for the asset we are interested in
             # This query returns a JSON with the file ID we need to download the specific file we need.
@@ -406,121 +376,18 @@ class Kraken:
                         raise RP2RuntimeError("Google Drive not authorized")
 
             if not data.get(_FILES):
-                self.__logger.error("No matching files were found on the Kraken Google Drive. data=%s", data)
-                return False, data
+                self.__logger.error("No matching files for '%s' on the Kraken Google Drive. data=%s", file_name, data)
+                return None
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
+
+            # Downloading the zipfile that contains the 6 files one for each of the standard durations of candles:
+            # 1m, 5m, 15m, 1h, 12h, 24h.
+            params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # _CONFIRM: 1 bypasses large file warning
+            file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
+
         except JSONDecodeError as exc:
             self.__logger.debug("Fetching of kraken csv files failed. Try again later.")
             raise RP2RuntimeError("JSON decode error") from exc
 
-        return True, data
-
-    def _available_assets_from_google_drive(self) -> List[str]:
-        params: Dict[str, Any] = {
-            _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents",
-            _API_KEY: self.__google_api_key,
-            'pageSize': 1000
-        }
-        query_google_result, data = self._query_google_drive(params)
-        if not query_google_result:
-            self.__logger.error(f"Files were not found for folder_id={_KRAKEN_FOLDER_ID} (skipping): data={data}. "
-                                f"Please open an issue at %s", self.ISSUES_URL)
-            return []
-
-        files = data[_FILES]
-        available_assets: List[str] = []
-        for file in files:
-            if file['name'] in ['Kraken_OHLC_Sep1-Nov25.zip', 'Incremental Updates']:
-                continue
-            available_assets.append(file['name'].replace('_OHLCVT.zip', ''))
-
-        return available_assets
-
-    def initialize_markets(self) -> None:
-        # setup internal asset to kraken asset conversion
-        self._kraken.load_markets()
-
-        def truncate_to_base(altname: str) -> str:
-            length = len(altname)
-
-            # Known Kraken assets with no zip files:
-            # ARB
-            # BLUR
-            # GMX
-            # HDX
-
-            # Corner cases are handled by the following logic to handle conversion from well-formed base pairs used
-            # by the dali importer to those stored by Kraken in their Google Drive when there is a mismatch between
-            # Kraken's convention and those used by Dali.
-            if altname in ['TUSD', 'TEUR']:
-                return ''
-            if altname in ['BLZEUR', 'BLZUSD']:
-                return 'BLZ'
-            if altname in ['CHZEUR', 'CHZUSD']:
-                return 'CHZ'
-            if altname in ['ETH2.SETH']:
-                return 'ETH2'
-            if altname in ['XTZAUD', 'XTZETH', 'XTZEUR', 'XTZGBP', 'XTZUSD', 'XTZUSDT', 'XTZXBT']:
-                return 'XTZ'
-
-            for fiat in _KRAKEN_FIAT_LIST:
-                altname = altname.removesuffix(fiat)
-                if length != len(altname):
-                    break
-            else:
-                altname = altname[:-3]
-            return altname
-
-        for key, value in self._kraken.markets_by_id.items():
-            pairs: List[str] = [key]
-
-            # BUGFIX: the following line fixes issue where the expected dictionary is the element
-            # of a list (of size 1). It should come be just a dictionary but in pytest (unit test flow)
-            # it is a list and not a dictionary.
-            value: Dict[str, str] = value if isinstance(value, dict) else value[0]  # type: ignore
-            altnames: List[str] = [value[_ALTNAME]]
-            google_abbr: str = truncate_to_base(value[_ALTNAME])
-            if not google_abbr:
-                continue
-            if self.dali_base_to_kraken_google_base.get(value[_BASE]):
-                pairs = self.dali_base_to_kraken_google_base[value[_BASE]][_PAIRS]  # type: ignore
-                pairs.append(key)
-                altnames = self.dali_base_to_kraken_google_base[value[_BASE]][_ALTNAME]  # type: ignore
-                altnames.append(value[_ALTNAME])
-                self.dali_base_to_kraken_google_base.update({value[_BASE]: {_PAIRS: pairs, _ALTNAME: altnames, _GOOGLE_ABBR: google_abbr}})
-                self.kraken_google_base_to_dali_base.update({google_abbr: {_PAIRS: pairs, _ALTNAME: altnames, _BASE: value[_BASE]}})
-            self.dali_base_to_kraken_google_base.update({value[_BASE]: {_PAIRS: pairs, _ALTNAME: altnames, _GOOGLE_ABBR: google_abbr}})
-            self.kraken_google_base_to_dali_base.update({google_abbr: {_PAIRS: pairs, _ALTNAME: altnames, _BASE: value[_BASE]}})
-
-    def expose_file_list_information(self) -> None:
-        # This function performs two different checks:
-        # 1) Expose the existence of OHLCVT zip files on the Kraken Google Drive matched against markets accessible
-        #    via the Kraken API
-        # 2) Expose OHLCVT zip files that do not have an obvious market accessible via the Kraken API
-        #
-        # The intended usage of this function is to expose information and support maintenance against upstream
-        # changes by Kraken exchange.
-
-        # 1) Iterates through well-formed assets (defined by Kraken API) and the Google Drive is checked to see if
-        #    a file exists for that asset.
-        for dummy_base_asset_dali, base_info_kraken in self.dali_base_to_kraken_google_base.items():
-            base_asset_kraken: str = str(base_info_kraken[_GOOGLE_ABBR])
-            base_file: str = f"{base_asset_kraken}_OHLCVT.zip"
-            params: Dict[str, Any] = {
-                _QUERY: f"'{_KRAKEN_FOLDER_ID}' in parents and name = '{base_file}'",
-                _API_KEY: self.__google_api_key,
-            }
-            query_google_result, data = self._query_google_drive(params)
-            if not query_google_result:
-                self.__logger.error(f"File name doesn't exist: {base_file} (skipping): "
-                                    f"base_asset_kraken={base_asset_kraken} from "
-                                    f"altname={base_info_kraken[_PAIRS]}, "
-                                    f"data={data}. Please open an issue at %s", self.ISSUES_URL)
-
-        # 2) Check available assets from the Google Drive against well-formed assets (defined by Kraken API)
-        kraken_asset_keys = set(self.kraken_google_base_to_dali_base.keys())
-        google_avaialble_assets = set(self._available_assets_from_google_drive())
-        orphaned_google_assets = google_avaialble_assets - kraken_asset_keys
-        if orphaned_google_assets:
-            self.__logger.error("Unmatched Google Drive asset against Kraken markets: orphaned_google_assets=%s", orphaned_google_assets)
+        return file_response.content
