@@ -88,7 +88,6 @@ class ProcessOperationResult(NamedTuple):
 
 
 class AbstractCcxtInputPlugin(AbstractInputPlugin):
-
     __DEFAULT_THREAD_COUNT: int = 1
 
     def __init__(
@@ -98,7 +97,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         native_fiat: Optional[str],
         thread_count: Optional[int],
     ) -> None:
-
         super().__init__(account_holder, native_fiat)
         self.__logger: logging.Logger = create_logger(f"{self.exchange_name()}/{self.account_holder}")
         self.__cache_key: str = f"{str(self.exchange_name()).lower()}-{account_holder}"
@@ -131,7 +129,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         raise NotImplementedError("Abstract method")
 
     def _get_markets(self) -> List[str]:
-
         if self.__markets:
             return self.__markets
 
@@ -305,7 +302,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         in_transactions: List[InTransaction],
         out_transactions: List[OutTransaction],
     ) -> None:
-
         processing_result_list: List[Optional[ProcessOperationResult]] = []
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_trades_pagination_detail_set()
         # Strip optionality
@@ -374,7 +370,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         self,
         intra_transactions: List[IntraTransaction],
     ) -> None:
-
         processing_result_list: List[Optional[ProcessOperationResult]] = []
         pagination_detail_set: Optional[AbstractPaginationDetailSet] = self._get_process_withdrawals_pagination_detail_set()
         # Strip optionality
@@ -451,7 +446,6 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         function: Callable[..., Iterable[Dict[str, Union[str, float]]]],
         params: Dict[str, Any],
     ) -> Iterable[Dict[str, Union[str, float]]]:
-
         results: Iterable[Dict[str, Union[str, float]]] = {}
         request_count: int = 0
 

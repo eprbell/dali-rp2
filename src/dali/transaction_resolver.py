@@ -478,7 +478,6 @@ def _resolve_intra_intra_transaction(
     transaction2: IntraTransaction,
     notes: Optional[str],
 ) -> IntraTransaction:
-
     # Pick the max of the two timestamps as the timestamp of the new resolved transaction
     timestamp: datetime = max(transaction1.timestamp_value, transaction2.timestamp_value)
     from_exchange: str = _resolve_fields(
@@ -600,7 +599,6 @@ def _resolve_in_out_transaction(
     out_transaction: OutTransaction,
     notes: Optional[str],
 ) -> IntraTransaction:
-
     timestamp: datetime = in_transaction.timestamp_value
     from_exchange: str = out_transaction.exchange
     from_holder: str = out_transaction.holder

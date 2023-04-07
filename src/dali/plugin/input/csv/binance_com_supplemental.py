@@ -34,7 +34,6 @@ from dali.out_transaction import OutTransaction
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __BINANCE_COM: str = "Binance.com"
     __BINANCE_COM_SUPPLEMENTAL_CSV: str = "Binance.com_Supplemental_CSV"
 
@@ -55,7 +54,6 @@ class InputPlugin(AbstractInputPlugin):
         betheth_csv_file: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__autoinvest_csv_file: Optional[str] = autoinvest_csv_file
         self.__betheth_csv_file: Optional[str] = betheth_csv_file

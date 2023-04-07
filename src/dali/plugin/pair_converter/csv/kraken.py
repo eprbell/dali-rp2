@@ -91,8 +91,9 @@ class _PairStartEnd(NamedTuple):
 
 
 class Kraken:
+  
+  
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
-
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __CACHE_DIRECTORY: str = ".dali_cache/kraken/"
@@ -115,7 +116,6 @@ class Kraken:
         self,
         google_api_key: str,
     ) -> None:
-
         self.__google_api_key: str = google_api_key
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
@@ -155,7 +155,6 @@ class Kraken:
             yield position, chunk
 
     def _split_chunks_size_n(self, file_name: str, csv_file: str, chunk_size: int = _CHUNK_SIZE) -> None:
-
         pair, duration_in_minutes = file_name.strip(".csv").split("_", 1)
         chunk_size *= min(int(duration_in_minutes), _MAX_MULTIPLIER)
         file_timestamp: str

@@ -36,7 +36,6 @@ def generate_configuration_file(
     transactions: List[AbstractTransaction],
     global_configuration: Dict[str, Any],
 ) -> Any:
-
     if not isinstance(output_dir_path, str):
         raise RP2RuntimeError(f"Internal error: parameter output_dir_path is not of type string: {repr(output_dir_path)}")
     if not isinstance(output_file_prefix, str):

@@ -30,7 +30,6 @@ from dali.in_transaction import InTransaction
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __COINCHECK: str = "Coincheck"
     __COINCHECK_SUPPLEMENTAL_PLUGIN: str = "Coincheck_Supplemental_CSV"
 
@@ -50,7 +49,6 @@ class InputPlugin(AbstractInputPlugin):
         buys_csv_file: str,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__buys_csv_file: str = buys_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__COINCHECK_SUPPLEMENTAL_PLUGIN}/{self.account_holder}")
