@@ -151,7 +151,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
     ) -> None:
-
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
@@ -190,7 +189,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return self.__exchange_graphs
 
     def _bfs_cyclic(self, graph: Dict[str, Dict[str, None]], start: str, end: str) -> Optional[List[str]]:
-
         # maintain a queue of paths
         # TO BE IMPLEMENTED - using on vertex queue and one dict?
         # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924058754
@@ -213,7 +211,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
             # enumerate all adjacent nodes, construct a new path and push it into the queue
             for adjacent in graph.get(node, {}):
-
                 # prevents an infinite loop.
                 if adjacent not in visited:
                     new_path: List[str] = list(path)
@@ -285,7 +282,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # Build conversion stack, we will iterate over this to find the price for each conversion
         # Then multiply them together to get our final price.
         for node in pricing_path:
-
             if last_node:
                 conversion_route.append(
                     AssetPairAndHistoricalPrice(
@@ -376,7 +372,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 return historical_bar
 
         while retry_count < len(_TIME_GRANULARITY):
-
             timeframe: str = _TIME_GRANULARITY[retry_count]
             request_count: int = 0
             historical_data: List[List[Union[int, float]]] = []
@@ -461,7 +456,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 current_graph[base_asset] = {quote_asset: None}
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
-
         if exchange not in self.__exchanges:
             # initializes the cctx exchange instance which is used to get the historical data
             # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter

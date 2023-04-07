@@ -61,32 +61,30 @@ class InputPlugin(AbstractInputPlugin):
         for asset in assets:
             self.__logger.info("Processing %s", asset)
 
-            input_data: InputData = parse_ods(
-                configuration=rp2_configuration,
-                asset=asset,
-                input_file_handle=input_file_handle
-            )
+            input_data: InputData = parse_ods(configuration=rp2_configuration, asset=asset, input_file_handle=input_file_handle)
             self.__logger.debug("InputData object: %s", input_data)
             for asset_entry in input_data.unfiltered_in_transaction_set:
                 in_transaction: RP2InTransaction = cast(RP2InTransaction, asset_entry)
                 self.__logger.debug("Transaction: %s", str(in_transaction))
-                result.append(InTransaction(
-                    plugin=self.__RP2_INPUT,
-                    unique_id=in_transaction.unique_id,
-                    raw_data=str(in_transaction),
-                    timestamp=str(in_transaction.timestamp),
-                    asset=in_transaction.asset,
-                    exchange=in_transaction.exchange,
-                    holder=in_transaction.holder,
-                    transaction_type=in_transaction.transaction_type.value,
-                    spot_price=str(in_transaction.spot_price),
-                    crypto_in=str(in_transaction.crypto_in),
-                    crypto_fee=str(in_transaction.crypto_fee) if in_transaction.crypto_fee else None,
-                    fiat_in_no_fee=str(in_transaction.fiat_in_no_fee) if in_transaction.fiat_in_no_fee else None,
-                    fiat_in_with_fee=str(in_transaction.fiat_in_with_fee) if in_transaction.fiat_in_with_fee else None,
-                    fiat_fee=str(in_transaction.fiat_fee) if in_transaction.fiat_fee else None,
-                    notes=str(in_transaction.notes) if in_transaction.notes else None
-                ))
+                result.append(
+                    InTransaction(
+                        plugin=self.__RP2_INPUT,
+                        unique_id=in_transaction.unique_id,
+                        raw_data=str(in_transaction),
+                        timestamp=str(in_transaction.timestamp),
+                        asset=in_transaction.asset,
+                        exchange=in_transaction.exchange,
+                        holder=in_transaction.holder,
+                        transaction_type=in_transaction.transaction_type.value,
+                        spot_price=str(in_transaction.spot_price),
+                        crypto_in=str(in_transaction.crypto_in),
+                        crypto_fee=str(in_transaction.crypto_fee) if in_transaction.crypto_fee else None,
+                        fiat_in_no_fee=str(in_transaction.fiat_in_no_fee) if in_transaction.fiat_in_no_fee else None,
+                        fiat_in_with_fee=str(in_transaction.fiat_in_with_fee) if in_transaction.fiat_in_with_fee else None,
+                        fiat_fee=str(in_transaction.fiat_fee) if in_transaction.fiat_fee else None,
+                        notes=str(in_transaction.notes) if in_transaction.notes else None,
+                    )
+                )
 
             for asset_transfer in input_data.unfiltered_intra_transaction_set:
                 intra_transaction: RP2IntraTransaction = cast(RP2IntraTransaction, asset_transfer)
@@ -105,8 +103,9 @@ class InputPlugin(AbstractInputPlugin):
                         spot_price=str(intra_transaction.spot_price) if intra_transaction.spot_price else None,
                         crypto_sent=str(intra_transaction.crypto_sent),
                         crypto_received=str(intra_transaction.crypto_received),
-                        notes=str(intra_transaction.notes) if intra_transaction.notes else None
-                    ))
+                        notes=str(intra_transaction.notes) if intra_transaction.notes else None,
+                    )
+                )
 
             for asset_exit in input_data.unfiltered_out_transaction_set:
                 out_transaction: RP2OutTransaction = cast(RP2OutTransaction, asset_exit)
@@ -127,6 +126,7 @@ class InputPlugin(AbstractInputPlugin):
                         crypto_out_with_fee=str(out_transaction.crypto_out_with_fee),
                         fiat_out_no_fee=str(out_transaction.fiat_out_no_fee) if out_transaction.fiat_out_no_fee else None,
                         fiat_fee=str(out_transaction.fiat_fee) if out_transaction.fiat_fee else None,
-                        notes=str(out_transaction.notes) if out_transaction.notes else None
-                    ))
+                        notes=str(out_transaction.notes) if out_transaction.notes else None,
+                    )
+                )
         return result

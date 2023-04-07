@@ -25,7 +25,6 @@ class PairConverterPlugin(CcxtPairConverterPlugin):
         historical_price_type: str,
         fiat_priority: Optional[str] = None,
     ) -> None:
-
         super().__init__(
             historical_price_type=historical_price_type,
             default_exchange="Binance.com",

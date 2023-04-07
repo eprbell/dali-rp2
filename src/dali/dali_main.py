@@ -71,7 +71,6 @@ def dali_main(country: AbstractCountry) -> None:
 
 
 def _dali_main_internal(country: AbstractCountry) -> None:
-
     args: Namespace
     parser: ArgumentParser
 

@@ -36,7 +36,6 @@ _RECV: str = "RECV"
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __TREZOR: str = "Trezor"
 
     __TIMESTAMP_INDEX: int = 0
@@ -56,7 +55,6 @@ class InputPlugin(AbstractInputPlugin):
         csv_file: str,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__account_nickname: str = account_nickname
         self.__currency: str = currency

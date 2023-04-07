@@ -36,7 +36,6 @@ from dali.out_transaction import OutTransaction
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __MANUAL: str = "Manual"
 
     __IN_UNIQUE_ID_INDEX: int = 0
@@ -86,7 +85,6 @@ class InputPlugin(AbstractInputPlugin):
         intra_csv_file: str,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder="", native_fiat=native_fiat)
 
         self.__in_csv_file: str = in_csv_file
@@ -105,7 +103,6 @@ class InputPlugin(AbstractInputPlugin):
         return result
 
     def _load_in_file(self, transactions: List[AbstractTransaction]) -> None:
-
         if not self.__in_csv_file:
             return
 
@@ -153,7 +150,6 @@ class InputPlugin(AbstractInputPlugin):
                 )
 
     def _load_out_file(self, transactions: List[AbstractTransaction]) -> None:
-
         if not self.__out_csv_file:
             return
 
@@ -202,7 +198,6 @@ class InputPlugin(AbstractInputPlugin):
                 )
 
     def _load_intra_file(self, transactions: List[AbstractTransaction]) -> None:
-
         if not self.__intra_csv_file:
             return
 

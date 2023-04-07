@@ -34,7 +34,6 @@ from dali.intra_transaction import IntraTransaction
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __BITBANK: str = "Bitbank.cc"
     __BITBANK_PLUGIN: str = "Bitbank_Supplemental_CSV"
 
@@ -60,7 +59,6 @@ class InputPlugin(AbstractInputPlugin):
         withdrawals_code: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__deposits_csv_file: Optional[str] = deposits_csv_file
         self.__deposits_code: Optional[str] = deposits_code
