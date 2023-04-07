@@ -30,7 +30,6 @@ from requests import PreparedRequest
 from requests.auth import AuthBase
 from requests.models import Response
 from requests.sessions import Session
-
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -428,9 +427,7 @@ class InputPlugin(AbstractInputPlugin):
             and _TO in transaction
             and _EMAIL in transaction[_TO]
             and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
-        ) or (
-            transaction[_TYPE] == _CARDSPEND
-        )
+        ) or (transaction[_TYPE] == _CARDSPEND)
 
     def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
         currency: str = account[_CURRENCY][_CODE]
@@ -561,7 +558,7 @@ class InputPlugin(AbstractInputPlugin):
             transaction_network = transaction[_NETWORK]
             crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else Keyword.UNKNOWN.value
             if amount < ZERO:
-                if ( # pylint: disable=too-many-boolean-expressions
+                if (  # pylint: disable=too-many-boolean-expressions
                     _TO in transaction
                     and transaction[_TO] is not None
                     and _RESOURCE in transaction[_TO]

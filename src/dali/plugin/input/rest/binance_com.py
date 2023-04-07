@@ -29,7 +29,6 @@ from multiprocessing.pool import ThreadPool
 from typing import Any, Dict, List, Optional, Union
 
 from ccxt import Exchange, binance
-
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
 

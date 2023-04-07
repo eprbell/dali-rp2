@@ -11,17 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
 import unittest
+from typing import List
 
-from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.plugin.country.us import US
+from rp2.rp2_decimal import ZERO, RP2Decimal
 
-from dali.configuration import Keyword
 from dali.abstract_transaction import AbstractTransaction
+from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
-from dali.out_transaction import OutTransaction
 from dali.intra_transaction import IntraTransaction
+from dali.out_transaction import OutTransaction
 from dali.plugin.input.ods.rp2_input import InputPlugin
 
 
@@ -31,11 +31,7 @@ class TestRP2InputOds(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        plugin = InputPlugin(
-            configuration_path='input/test_ods_rp2_input.ini',
-            input_file='input/test_ods_rp2_input.ods',
-            native_fiat="USD"
-        )
+        plugin = InputPlugin(configuration_path="input/test_ods_rp2_input.ini", input_file="input/test_ods_rp2_input.ods", native_fiat="USD")
         cls.transactions = plugin.load(US())
 
     def test_all_transactions_found(self) -> None:

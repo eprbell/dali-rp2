@@ -21,7 +21,6 @@ from datetime import datetime
 from typing import List, Optional
 
 import pytz
-
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
