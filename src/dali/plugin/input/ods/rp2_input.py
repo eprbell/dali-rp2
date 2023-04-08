@@ -16,12 +16,12 @@ import logging
 from typing import List, Optional, cast
 
 from rp2.abstract_country import AbstractCountry
-from rp2.configuration import Configuration, MAX_DATE, MIN_DATE
+from rp2.configuration import MAX_DATE, MIN_DATE, Configuration
 from rp2.in_transaction import InTransaction as RP2InTransaction
 from rp2.input_data import InputData
 from rp2.intra_transaction import IntraTransaction as RP2IntraTransaction
 from rp2.logger import create_logger
-from rp2.ods_parser import parse_ods, open_ods
+from rp2.ods_parser import open_ods, parse_ods
 from rp2.out_transaction import OutTransaction as RP2OutTransaction
 
 from dali.abstract_input_plugin import AbstractInputPlugin
