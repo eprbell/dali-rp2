@@ -91,8 +91,6 @@ class _PairStartEnd(NamedTuple):
 
 
 class Kraken:
-  
-  
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
