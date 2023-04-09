@@ -26,7 +26,6 @@ from dali.plugin.input.ods.rp2_input import InputPlugin
 
 
 class TestRP2InputOds(unittest.TestCase):
-
     transactions: List[AbstractTransaction]
 
     @classmethod
