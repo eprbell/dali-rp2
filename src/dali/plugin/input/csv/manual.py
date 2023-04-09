@@ -51,6 +51,7 @@ class InputPlugin(AbstractInputPlugin):
     __IN_FIAT_IN_WITH_FEE_INDEX: int = 10
     __IN_FIAT_FEE_INDEX: int = 11
     __IN_NOTES_INDEX: int = 12
+    __IN_FIAT_TICKER: int = 13
 
     __OUT_UNIQUE_ID_INDEX: int = 0
     __OUT_TIMESTAMP_INDEX: int = 1
@@ -65,6 +66,8 @@ class InputPlugin(AbstractInputPlugin):
     __OUT_FIAT_OUT_NO_FEE_INDEX: int = 10
     __OUT_FIAT_FEE_INDEX: int = 11
     __OUT_NOTES_INDEX: int = 12
+    __OUT_FIAT_TICKER: int = 13
+
 
     __INTRA_UNIQUE_ID_INDEX: int = 0
     __INTRA_TIMESTAMP_INDEX: int = 1
@@ -77,6 +80,7 @@ class InputPlugin(AbstractInputPlugin):
     __INTRA_CRYPTO_SENT_INDEX: int = 8
     __INTRA_CRYPTO_RECEIVED_INDEX: int = 9
     __INTRA_NOTES_INDEX: int = 10
+    __OUT_FIAT_TICKER: int = 11
 
     def __init__(
         self,
@@ -146,6 +150,7 @@ class InputPlugin(AbstractInputPlugin):
                         fiat_in_with_fee=line[self.__IN_FIAT_IN_WITH_FEE_INDEX],
                         fiat_fee=line[self.__IN_FIAT_FEE_INDEX],
                         notes=line[self.__IN_NOTES_INDEX],
+                        fiat_ticker=line[self.__IN_FIAT_TICKER]
                     )
                 )
 
@@ -194,6 +199,7 @@ class InputPlugin(AbstractInputPlugin):
                         fiat_out_no_fee=line[self.__OUT_FIAT_OUT_NO_FEE_INDEX],
                         fiat_fee=line[self.__OUT_FIAT_FEE_INDEX],
                         notes=line[self.__OUT_NOTES_INDEX],
+                        fiat_ticker=line[self.__OUT_FIAT_TICKER]
                     )
                 )
 
@@ -227,6 +233,7 @@ class InputPlugin(AbstractInputPlugin):
                 to_holder: str = line[self.__INTRA_TO_HOLDER_INDEX]
                 crypto_sent: str = line[self.__INTRA_CRYPTO_SENT_INDEX]
                 crypto_received: str = line[self.__INTRA_CRYPTO_RECEIVED_INDEX]
+                fiat_ticker: str = line[self.__OUT_FIAT_TICKER]
                 transactions.append(
                     IntraTransaction(
                         plugin=self.__MANUAL,
@@ -242,5 +249,6 @@ class InputPlugin(AbstractInputPlugin):
                         crypto_sent=crypto_sent if crypto_sent else Keyword.UNKNOWN.value,
                         crypto_received=crypto_received if crypto_received else Keyword.UNKNOWN.value,
                         notes=line[self.__INTRA_NOTES_INDEX],
+                        fiat_ticker=fiat_ticker if fiat_ticker else Keyword.UNKNOWN.value
                     )
                 )
