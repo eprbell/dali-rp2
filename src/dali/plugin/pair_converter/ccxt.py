@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timedelta
 from inspect import Signature, signature
 from time import sleep, time
-from typing import Any, Dict, List, NamedTuple, Optional, Union
+from typing import Any, DefaultDict, Dict, Iterator, List, NamedTuple, Optional, Union
 
 from ccxt import (
     DDoSProtection,
@@ -30,6 +30,8 @@ from ccxt import (
     huobi,
     kraken,
 )
+from prezzemolo.graph import Graph
+from prezzemolo.vertex import Vertex
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
@@ -37,6 +39,7 @@ from rp2.rp2_error import RP2RuntimeError
 from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
     AssetPairAndTimestamp,
+    GraphVertexesDict,
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
@@ -111,18 +114,18 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
 
 # Priority for quote asset. If asset is not listed it will be filtered out.
 # In principle this should be fiat in order of trade volume and then stable coins in order of trade volume
-_QUOTE_PRIORITY: Dict[str, None] = {
-    "USD": None,
-    "JPY": None,
-    "KRW": None,
-    "EUR": None,
-    "GBP": None,
-    "AUD": None,
-    "USDT": None,
-    "USDC": None,
-    "BUSD": None,
-    "TUSD": None,
-    "OUSD": None,
+_QUOTE_PRIORITY: Dict[str, float] = {
+    "USD": 1.0,
+    "JPY": 2.0,
+    "KRW": 3.0,
+    "EUR": 4.0,
+    "GBP": 5.0,
+    "AUD": 6.0,
+    "USDT": 7.0,
+    "USDC": 8.0,
+    "BUSD": 9.0,
+    "TUSD": 10.0,
+    "OUSD": 11.0,
 }
 
 # Time constants
@@ -133,6 +136,11 @@ _CACHE_INTERVAL: int = 200
 
 # CSV Reader
 _GOOGLE_API_KEY: str = "google_api_key"
+
+# Djikstra weights
+# Priority should go to quote assets listed above, then other assets, and finally alternatives
+_STANDARD_WEIGHT: float = 50.0
+_ALTERNATIVE_MARKET_WEIGHT: float = 50.5
 
 
 class AssetPairAndHistoricalPrice(NamedTuple):
@@ -159,12 +167,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
         self.__google_api_key: Optional[str] = google_api_key
         self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
-
-        # TO BE IMPLEMENTED - graph and vertex classes to make this more understandable
-        # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924056308
         self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
         self.__exchange_csv_reader: Dict[str, Any] = {}
-        self.__exchange_graphs: Dict[str, Dict[str, Dict[str, None]]] = {}
+        self.__exchange_graphs: Dict[str, Graph[str]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         if exchange_locked:
             self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
@@ -186,52 +191,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return self.__exchange_markets
 
     @property
-    def exchange_graphs(self) -> Dict[str, Dict[str, Dict[str, None]]]:
+    def exchange_graphs(self) -> Dict[str, Graph[str]]:
         return self.__exchange_graphs
-
-    def _bfs_cyclic(self, graph: Dict[str, Dict[str, None]], start: str, end: str) -> Optional[List[str]]:
-
-        # maintain a queue of paths
-        # TO BE IMPLEMENTED - using on vertex queue and one dict?
-        # https://github.com/eprbell/dali-rp2/pull/53#discussion_r924058754
-        queue: List[List[str]] = []
-        visited: Dict[str, None] = {}
-
-        # push the first path into the queue
-        queue.append([start])
-
-        while queue:
-            # get the first path from the queue
-            path: List[str] = queue.pop(0)
-
-            # get the last node from the path
-            node: str = path[-1]
-
-            # path found
-            if node == end:
-                return path
-
-            # enumerate all adjacent nodes, construct a new path and push it into the queue
-            for adjacent in graph.get(node, {}):
-
-                # prevents an infinite loop.
-                if adjacent not in visited:
-                    new_path: List[str] = list(path)
-                    new_path.append(adjacent)
-                    queue.append(new_path)
-                    visited[adjacent] = None
-
-        # No path found
-        return None
-
-    def _prioritize_quote_assets(self, current_graph: Dict[str, List[str]]) -> None:
-        for base_asset in current_graph.keys():
-            for priority_quote in reversed(_QUOTE_PRIORITY):
-                if priority_quote in current_graph[base_asset]:
-                    current_graph[base_asset].pop(current_graph[base_asset].index(priority_quote))
-                    remainder: List[str] = current_graph[base_asset]
-                    current_graph[base_asset] = [priority_quote]
-                    current_graph[base_asset].extend(remainder)
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         self.__logger.debug("Converting %s to %s", from_asset, to_asset)
@@ -259,9 +220,12 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         current_markets = self.__exchange_markets[exchange]
         current_graph = self.__exchange_graphs[exchange]
-
+        vertexes: DefaultDict[str, Vertex[str]] = self.graph_vertexes[current_graph]
+        from_asset_vertex: Optional[Vertex[str]] = vertexes.get(from_asset)
+        to_asset_vertex: Optional[Vertex[str]] = vertexes.get(to_asset)
         market_symbol = from_asset + to_asset
         result: Optional[HistoricalBar] = None
+        pricing_path: Optional[Iterator[Vertex[str]]] = None
 
         # TO BE IMPLEMENTED - bypass routing if conversion can be done with one market on the exchange
         if market_symbol in current_markets and (exchange in current_markets[market_symbol]):
@@ -271,12 +235,17 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # else:
         # Graph building goes here.
 
-        pricing_path: Optional[List[str]] = self._bfs_cyclic(current_graph, from_asset, to_asset)
+        if from_asset_vertex and to_asset_vertex:
+            pricing_path = current_graph.dijkstra(from_asset_vertex, to_asset_vertex, False)
+        else:
+            raise RP2RuntimeError(f"The asset {from_asset} or {to_asset} is missing from graph")
+
         if pricing_path is None:
             self.__logger.debug("No path found for %s to %s. Please open an issue at %s.", from_asset, to_asset, self.issues_url)
             return None
 
-        self.__logger.debug("Found path - %s", pricing_path)
+        pricing_path_list: List[str] = [v.name for v in pricing_path]
+        self.__logger.debug("Found path - %s", pricing_path_list)
 
         conversion_route: List[AssetPairAndHistoricalPrice] = []
         last_node: Optional[str] = None
@@ -284,7 +253,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         # Build conversion stack, we will iterate over this to find the price for each conversion
         # Then multiply them together to get our final price.
-        for node in pricing_path:
+        for node in pricing_path_list:
 
             if last_node:
                 conversion_route.append(
@@ -316,7 +285,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     timestamp,
                     hop_data.exchange,
                 )
-
             if result is not None:
                 # TO BE IMPLEMENTED - override Historical Bar * to multiply two bars?
                 result = HistoricalBar(
@@ -441,7 +409,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         return result
 
-    def _add_alternative_markets(self, current_graph: Dict[str, Dict[str, None]], current_markets: Dict[str, List[str]]) -> None:
+    def _add_alternative_markets(self, graph: Graph[str], current_markets: Dict[str, List[str]]) -> None:
+        vertexes: DefaultDict[str, Vertex[str]] = self.graph_vertexes[graph]
+
         for base_asset, quote_asset in _ALT_MARKET_BY_BASE_DICT.items():
             alt_market = base_asset + quote_asset
             alt_exchange_name = _ALT_MARKET_EXCHANGES_DICT[alt_market]
@@ -455,10 +425,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
                 self.__exchanges[alt_exchange_name] = alt_exchange
 
-            if current_graph.get(base_asset) and (quote_asset not in current_graph[base_asset]):
-                current_graph[base_asset][quote_asset] = None
-            else:
-                current_graph[base_asset] = {quote_asset: None}
+            # If the key doesn't exist, the GraphVertexesDict will create a vertex and add it to the graph
+            current_vertex: Vertex[str] = vertexes[base_asset]
+            neighbor: Vertex[str] = vertexes[quote_asset]
+            if neighbor not in current_vertex.neighbors:
+                current_vertex.add_neighbor(neighbor, _ALTERNATIVE_MARKET_WEIGHT)
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
 
@@ -471,7 +442,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         # key: market, value: exchanges where the market is available in order of priority
         current_markets: Dict[str, List[str]] = {}
-        current_graph: Dict[str, Dict[str, None]] = {}
+        current_graph: Graph[str] = Graph[str]()
+        vertexes: DefaultDict[str, Vertex[str]] = GraphVertexesDict(current_graph)
 
         for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
             self.__logger.debug("Market: %s", market)
@@ -480,10 +452,14 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
             # TO BE IMPLEMENTED - lazy build graph only if needed
 
-            # Add the quote asset to the graph if it isn't there already.
-            current_graph.setdefault(market[_BASE], {})[market[_QUOTE]] = None
+            # If the key doesn't exist, the GraphVertexesDict will create a vertex and add it to the graph
+            current_vertex = vertexes[market[_BASE]]
+            neighbor = vertexes[market[_QUOTE]]
+            if neighbor not in current_vertex.neighbors:
+                current_vertex.add_neighbor(neighbor, _QUOTE_PRIORITY.get(neighbor.name, _STANDARD_WEIGHT))
 
-        self._prioritize_quote_assets(current_markets)
+        # Graph[str](list(vertexes.values()))
+        self.graph_vertexes[current_graph] = vertexes
 
         # Add alternative markets if they don't exist
         if not self.__exchange_locked:

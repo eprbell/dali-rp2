@@ -12,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from collections import defaultdict
 from datetime import datetime, timedelta
-from json import JSONDecodeError, loads
-from typing import Any, Dict, List, NamedTuple, Optional, cast
+from json import JSONDecodeError
+from typing import Any, DefaultDict, Dict, List, NamedTuple, Optional, cast
 
 import requests
+from prezzemolo.graph import Graph
+from prezzemolo.vertex import Vertex
 from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
@@ -43,7 +46,18 @@ _FIAT_EXCHANGE: str = "exchangerate.host"
 # First on the list has the most priority
 # This is hard-coded for now based on volume of each of these markets for BTC on Coinmarketcap.com
 # Any change to this priority should be documented in "docs/configuration_file.md"
-_FIAT_PRIORITY: List[str] = ["USD", "JPY", "KRW", "EUR", "GBP", "AUD"]
+_FIAT_PRIORITY: Dict[str, float] = {
+    "USD": 1.0,
+    "JPY": 2.0,
+    "KRW": 3.0,
+    "EUR": 4.0,
+    "GBP": 5.0,
+    "AUD": 6.0,
+}
+
+# Other Weights
+_STANDARD_WEIGHT: float = 1.0
+_STANDARD_INCREMENT: float = 1.0
 
 
 class AssetPairAndTimestamp(NamedTuple):
@@ -51,6 +65,22 @@ class AssetPairAndTimestamp(NamedTuple):
     from_asset: str
     to_asset: str
     exchange: str
+
+
+# This class requires a graph that it will add newly created vertexes to if the user tries to access one that is missing.
+# The new vertexes are created with a name of the str key.
+class GraphVertexesDict(defaultdict[str, Vertex[str]]):
+    def __init__(self, graph: Graph[str]) -> None:
+        super().__init__(None)
+        self.__graph: Graph[str] = graph
+        for vertex in graph.vertexes:
+            self[vertex.name] = vertex
+
+    def __missing__(self, key: str) -> Vertex[str]:
+        value: Vertex[str] = Vertex[str](name=key)
+        self[key] = value
+        self.__graph.add_vertex(value)
+        return value
 
 
 class AbstractPairConverterPlugin:
@@ -69,8 +99,15 @@ class AbstractPairConverterPlugin:
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
         self.__fiat_list: List[str] = []
-        self.__fiat_priority: List[str]
-        self.__fiat_priority = loads(fiat_priority) if fiat_priority is not None else _FIAT_PRIORITY
+        self.__fiat_priority: Dict[str, float]
+        self.__graph_vertexes: Dict[Graph[str], DefaultDict[str, Vertex[str]]] = {}
+        if fiat_priority:
+            weight: float = _STANDARD_WEIGHT
+            for fiat in fiat_priority:
+                self.__fiat_priority[fiat] = weight
+                weight += _STANDARD_INCREMENT
+        else:
+            self.__fiat_priority = _FIAT_PRIORITY
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -110,6 +147,10 @@ class AbstractPairConverterPlugin:
     @property
     def issues_url(self) -> str:
         return self.__ISSUES_URL
+
+    @property
+    def graph_vertexes(self) -> Dict[Graph[str], DefaultDict[str, Vertex[str]]]:
+        return self.__graph_vertexes
 
     # The exchange parameter is a hint on which exchange to use for price lookups. The plugin is free to use it or ignore it.
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
@@ -179,34 +220,33 @@ class AbstractPairConverterPlugin:
             LOGGER.info("Fetching of fiat symbols failed. The server might be down. Please try again later.")
             raise RP2RuntimeError("JSON decode error") from exc
 
-    def _add_fiat_edges_to_graph(self, graph: Dict[str, Dict[str, None]], markets: Dict[str, List[str]]) -> None:
+    def _add_fiat_edges_to_graph(self, graph: Graph[str], markets: Dict[str, List[str]]) -> None:
+        vertexes: DefaultDict[str, Vertex[str]] = self.graph_vertexes[graph]
+
         if not self.__fiat_list:
             self._build_fiat_list()
 
         for fiat in self.__fiat_list:
             to_fiat_list: Dict[str, None] = dict.fromkeys(self.__fiat_list.copy())
             del to_fiat_list[fiat]
-            if graph.get(fiat):
+            # We don't want to add a fiat vertex here because that would allow a double hop on fiat (eg. USD -> KRW -> JPY)
+            fiat_vertex: Optional[Vertex[str]] = vertexes.get(fiat)
+            if fiat_vertex:
                 for to_be_added_fiat in to_fiat_list:
+                    # If the vertex doesn't exist, GraphVertexesDict will return a new vertex and add it to the graph
+                    to_be_added_fiat_vertex: Optional[Vertex[str]] = vertexes[to_be_added_fiat]
                     # add a pair if it doesn't exist
-                    if to_be_added_fiat not in graph[fiat]:
-                        graph[fiat][to_be_added_fiat] = None
-            else:
-                graph[fiat] = to_fiat_list
+                    if to_be_added_fiat_vertex and to_be_added_fiat_vertex not in list(fiat_vertex.neighbors):
+                        fiat_vertex.add_neighbor(
+                            to_be_added_fiat_vertex,
+                            self.__fiat_priority.get(fiat_vertex.name, _STANDARD_WEIGHT),
+                        )
+
+                LOGGER.debug("Added to assets for %s: %s", fiat, fiat_vertex.neighbors)
 
             for to_fiat in to_fiat_list:
                 fiat_market = f"{fiat}{to_fiat}"
                 markets[fiat_market] = [_FIAT_EXCHANGE]
-
-            # Add prioritized fiat at the beginning
-            for priority_fiat in reversed(self.__fiat_priority):
-                if priority_fiat in graph[fiat]:
-                    graph[fiat].pop(priority_fiat)
-                    remainder: Dict[str, None] = graph[fiat]
-                    graph[fiat] = {priority_fiat: None}
-                    graph[fiat].update(remainder)
-
-            LOGGER.debug("Added to assets for %s: %s", fiat, graph[fiat])
 
     def _is_fiat_pair(self, from_asset: str, to_asset: str) -> bool:
         return self._is_fiat(from_asset) and self._is_fiat(to_asset)
