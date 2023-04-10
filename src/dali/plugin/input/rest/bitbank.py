@@ -25,7 +25,6 @@ from datetime import datetime
 from typing import Any, List, Optional
 
 from ccxt import bitbank
-
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_ccxt_input_plugin import (
@@ -56,7 +55,6 @@ _TIMESTAMP: str = "timestamp"
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
-
     __EXCHANGE_NAME: str = "Bitbank.cc"
     __PLUGIN_NAME: str = "Bitbank.cc_REST"
     __DEFAULT_THREAD_COUNT: int = 1
@@ -69,7 +67,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
         native_fiat: str,
         thread_count: Optional[int] = __DEFAULT_THREAD_COUNT,
     ) -> None:
-
         self.__api_key = api_key
         self.__api_secret = api_secret
         # We will have a default start time of March 1st, 2017 since Bitbank Exchange officially launched on March 1st Japan Time.

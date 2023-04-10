@@ -53,7 +53,7 @@ from dali.plugin.pair_converter.historic_crypto import (
 )
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.6.7"
+_VERSION: str = "0.6.8"
 
 
 class _InputPluginHelperArgs(NamedTuple):
@@ -71,7 +71,6 @@ def dali_main(country: AbstractCountry) -> None:
 
 
 def _dali_main_internal(country: AbstractCountry) -> None:
-
     args: Namespace
     parser: ArgumentParser
 

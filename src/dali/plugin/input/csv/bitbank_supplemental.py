@@ -21,7 +21,6 @@ from datetime import timezone as DatetimeTimezone
 from typing import List, Optional
 
 from pytz import timezone as PytzTimezone
-
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_error import RP2ValueError
@@ -34,7 +33,6 @@ from dali.intra_transaction import IntraTransaction
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __BITBANK: str = "Bitbank.cc"
     __BITBANK_PLUGIN: str = "Bitbank_Supplemental_CSV"
 
@@ -60,7 +58,6 @@ class InputPlugin(AbstractInputPlugin):
         withdrawals_code: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__deposits_csv_file: Optional[str] = deposits_csv_file
         self.__deposits_code: Optional[str] = deposits_code

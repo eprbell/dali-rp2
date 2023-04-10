@@ -14,6 +14,7 @@
 
 from enum import Enum
 from typing import Dict, Optional, Set, Union
+
 from rp2.rp2_error import RP2ValueError
 
 

@@ -16,12 +16,12 @@
 # CSV Format: timestamp, date, time, type, transaction_id, fee, fee unit, address, label, amount, amount unit, fiat, other
 
 import logging
+import re
 from csv import reader
 from datetime import datetime
-import re
-from dateutil.parser import parse
 from typing import List, Optional
 
+from dateutil.parser import parse
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -36,7 +36,6 @@ _RECV: str = "RECV"
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __TREZOR_V2: str = "Trezor V2"
 
     __DATE_INDEX: int = 1
@@ -56,7 +55,6 @@ class InputPlugin(AbstractInputPlugin):
         csv_file: str,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__account_nickname: str = account_nickname
         self.__currency: str = currency

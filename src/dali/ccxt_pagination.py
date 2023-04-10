@@ -98,7 +98,6 @@ class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
         markets: Optional[List[str]] = None,
         params: Optional[Dict[str, Union[int, str, None]]] = None,
     ) -> None:
-
         super().__init__(exchange_start_time, limit, markets, params, window)
         self.__start_time_key: str = start_time_key
         self.__end_time_key: str = end_time_key
@@ -162,7 +161,6 @@ class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
         params: Optional[Dict[str, Union[int, str, None]]] = None,
         window: Optional[int] = None,
     ) -> None:
-
         super().__init__(limit, markets, params)
         self.__end_of_data = False
         self.__since: int = exchange_start_time
@@ -171,7 +169,6 @@ class DateBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
         self.__window: Optional[int] = window
 
     def update_fetched_elements(self, current_results: Any) -> None:
-
         end_of_market: bool = False
 
         # Update Since if needed otherwise end_of_market
@@ -226,13 +223,11 @@ class CustomDateBasedPaginationDetailsIterator(DateBasedPaginationDetailsIterato
         markets: Optional[List[str]] = None,
         params: Optional[Dict[str, Union[int, str, None]]] = None,
     ) -> None:
-
         super().__init__(exchange_start_time, limit, markets, params, window)
         self.__start_time_key: str = start_time_key
         self.__end_time_key: str = end_time_key
 
     def __next__(self) -> PaginationDetails:
-
         while not self._is_end_of_data():
             base_details: PaginationDetails = super().__next__()
             if base_details.params:

@@ -30,7 +30,6 @@ from requests import PreparedRequest
 from requests.auth import AuthBase
 from requests.models import Response
 from requests.sessions import Session
-
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -114,7 +113,6 @@ class _SwapPair(NamedTuple):
 
 
 class _CoinbaseAuth(AuthBase):
-
     __API_VERSION: str = "2017-11-27"
 
     def __init__(self, api_key: str, api_secret: str) -> None:
@@ -138,7 +136,6 @@ class _CoinbaseAuth(AuthBase):
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __API_URL: str = "https://api.coinbase.com"
     __DEFAULT_THREAD_COUNT: int = 3
     __MAX_THREAD_COUNT: int = 4
@@ -160,7 +157,6 @@ class InputPlugin(AbstractInputPlugin):
         native_fiat: Optional[str] = None,
         thread_count: Optional[int] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__api_url: str = InputPlugin.__API_URL
         self.__auth: _CoinbaseAuth = _CoinbaseAuth(api_key, api_secret)
@@ -422,15 +418,12 @@ class InputPlugin(AbstractInputPlugin):
                 )
 
     def _is_credit_card_spend(self, transaction: Any) -> bool:
-
         return (  # type: ignore
             transaction[_TYPE] is None
             and _TO in transaction
             and _EMAIL in transaction[_TO]
             and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
-        ) or (
-            transaction[_TYPE] == _CARDSPEND
-        )
+        ) or (transaction[_TYPE] == _CARDSPEND)
 
     def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
         currency: str = account[_CURRENCY][_CODE]
@@ -561,7 +554,7 @@ class InputPlugin(AbstractInputPlugin):
             transaction_network = transaction[_NETWORK]
             crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else Keyword.UNKNOWN.value
             if amount < ZERO:
-                if ( # pylint: disable=too-many-boolean-expressions
+                if (  # pylint: disable=too-many-boolean-expressions
                     _TO in transaction
                     and transaction[_TO] is not None
                     and _RESOURCE in transaction[_TO]

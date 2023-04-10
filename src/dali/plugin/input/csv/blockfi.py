@@ -51,7 +51,6 @@ _WITHDRAWAL_FEE: str = "Withdrawal Fee"
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __BLOCKFI: str = "BlockFi"
 
     __CURRENCY_INDEX: int = 0
@@ -69,7 +68,6 @@ class InputPlugin(AbstractInputPlugin):
         trade_csv_file: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__transaction_csv_file: str = transaction_csv_file
         self.__trade_csv_file: Optional[str] = trade_csv_file
@@ -232,7 +230,7 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.debug("Header: %s", header)
 
             column_index: Dict[str, int] = {}
-            for (index, name) in enumerate(header):
+            for index, name in enumerate(header):
                 column_index[name] = index
 
             for line in lines:
