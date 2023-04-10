@@ -115,17 +115,17 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
 # Priority for quote asset. If asset is not listed it will be filtered out.
 # In principle this should be fiat in order of trade volume and then stable coins in order of trade volume
 _QUOTE_PRIORITY: Dict[str, float] = {
-    "USD": 1.0,
-    "JPY": 2.0,
-    "KRW": 3.0,
-    "EUR": 4.0,
-    "GBP": 5.0,
-    "AUD": 6.0,
-    "USDT": 7.0,
-    "USDC": 8.0,
-    "BUSD": 9.0,
-    "TUSD": 10.0,
-    "OUSD": 11.0,
+    "USD": 1,
+    "JPY": 2,
+    "KRW": 3,
+    "EUR": 4,
+    "GBP": 5,
+    "AUD": 6,
+    "USDT": 7,
+    "USDC": 8,
+    "BUSD": 9,
+    "TUSD": 10,
+    "OUSD": 11,
 }
 
 # Time constants
@@ -139,8 +139,8 @@ _GOOGLE_API_KEY: str = "google_api_key"
 
 # Djikstra weights
 # Priority should go to quote assets listed above, then other assets, and finally alternatives
-_STANDARD_WEIGHT: float = 50.0
-_ALTERNATIVE_MARKET_WEIGHT: float = 50.5
+_STANDARD_WEIGHT: float = 50
+_ALTERNATIVE_MARKET_WEIGHT: float = 51
 
 
 class AssetPairAndHistoricalPrice(NamedTuple):

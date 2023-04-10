@@ -47,17 +47,17 @@ _FIAT_EXCHANGE: str = "exchangerate.host"
 # This is hard-coded for now based on volume of each of these markets for BTC on Coinmarketcap.com
 # Any change to this priority should be documented in "docs/configuration_file.md"
 _FIAT_PRIORITY: Dict[str, float] = {
-    "USD": 1.0,
-    "JPY": 2.0,
-    "KRW": 3.0,
-    "EUR": 4.0,
-    "GBP": 5.0,
-    "AUD": 6.0,
+    "USD": 1,
+    "JPY": 2,
+    "KRW": 3,
+    "EUR": 4,
+    "GBP": 5,
+    "AUD": 6,
 }
 
 # Other Weights
-_STANDARD_WEIGHT: float = 1.0
-_STANDARD_INCREMENT: float = 1.0
+_STANDARD_WEIGHT: float = 1
+_STANDARD_INCREMENT: float = 1
 
 
 class AssetPairAndTimestamp(NamedTuple):
