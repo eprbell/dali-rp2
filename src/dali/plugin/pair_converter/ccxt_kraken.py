@@ -26,7 +26,6 @@ class PairConverterPlugin(CcxtPairConverterPlugin):
         fiat_priority: Optional[str] = None,
         google_api_key: Optional[str] = None,
     ) -> None:
-
         super().__init__(
             historical_price_type=historical_price_type,
             default_exchange="Kraken",

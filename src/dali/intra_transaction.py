@@ -75,7 +75,6 @@ class IntraTransaction(AbstractTransaction):
         self.__is_unresolved: bool = self._setup_constructor_parameter_dictionary(self.__constructor_parameter_dictionary)
 
     def to_string(self, indent: int = 0, repr_format: bool = True, extra_data: Optional[List[str]] = None) -> str:
-
         class_specific_data: List[str] = []
         stringify: Callable[[object], str] = repr
         if not repr_format:

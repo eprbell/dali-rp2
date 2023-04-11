@@ -31,7 +31,6 @@ from requests import PreparedRequest
 from requests.auth import AuthBase
 from requests.models import Response
 from requests.sessions import Session
-
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -70,6 +69,7 @@ _TRADE_ID: str = "trade_id"
 _TRANSFER: str = "transfer"
 _TRANSFER_ID: str = "transfer_id"
 _TRANSFER_TYPE: str = "transfer_type"
+_TX_SERVICE_TRANSACTION_ID: str = "tx_service_transaction_id"
 _TYPE: str = "type"
 _USD_VOLUME: str = "usd_volume"
 _WITHDRAW: str = "withdraw"
@@ -112,7 +112,6 @@ class _CoinbaseProAuth(AuthBase):
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __API_URL: str = "https://api.pro.coinbase.com/"
     __DEFAULT_THREAD_COUNT: int = 2
     __MAX_THREAD_COUNT: int = 4
@@ -133,7 +132,6 @@ class InputPlugin(AbstractInputPlugin):
         native_fiat: Optional[str] = None,
         thread_count: Optional[int] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__api_url: str = InputPlugin.__API_URL
         self.__auth = _CoinbaseProAuth(api_key, api_secret, api_passphrase)
@@ -231,11 +229,11 @@ class InputPlugin(AbstractInputPlugin):
         raw_data: str = f"{json.dumps(transaction)}//{json.dumps(transfer)}"
 
         self.__logger.debug("Transfer: %s", json.dumps(transfer))
-        if _CRYPTO_TRANSACTION_HASH not in transfer_details:
-            self.__logger.debug("Transfer to/from Coinbase already captured by Coinbase plugin: ignoring.")
-            return
-
-        if _COINBASE_TRANSACTION_ID in transfer_details:
+        if (
+            _CRYPTO_TRANSACTION_HASH not in transfer_details
+            or _TX_SERVICE_TRANSACTION_ID not in transfer_details
+            or _COINBASE_TRANSACTION_ID in transfer_details
+        ):
             self.__logger.debug("Transfer is a Coinbase transaction already captured by Coinbase plugin: ignoring.")
             return
 

@@ -38,8 +38,8 @@ import logging
 from csv import reader
 from datetime import datetime
 from typing import List, Optional
-import dateutil
 
+import dateutil
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -54,7 +54,6 @@ _RECV: str = "IN"
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __LEDGER: str = "Ledger"
 
     __TIMESTAMP_INDEX: int = 0
@@ -77,7 +76,6 @@ class InputPlugin(AbstractInputPlugin):
         csv_file: str,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__account_nickname: str = account_nickname
         self.__csv_file: str = csv_file

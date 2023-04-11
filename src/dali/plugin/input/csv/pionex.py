@@ -35,7 +35,6 @@ from dali.out_transaction import OutTransaction
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __PIONEX: str = "Pionex"
     __PIONEX_PLUGIN: str = "Pionex_CSV"
 
@@ -65,7 +64,6 @@ class InputPlugin(AbstractInputPlugin):
         transfers_csv_file: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__trades_csv_file: Optional[str] = trades_csv_file
         self.__transfers_csv_file: Optional[str] = transfers_csv_file
@@ -153,7 +151,6 @@ class InputPlugin(AbstractInputPlugin):
             header = next(lines)
             self.__logger.debug("Header: %s", header)
             for line in lines:
-
                 raw_data: str = self.__DELIMITER.join(line)
                 self.__logger.debug("Transaction: %s", raw_data)
 

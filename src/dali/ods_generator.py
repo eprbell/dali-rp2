@@ -76,7 +76,6 @@ def generate_input_file(
     transactions: List[AbstractTransaction],
     global_configuration: Dict[str, Any],
 ) -> Any:
-
     native_fiat: str = global_configuration[Keyword.NATIVE_FIAT.value]
 
     _table_to_header: Dict[str, Dict[str, str]] = {
@@ -254,7 +253,6 @@ def _fill_cell(
     visual_style: str = "transparent",
     data_style: str = "default",
 ) -> None:
-
     if value is None:
         return
 

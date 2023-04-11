@@ -29,7 +29,6 @@ from multiprocessing.pool import ThreadPool
 from typing import Any, Dict, List, Optional, Union
 
 from ccxt import Exchange, binance
-
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
 
@@ -150,7 +149,6 @@ _STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENER
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
-
     __EXCHANGE_NAME: str = "Binance.com"
     __PLUGIN_NAME: str = "Binance.com_REST"
     __DEFAULT_THREAD_COUNT: int = 1
@@ -164,7 +162,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
         username: Optional[str] = None,
         thread_count: Optional[int] = __DEFAULT_THREAD_COUNT,
     ) -> None:
-
         self.__api_key = api_key
         self.__api_secret = api_secret
         # We will have a default start time of July 13th, 2017 since Binance Exchange officially launched on July 14th Beijing Time.
@@ -235,7 +232,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
         in_transactions: List[InTransaction],
         out_transactions: List[OutTransaction],
     ) -> None:
-
         ### Regular Dividends from Staking (including Eth staking) and Savings (Lending) after around May 8th, 2021 01:00 UTC.
 
         # We need milliseconds for Binance
@@ -324,7 +320,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         # We will step backward in time from the switch over
         while current_start < now_time:
-
             self._logger.debug("Pulling locked staking from older api system from %s to %s", current_start, current_end)
 
             locked_staking = self._client.sapi_get_staking_stakingrecord(
@@ -392,7 +387,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
             # NOTE: all values are str
 
             for subscription in locked_subscriptions:
-
                 # If the dict already exists add another key, if not add new dict
                 if current_subscriptions.get(subscription[_ASSET]):
                     current_subscriptions[subscription[_ASSET]][f"{RP2Decimal(subscription[_AMOUNT]):.13f}"] = subscription
@@ -423,19 +417,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
             # NOTE: all values are str
 
             for redemption in locked_redemptions:
-
                 redemption_amount: str = f"{RP2Decimal(redemption[_AMOUNT]):.13f}"
 
                 # Check if there is a subscription with this asset and if the redemption amount is equal to the subscription amount
                 if redemption[_ASSET] in current_subscriptions and redemption_amount not in current_subscriptions[redemption[_ASSET]]:
-
                     # If they do not equal we need to calculate what the amended principal should be based on total interest paid to that productId
                     total_interest_earned: RP2Decimal = total_current_interest[redemption[_POSITION_ID]]
                     original_principal: str = f"{(RP2Decimal(redemption[_AMOUNT]) + RP2Decimal(str(total_interest_earned))):.13f}"
                     earliest_redemption_timestamp: int = 0
 
                     if str(original_principal) in current_subscriptions[redemption[_ASSET]]:
-
                         subscription_time: int = int(current_subscriptions[redemption[_ASSET]][str(original_principal)][_TIME])
                         lockperiod_in_ms: int = int(current_subscriptions[redemption[_ASSET]][str(original_principal)][_LOCK_PERIOD]) * _ONE_DAY_IN_MS
                         earliest_redemption_timestamp = subscription_time + lockperiod_in_ms
@@ -475,7 +466,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         )
 
                 elif redemption[_ASSET] in current_subscriptions and redemption_amount in current_subscriptions[redemption[_ASSET]]:
-
                     self._logger.debug("Locked Savings positionId %s redeemed successfully.", redemption[_POSITION_ID])
 
                 else:
@@ -497,7 +487,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         # We will step backward in time from the switch over
         while current_start < earliest_record_epoch:
-
             self._logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
 
             flexible_saving = self._client.sapi_get_lending_union_interesthistory(
@@ -640,7 +629,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
         out_transactions: List[OutTransaction],
         intra_transactions: List[IntraTransaction],
     ) -> None:
-
         # We need milliseconds for Binance
         now_time = int(datetime.now().timestamp()) * _MS_IN_SECOND
 
@@ -767,7 +755,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
             # over each 'dribblet'. Each dribblet can have multiple assets converted into BNB at the same time.
             # If the user converts more than 100 assets at one time, we can not retrieve accurate records.
             if len(dust_trades) == _DUST_TRADE_RECORD_LIMIT:
-
                 first_dribblet = [x for x in dust_trades if x[_DIV_TIME] == dust_trades[0][_DIV_TIME]]
                 if len(first_dribblet) == _DUST_TRADE_RECORD_LIMIT:
                     raise RP2RuntimeError(
@@ -938,7 +925,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         if transaction[_STATUS] == "Completed":
             if self.is_native_fiat(transaction[_FIAT_CURRENCY]):
-
                 # For double entry accounting purposes we must create a fiat InTransaction
                 in_transaction_list.append(
                     InTransaction(

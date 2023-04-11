@@ -20,7 +20,6 @@ from typing import Any, Dict, List, Union
 
 from ccxt import Exchange
 from dateutil import parser
-
 from rp2.plugin.country.us import US
 from rp2.rp2_decimal import RP2Decimal
 

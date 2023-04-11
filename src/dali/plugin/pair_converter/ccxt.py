@@ -159,7 +159,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
     ) -> None:
-
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
@@ -254,7 +253,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # Build conversion stack, we will iterate over this to find the price for each conversion
         # Then multiply them together to get our final price.
         for node in pricing_path_list:
-
             if last_node:
                 conversion_route.append(
                     AssetPairAndHistoricalPrice(
@@ -344,7 +342,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 return historical_bar
 
         while retry_count < len(_TIME_GRANULARITY):
-
             timeframe: str = _TIME_GRANULARITY[retry_count]
             request_count: int = 0
             historical_data: List[List[Union[int, float]]] = []
@@ -432,7 +429,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 current_vertex.add_neighbor(neighbor, _ALTERNATIVE_MARKET_WEIGHT)
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
-
         if exchange not in self.__exchanges:
             # initializes the cctx exchange instance which is used to get the historical data
             # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter

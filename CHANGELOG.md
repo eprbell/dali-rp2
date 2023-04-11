@@ -14,6 +14,9 @@
 
 # RP2 Change Log
 
+## 0.6.8
+* Coinbase data loader: added a new flavor of transfer transaction that was slightly different from the other ones (#137)
+
 ## 0.6.7
 * Coinbase data loader: fixed bug in advanced trade buy logic was not accounting for fee correctly
 * Coinbase data loader: added support for moving coins into staking pool (#132)

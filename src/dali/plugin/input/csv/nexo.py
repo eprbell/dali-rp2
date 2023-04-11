@@ -57,7 +57,6 @@ class InputPlugin(AbstractInputPlugin):
         transaction_csv_file: str,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__transaction_csv_file: str = transaction_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__NEXO}/{self.account_holder}")
