@@ -69,7 +69,7 @@ class AssetPairAndTimestamp(NamedTuple):
 
 # This class requires a graph that it will add newly created vertexes to if the user tries to access one that is missing.
 # The new vertexes are created with a name of the str key.
-class GraphVertexesDict(defaultdict[str, Vertex[str]]):
+class GraphVertexesDict(DefaultDict[str, Vertex[str]]):
     def __init__(self, graph: Graph[str]) -> None:
         super().__init__(None)
         self.__graph: Graph[str] = graph
