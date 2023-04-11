@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections import defaultdict
 from datetime import datetime, timedelta
 from json import JSONDecodeError
 from typing import Any, DefaultDict, Dict, List, NamedTuple, Optional, cast
