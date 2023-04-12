@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timedelta
 from inspect import Signature, signature
 from time import sleep, time
-from typing import Any, DefaultDict, Dict, Iterator, List, NamedTuple, Optional, Union
+from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Union
 
 from ccxt import (
     DDoSProtection,
@@ -30,7 +30,6 @@ from ccxt import (
     huobi,
     kraken,
 )
-from prezzemolo.graph import Graph
 from prezzemolo.vertex import Vertex
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
@@ -39,7 +38,7 @@ from rp2.rp2_error import RP2RuntimeError
 from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
     AssetPairAndTimestamp,
-    GraphVertexesDict,
+    MappedGraph,
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
@@ -168,7 +167,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
         self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
         self.__exchange_csv_reader: Dict[str, Any] = {}
-        self.__exchange_graphs: Dict[str, Graph[str]] = {}
+        self.__exchange_graphs: Dict[str, MappedGraph[str]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         if exchange_locked:
             self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
@@ -190,7 +189,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return self.__exchange_markets
 
     @property
-    def exchange_graphs(self) -> Dict[str, Graph[str]]:
+    def exchange_graphs(self) -> Dict[str, MappedGraph[str]]:
         return self.__exchange_graphs
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
@@ -219,9 +218,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         current_markets = self.__exchange_markets[exchange]
         current_graph = self.__exchange_graphs[exchange]
-        vertexes: DefaultDict[str, Vertex[str]] = self.graph_vertexes[current_graph]
-        from_asset_vertex: Optional[Vertex[str]] = vertexes.get(from_asset)
-        to_asset_vertex: Optional[Vertex[str]] = vertexes.get(to_asset)
+        from_asset_vertex: Optional[Vertex[str]] = current_graph.get_vertex(from_asset)
+        to_asset_vertex: Optional[Vertex[str]] = current_graph.get_vertex(to_asset)
         market_symbol = from_asset + to_asset
         result: Optional[HistoricalBar] = None
         pricing_path: Optional[Iterator[Vertex[str]]] = None
@@ -406,14 +404,12 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         return result
 
-    def _add_alternative_markets(self, graph: Graph[str], current_markets: Dict[str, List[str]]) -> None:
-        vertexes: DefaultDict[str, Vertex[str]] = self.graph_vertexes[graph]
-
+    def _add_alternative_markets(self, graph: MappedGraph[str], current_markets: Dict[str, List[str]]) -> None:
         for base_asset, quote_asset in _ALT_MARKET_BY_BASE_DICT.items():
             alt_market = base_asset + quote_asset
             alt_exchange_name = _ALT_MARKET_EXCHANGES_DICT[alt_market]
 
-            # TO BE IMPLEMENTED - Add alt market to the end of list if another exchange exists already
+            # TO BE IMPLEMENTED - Add markets to a priorityqueue inside MappedGraph to prioritize higher volume exchanges
             current_markets[alt_market] = [alt_exchange_name]
 
             # Cache the exchange so that we can pull prices from it later
@@ -422,11 +418,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
                 self.__exchanges[alt_exchange_name] = alt_exchange
 
-            # If the key doesn't exist, the GraphVertexesDict will create a vertex and add it to the graph
-            current_vertex: Vertex[str] = vertexes[base_asset]
-            neighbor: Vertex[str] = vertexes[quote_asset]
-            if neighbor not in current_vertex.neighbors:
-                current_vertex.add_neighbor(neighbor, _ALTERNATIVE_MARKET_WEIGHT)
+            # If the key doesn't exist, the MappedGraph will create a vertex and add it to the graph
+            graph.add_neighbor(base_asset, quote_asset, _ALTERNATIVE_MARKET_WEIGHT)
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
         if exchange not in self.__exchanges:
@@ -438,8 +431,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         # key: market, value: exchanges where the market is available in order of priority
         current_markets: Dict[str, List[str]] = {}
-        current_graph: Graph[str] = Graph[str]()
-        vertexes: DefaultDict[str, Vertex[str]] = GraphVertexesDict(current_graph)
+        current_graph: MappedGraph[str] = MappedGraph[str]()
 
         for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
             self.__logger.debug("Market: %s", market)
@@ -449,13 +441,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             # TO BE IMPLEMENTED - lazy build graph only if needed
 
             # If the key doesn't exist, the GraphVertexesDict will create a vertex and add it to the graph
-            current_vertex = vertexes[market[_BASE]]
-            neighbor = vertexes[market[_QUOTE]]
-            if neighbor not in current_vertex.neighbors:
-                current_vertex.add_neighbor(neighbor, _QUOTE_PRIORITY.get(neighbor.name, _STANDARD_WEIGHT))
-
-        # Graph[str](list(vertexes.values()))
-        self.graph_vertexes[current_graph] = vertexes
+            current_graph.add_neighbor(market[_BASE], market[_QUOTE], _QUOTE_PRIORITY.get(market[_QUOTE], _STANDARD_WEIGHT))
 
         # Add alternative markets if they don't exist
         if not self.__exchange_locked:

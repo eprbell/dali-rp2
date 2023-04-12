@@ -14,10 +14,11 @@
 
 from datetime import datetime, timedelta
 from json import JSONDecodeError
-from typing import Any, DefaultDict, Dict, List, NamedTuple, Optional, cast
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
 from prezzemolo.graph import Graph
+from prezzemolo.utility import ValueType
 from prezzemolo.vertex import Vertex
 from requests.exceptions import ReadTimeout
 from requests.models import Response
@@ -66,20 +67,29 @@ class AssetPairAndTimestamp(NamedTuple):
     exchange: str
 
 
-# This class requires a graph that it will add newly created vertexes to if the user tries to access one that is missing.
-# The new vertexes are created with a name of the str key.
-class GraphVertexesDict(DefaultDict[str, Vertex[str]]):
-    def __init__(self, graph: Graph[str]) -> None:
-        super().__init__(None)
-        self.__graph: Graph[str] = graph
-        for vertex in graph.vertexes:
-            self[vertex.name] = vertex
+class MappedGraph(Graph[ValueType]):
+    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None) -> None:
+        super().__init__(vertexes)
+        self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
 
-    def __missing__(self, key: str) -> Vertex[str]:
-        value: Vertex[str] = Vertex[str](name=key)
-        self[key] = value
-        self.__graph.add_vertex(value)
-        return value
+    def get_vertex(self, name: str) -> Optional[Vertex[ValueType]]:
+        return self.__name_to_vertex.get(name)
+
+    def get_or_set_vertex(self, name: str) -> Vertex[ValueType]:
+        old_vertex: Optional[Vertex[ValueType]] = self.get_vertex(name)
+        if old_vertex:
+            return old_vertex
+
+        new_vertex: Vertex[ValueType] = Vertex[ValueType](name=name)
+        super().add_vertex(new_vertex)
+        self.__name_to_vertex[name] = new_vertex
+        return new_vertex
+
+    def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0) -> None:
+        vertex: Vertex[ValueType] = self.get_or_set_vertex(vertex_name)
+        neighbor: Vertex[ValueType] = self.get_or_set_vertex(neighbor_name)
+        if not vertex.has_neighbor(neighbor):
+            vertex.add_neighbor(neighbor, weight)
 
 
 class AbstractPairConverterPlugin:
@@ -99,7 +109,6 @@ class AbstractPairConverterPlugin:
         self.__session: Session = requests.Session()
         self.__fiat_list: List[str] = []
         self.__fiat_priority: Dict[str, float]
-        self.__graph_vertexes: Dict[Graph[str], DefaultDict[str, Vertex[str]]] = {}
         if fiat_priority:
             weight: float = _STANDARD_WEIGHT
             for fiat in fiat_priority:
@@ -146,10 +155,6 @@ class AbstractPairConverterPlugin:
     @property
     def issues_url(self) -> str:
         return self.__ISSUES_URL
-
-    @property
-    def graph_vertexes(self) -> Dict[Graph[str], DefaultDict[str, Vertex[str]]]:
-        return self.__graph_vertexes
 
     # The exchange parameter is a hint on which exchange to use for price lookups. The plugin is free to use it or ignore it.
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
@@ -219,9 +224,7 @@ class AbstractPairConverterPlugin:
             LOGGER.info("Fetching of fiat symbols failed. The server might be down. Please try again later.")
             raise RP2RuntimeError("JSON decode error") from exc
 
-    def _add_fiat_edges_to_graph(self, graph: Graph[str], markets: Dict[str, List[str]]) -> None:
-        vertexes: DefaultDict[str, Vertex[str]] = self.graph_vertexes[graph]
-
+    def _add_fiat_edges_to_graph(self, graph: MappedGraph[str], markets: Dict[str, List[str]]) -> None:
         if not self.__fiat_list:
             self._build_fiat_list()
 
@@ -229,19 +232,15 @@ class AbstractPairConverterPlugin:
             to_fiat_list: Dict[str, None] = dict.fromkeys(self.__fiat_list.copy())
             del to_fiat_list[fiat]
             # We don't want to add a fiat vertex here because that would allow a double hop on fiat (eg. USD -> KRW -> JPY)
-            fiat_vertex: Optional[Vertex[str]] = vertexes.get(fiat)
-            if fiat_vertex:
+            if graph.get_vertex(fiat):
                 for to_be_added_fiat in to_fiat_list:
-                    # If the vertex doesn't exist, GraphVertexesDict will return a new vertex and add it to the graph
-                    to_be_added_fiat_vertex: Optional[Vertex[str]] = vertexes[to_be_added_fiat]
-                    # add a pair if it doesn't exist
-                    if to_be_added_fiat_vertex and to_be_added_fiat_vertex not in list(fiat_vertex.neighbors):
-                        fiat_vertex.add_neighbor(
-                            to_be_added_fiat_vertex,
-                            self.__fiat_priority.get(fiat_vertex.name, _STANDARD_WEIGHT),
-                        )
+                    graph.add_neighbor(
+                        fiat,
+                        to_be_added_fiat,
+                        self.__fiat_priority.get(fiat, _STANDARD_WEIGHT),
+                    )
 
-                LOGGER.debug("Added to assets for %s: %s", fiat, fiat_vertex.neighbors)
+                LOGGER.debug("Added to assets for %s: %s", fiat, to_fiat_list)
 
             for to_fiat in to_fiat_list:
                 fiat_market = f"{fiat}{to_fiat}"

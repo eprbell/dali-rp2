@@ -18,11 +18,10 @@ from typing import Any, Dict, List, Union
 
 import pytest
 from ccxt import binance, kraken
-from prezzemolo.graph import Graph
 from prezzemolo.vertex import Vertex
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
-from dali.abstract_pair_converter_plugin import AssetPairAndTimestamp, GraphVertexesDict
+from dali.abstract_pair_converter_plugin import AssetPairAndTimestamp, MappedGraph
 from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
@@ -107,7 +106,7 @@ _MS_IN_SECOND: int = 1000
 
 class TestCcxtPlugin:
     @pytest.fixture
-    def test_graph(self) -> Graph[str]:
+    def test_graph(self) -> MappedGraph[str]:
         beth: Vertex[str] = Vertex[str](name="BETH")
         btc: Vertex[str] = Vertex[str](name="BTC")
         eth: Vertex[str] = Vertex[str](name="ETH")
@@ -123,9 +122,9 @@ class TestCcxtPlugin:
         usdt.add_neighbor(usd, 1.0)
         usd.add_neighbor(jpy, 2.0)
 
-        return Graph[str]([beth, btc, eth, gbp, jpy, usdt, usd])
+        return MappedGraph[str]([beth, btc, eth, gbp, jpy, usdt, usd])
 
-    def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any, test_graph: Graph[str]) -> None:
+    def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any, test_graph: MappedGraph[str]) -> None:
         exchange = kraken(
             {
                 "apiKey": "key",
@@ -167,16 +166,15 @@ class TestCcxtPlugin:
         ]
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: test_graph})
-        mocker.patch.object(plugin, "_AbstractPairConverterPlugin__graph_vertexes", {test_graph: GraphVertexesDict(test_graph)})
 
-    def test_unknown_exchange(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_unknown_exchange(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         self.__btcusdt_mock(plugin, mocker, test_graph)
 
         data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "Bogus Exchange")
         assert data
 
-    def test_historical_prices(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_historical_prices(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
         if os.path.exists(cache_path):
@@ -231,7 +229,7 @@ class TestCcxtPlugin:
         data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", TEST_EXCHANGE)
         assert data is None
 
-    def test_missing_fiat_pair(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_missing_fiat_pair(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         self.__btcusdt_mock(plugin, mocker, test_graph)
 
@@ -257,7 +255,7 @@ class TestCcxtPlugin:
 
     # Some crypto assets have no fiat or stable coin pair; they are only paired with BTC or ETH (e.g. EZ or BETH)
     # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
-    def test_no_fiat_pair(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_no_fiat_pair(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
 
         exchange = kraken(
@@ -315,7 +313,6 @@ class TestCcxtPlugin:
         ]
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: test_graph})
-        mocker.patch.object(plugin, "_AbstractPairConverterPlugin__graph_vertexes", {test_graph: GraphVertexesDict(test_graph)})
 
         data = plugin.get_historic_bar_from_native_source(BETHETH_TIMESTAMP, "BETH", "USD", TEST_EXCHANGE)
 
@@ -328,7 +325,7 @@ class TestCcxtPlugin:
         assert data.volume == BETHETH_VOLUME + ETHUSDT_VOLUME + USDTUSD_VOLUME
 
     # Test to make sure the default stable coin is not used with a fiat market that does exist on the exchange
-    def test_nonusd_fiat_pair(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_nonusd_fiat_pair(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange="Binance.com")
         alt_exchange = binance(
             {
@@ -365,7 +362,6 @@ class TestCcxtPlugin:
         ]
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: test_graph})
-        mocker.patch.object(plugin, "_AbstractPairConverterPlugin__graph_vertexes", {test_graph: GraphVertexesDict(test_graph)})
 
         data = plugin.get_historic_bar_from_native_source(BTCGBP_TIMESTAMP, "BTC", "GBP", TEST_EXCHANGE)
 
@@ -378,7 +374,7 @@ class TestCcxtPlugin:
         assert data.volume == BTCGBP_VOLUME
 
     # Plugin should hand off the handling of a fiat to fiat pair to the fiat converter
-    def test_fiat_pair(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_fiat_pair(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         exchange = binance(
             {
@@ -390,7 +386,6 @@ class TestCcxtPlugin:
         # Need to be mocked to prevent logger spam
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: ["WHATEVER"]})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: test_graph})
-        mocker.patch.object(plugin, "_AbstractPairConverterPlugin__graph_vertexes", {test_graph: GraphVertexesDict(test_graph)})
         mocker.patch.object(plugin, "_get_fiat_exchange_rate").return_value = HistoricalBar(
             duration=timedelta(seconds=86400),
             timestamp=EUR_USD_TIMESTAMP,
@@ -412,7 +407,7 @@ class TestCcxtPlugin:
         assert data.close == EUR_USD_RATE
         assert data.volume == ZERO
 
-    def test_kraken_csv(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_kraken_csv(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
 
         cache_path = os.path.join(CACHE_DIR, "Test-" + plugin.cache_key())
@@ -466,7 +461,6 @@ class TestCcxtPlugin:
         ]
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {TEST_EXCHANGE: test_graph})
-        mocker.patch.object(plugin, "_AbstractPairConverterPlugin__graph_vertexes", {test_graph: GraphVertexesDict(test_graph)})
 
         data = plugin.get_historic_bar_from_native_source(KRAKEN_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
 
@@ -478,7 +472,7 @@ class TestCcxtPlugin:
         assert data.close == BAR_CLOSE * KRAKEN_CLOSE
         assert data.volume == BAR_VOLUME + KRAKEN_VOLUME
 
-    def test_locked_exchange(self, mocker: Any, test_graph: Graph[str]) -> None:
+    def test_locked_exchange(self, mocker: Any, test_graph: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange=LOCKED_EXCHANGE, exchange_locked=True)
         # Name is changed to exchange_instance to avoid conflicts with the side effect function `add_exchange_side_effect`
         exchange_instance = kraken(
@@ -522,7 +516,6 @@ class TestCcxtPlugin:
         def add_exchange_side_effect(exchange: str) -> None:  # pylint: disable=unused-argument
             mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {LOCKED_EXCHANGE: exchange_instance})
             mocker.patch.object(plugin, "_PairConverterPlugin__exchange_graphs", {LOCKED_EXCHANGE: test_graph})
-            mocker.patch.object(plugin, "_AbstractPairConverterPlugin__graph_vertexes", {test_graph: GraphVertexesDict(test_graph)})
             mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {LOCKED_EXCHANGE: LOCKED_MARKETS})
 
         mocker.patch.object(plugin, "_add_exchange_to_memcache", autospec=True).side_effect = add_exchange_side_effect
