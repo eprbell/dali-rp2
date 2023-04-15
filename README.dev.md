@@ -64,7 +64,7 @@ sudo apt-get install python3 python3-pip virtualenv
 
 Then install DaLI Python package requirements:
 ```
-cd <rp2_directory>
+cd <dali_directory>
 virtualenv -p python3 .venv
 . .venv/bin/activate
 .venv/bin/pip3 install -e '.[dev]'
@@ -78,7 +78,7 @@ brew install python3 virtualenv
 
 Then install DaLI Python package requirements:
 ```
-cd <rp2_directory>
+cd <dali_directory>
 virtualenv -p python3 .venv
 . .venv/bin/activate
 .venv/bin/pip3 install -e '.[dev]'
@@ -91,7 +91,7 @@ python -m pip install virtualenv
 
 Then install DaLI Python package requirements:
 ```
-cd <rp2_directory>
+cd <dali_directory>
 virtualenv -p python .venv
 .venv\Scripts\activate.ps1
 python -m pip install -e ".[dev]"
