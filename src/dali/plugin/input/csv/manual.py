@@ -52,6 +52,7 @@ class InputPlugin(AbstractInputPlugin):
     __IN_FIAT_FEE_INDEX: int = 11
     __IN_NOTES_INDEX: int = 12
     __IN_FIAT_TICKER: int = 13
+    __IN_LEN: int = __IN_FIAT_TICKER
 
     __OUT_UNIQUE_ID_INDEX: int = 0
     __OUT_TIMESTAMP_INDEX: int = 1
@@ -67,7 +68,7 @@ class InputPlugin(AbstractInputPlugin):
     __OUT_FIAT_FEE_INDEX: int = 11
     __OUT_NOTES_INDEX: int = 12
     __OUT_FIAT_TICKER: int = 13
-
+    __OUT_LEN: int = __OUT_FIAT_TICKER
 
     __INTRA_UNIQUE_ID_INDEX: int = 0
     __INTRA_TIMESTAMP_INDEX: int = 1
@@ -80,7 +81,8 @@ class InputPlugin(AbstractInputPlugin):
     __INTRA_CRYPTO_SENT_INDEX: int = 8
     __INTRA_CRYPTO_RECEIVED_INDEX: int = 9
     __INTRA_NOTES_INDEX: int = 10
-    __OUT_FIAT_TICKER: int = 11
+    __INTRA_FIAT_TICKER: int = 11
+    __INTRA_LEN: int = __INTRA_FIAT_TICKER
 
     def __init__(
         self,
@@ -117,15 +119,15 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = ",".join(line).strip()
                 if not header_found:
                     # let user know there is not enough columns
-                    if len(line) - 1 < self.__IN_NOTES_INDEX:
-                        raise ValueError(f"Not enough columns: the {self.__in_csv_file} CSV must contain {self.__IN_NOTES_INDEX} columns.")
+                    if len(line) - 1 < self.__IN_LEN:
+                        raise ValueError(f"Not enough columns: the {self.__in_csv_file} CSV must contain {self.__IN_LEN} columns.")
 
                     # Skip header line
                     header_found = True
                     self.__logger.debug("Header: %s", ";".join(line))
                     continue
 
-                if raw_data.startswith("," * self.__IN_NOTES_INDEX):
+                if raw_data.startswith("," * self.__IN_LEN):
                     # Skip empty lines
                     continue
 
@@ -166,15 +168,15 @@ class InputPlugin(AbstractInputPlugin):
 
                 if not header_found:
                     # let user know there is not enough columns
-                    if len(line) - 1 < self.__OUT_NOTES_INDEX:
-                        raise ValueError(f"Not enough columns: the {self.__out_csv_file} CSV must contain {self.__OUT_NOTES_INDEX} columns.")
+                    if len(line) - 1 < self.__OUT_LEN:
+                        raise ValueError(f"Not enough columns: the {self.__out_csv_file} CSV must contain {self.__OUT_LEN} columns.")
 
                     # Skip header line
                     header_found = True
                     self.__logger.debug("Header: %s", ";".join(line))
                     continue
 
-                if raw_data.startswith("," * self.__OUT_NOTES_INDEX):
+                if raw_data.startswith("," * self.__OUT_LEN):
                     # Skip empty lines
                     continue
 
@@ -214,15 +216,15 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = ",".join(line).strip()
                 if not header_found:
                     # let user know there is not enough columns
-                    if len(line) - 1 < self.__INTRA_NOTES_INDEX:
-                        raise ValueError(f"Not enough columns: the {self.__intra_csv_file} CSV must contain {self.__INTRA_NOTES_INDEX} columns.")
+                    if len(line) - 1 < self.__INTRA_LEN:
+                        raise ValueError(f"Not enough columns: the {self.__intra_csv_file} CSV must contain {self.__INTRA_LEN} columns.")
 
                     # Skip header line
                     header_found = True
                     self.__logger.debug("Header: %s", ";".join(line))
                     continue
 
-                if raw_data.startswith("," * self.__INTRA_NOTES_INDEX):
+                if raw_data.startswith("," * self.__INTRA_LEN):
                     # Skip empty lines
                     continue
 
