@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from datetime import datetime, timedelta
 from json import JSONDecodeError, loads
 from typing import Any, Dict, List, NamedTuple, Optional, cast
@@ -22,6 +23,7 @@ from requests.models import Response
 from requests.sessions import Session
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError, RP2TypeError
+from rp2.logger import create_logger
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
@@ -58,6 +60,7 @@ class AbstractPairConverterPlugin:
     __TIMEOUT: int = 30
 
     def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None) -> None:
+        self.__logger: logging.Logger = create_logger("AbstractPairConverterPlugin")
         if not isinstance(historical_price_type, str):
             raise RP2TypeError(f"historical_price_type is not a string: {historical_price_type}")
         if historical_price_type not in HISTORICAL_PRICE_KEYWORD_SET:
@@ -67,7 +70,7 @@ class AbstractPairConverterPlugin:
         try:
             result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
         except EOFError:
-            print("EOFError: Cached file corrupted, no cache found.")
+            self.__logger.error("EOFError: Cached file corrupted, no cache found.")
             result = None
         self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type

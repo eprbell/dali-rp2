@@ -254,7 +254,7 @@ class Kraken:
 
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.info(F"Attempting to load %s from Kraken Google Drive for timestamp={timestamp}.", base_file)
+        self.__logger.info(f"Attempting to load %s from Kraken Google Drive for timestamp={timestamp}.", base_file)
         file_bytes = self._google_file_to_bytes(base_file)
 
         if file_bytes:

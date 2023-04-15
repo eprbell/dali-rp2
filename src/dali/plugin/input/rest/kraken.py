@@ -44,43 +44,43 @@ from dali.configuration import Keyword, _FIAT_SET
 from dali.cache import load_from_cache, save_to_cache
 
 # keywords
-_AMOUNT: str = 'amount'
-_ASSET: str = 'asset'
-_BASE: str = 'base'
-_BASE_ID: str = 'baseId'
-_COST: str = 'cost'
-_COUNT: str = 'count'
-_CREDIT: str = 'credit'
-_DEPOSIT: str = 'deposit'
-_FEE: str = 'fee'
-_ID: str = 'id'
-_IN: str = 'in'
-_INTRA: str = 'intra'
-_LEDGER: str = 'ledger'
-_MARGIN: str = 'margin'
-_OFFSET: str = 'ofs'
-_OUT: str = 'out'
-_PAIR: str = 'pair'
-_PRICE: str = 'price'
-_QUOTE: str = 'quote'
-_REFID: str = 'refid'
-_RESULT: str = 'result'
-_ROLLOVER: str = 'rollover'
-_SALE: str = 'sale'
-_SETTLED: str = 'settled'
-_STAKING: str = 'staking'
-_TIMESTAMP: str = 'time'
-_TRADE: str = 'trade'
-_TRADES: str = 'trades'
-_TRANSFER: str = 'transfer'
-_TYPE: str = 'type'
-_WITHDRAWAL: str = 'withdrawal'
+_AMOUNT: str = "amount"
+_ASSET: str = "asset"
+_BASE: str = "base"
+_BASE_ID: str = "baseId"
+_COST: str = "cost"
+_COUNT: str = "count"
+_CREDIT: str = "credit"
+_DEPOSIT: str = "deposit"
+_FEE: str = "fee"
+_ID: str = "id"
+_IN: str = "in"
+_INTRA: str = "intra"
+_LEDGER: str = "ledger"
+_MARGIN: str = "margin"
+_OFFSET: str = "ofs"
+_OUT: str = "out"
+_PAIR: str = "pair"
+_PRICE: str = "price"
+_QUOTE: str = "quote"
+_REFID: str = "refid"
+_RESULT: str = "result"
+_ROLLOVER: str = "rollover"
+_SALE: str = "sale"
+_SETTLED: str = "settled"
+_STAKING: str = "staking"
+_TIMESTAMP: str = "time"
+_TRADE: str = "trade"
+_TRADES: str = "trades"
+_TRANSFER: str = "transfer"
+_TYPE: str = "type"
+_WITHDRAWAL: str = "withdrawal"
 
 # Record Limits
 _TRADE_RECORD_LIMIT: int = 50
 
-_KRAKEN_FIAT_SET: Set[str] = {'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'USD',
-                              'USDC', 'USDT', 'ZAUD', 'ZCAD', 'ZEUR', 'ZGBP', 'ZJPY', 'ZUSD'}
+_KRAKEN_FIAT_SET: Set[str] = {"AUD", "CAD", "EUR", "GBP", "JPY", "USD",
+                              "USDC", "USDT", "ZAUD", "ZCAD", "ZEUR", "ZGBP", "ZJPY", "ZUSD"}
 
 _KRAKEN_FIAT_LIST = list(set(list(_KRAKEN_FIAT_SET) + list(_FIAT_SET)))
 
@@ -89,7 +89,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
     __EXCHANGE_NAME: str = "kraken"
     __PLUGIN_NAME: str = "kraken_REST"
     __DEFAULT_THREAD_COUNT: int = 1
-    __CACHE_FILE: str = 'kraken.pickle'
+    __CACHE_FILE: str = "kraken.pickle"
 
     def __init__(
         self,
@@ -106,16 +106,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # We will have a default start time of July 27th, 2011 since Kraken Exchange officially launched on July 28th.
         super().__init__(account_holder, datetime(2011, 7, 27, 0, 0, 0, 0), native_fiat, thread_count)
         self.__logger: logging.Logger = create_logger(f"{self.__EXCHANGE_NAME}")
-        self._initialize_client()
-        self._client.load_markets()
-        self._client.markets_by_id.update({'BSVUSD': {_ID: 'BSVUSD', _BASE_ID: 'BSV', _BASE: 'BSV', _QUOTE: 'USD'}})
         self.base_id_to_base: Dict[str, str] = {}
-        for dummy_key, value in self._client.markets_by_id.items():
-            # BUGFIX: Because value comes as a list when in a pytest environment.
-            # Its not obvious why this happens as it is supposed to be a dict.
-            value = value if isinstance(value, dict) else value[0]  # type: ignore
-            self.base_id_to_base.update({value[_BASE_ID]: value[_BASE]})
         self.use_cache: Optional[bool] = use_cache
+        self._initialize_client()
 
     def exchange_name(self) -> str:
         return self.__EXCHANGE_NAME
@@ -131,6 +124,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 "secret": self.__api_secret,
             }
         )
+
+    def _initilaize_markets(self) -> None:
+        self._client.load_markets()
+        self._client.markets_by_id.update({"BSVUSD": {_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}})
+
+        for dummy_key, value in self._client.markets_by_id.items():
+            self.base_id_to_base.update({value[_BASE_ID]: value[_BASE]})
 
     @property
     def _client(self) -> kraken:
@@ -184,6 +184,9 @@ class InputPlugin(AbstractCcxtInputPlugin):
         return result
 
     def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
+        if not self.base_id_to_base:
+            self._initilaize_markets()
+
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
@@ -192,8 +195,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         result: List[AbstractTransaction] = []
 
         unhandled_types: Dict[str, str] = {}
-        for key in ledger:
-            record: Dict[str, str] = ledger[key]
+        for ledger_id in ledger:
+            record: Dict[str, str] = ledger[ledger_id]
             self.__logger.debug("Ledger record: %s", record)
 
             timestamp_value: str = self._rp2_timestamp_from_seconds_epoch(record[_TIMESTAMP])
@@ -223,21 +226,17 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         spot_price=spot_price,
                         crypto_sent=Keyword.UNKNOWN.value if is_deposit else str(amount),
                         crypto_received=str(amount) if is_deposit else Keyword.UNKNOWN.value,
-                        notes=key,
+                        notes=ledger_id,
                     )
                 )
                 continue
 
-            crypto_fee: str = '0' if is_fiat_asset else str(record[_FEE])
+            crypto_fee: str = "0" if is_fiat_asset else str(record[_FEE])
             fiat_fee: Union[str, None] = record[_FEE] if is_fiat_asset else None
 
             if record[_TYPE] == _TRADE and not is_fiat_asset:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
-
-                # BUGFIX: For some reason in pytest, markets_by_id passes back lists instead of
-                # dicts. It should be dicts. Hence the dummy_bugfix.
-                dummy_bugfix: Dict[str, str] = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]]
-                market: Dict[str, str] = dummy_bugfix if isinstance(dummy_bugfix, dict) else dummy_bugfix[0]  # type: ignore
+                market: Dict[str, str] = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]]
                 asset_quote: str = market[_QUOTE]
                 is_quote_asset_fiat: bool = asset_quote in _KRAKEN_FIAT_LIST
 
@@ -265,7 +264,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             fiat_in_no_fee=fiat_in_no_fee,
                             fiat_in_with_fee=fiat_in_with_fee,
                             fiat_fee=fiat_fee,
-                            notes=key,
+                            notes=ledger_id,
                         )
                     )
                 else:
@@ -290,7 +289,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             crypto_out_with_fee=crypto_out_with_fee,
                             fiat_out_no_fee=fiat_out_no_fee,
                             fiat_fee=fiat_fee,
-                            notes=key,
+                            notes=ledger_id,
                         )
                     )
             elif record[_TYPE] in {_MARGIN, _ROLLOVER}:
@@ -318,7 +317,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         crypto_out_with_fee=crypto_out_with_fee,
                         fiat_out_no_fee=fiat_out_no_fee,
                         fiat_fee=fiat_fee,
-                        notes=key,
+                        notes=ledger_id,
                     )
                 )
             elif record[_TYPE] == _TRANSFER:
@@ -339,7 +338,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         crypto_in=crypto_in,
                         crypto_fee=crypto_fee,
                         fiat_fee=fiat_fee,
-                        notes=key,
+                        notes=ledger_id,
                     )
                 )
             elif record[_TYPE] == _TRADE and is_fiat_asset:
@@ -352,7 +351,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 self.__logger.error(
                     f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s",
                     raw_data, self.ISSUES_URL)
-                unhandled_types.update({record[_TYPE]: key})
+                unhandled_types.update({record[_TYPE]: ledger_id})
 
             self.__logger.debug("unknown types of the ledger=%s", str(unhandled_types))
 
@@ -367,9 +366,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         params: Dict[str, Union[str, int]] = {_OFFSET: index}
         response: Any = self._safe_api_call(
             self._client.private_post_tradeshistory,
-            # self._client.fetch_my_trades, # UNIFIED CCXT API
             {
-                'params': params,
+                "params": params,
             },
         )
         # {
@@ -420,10 +418,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         params: Dict[str, Union[str, int]] = {_OFFSET: index}
         response: Any = self._safe_api_call(
             self._client.private_post_ledgers,
-            # self._client.fetch_ledger, # UNIFIED CCXT API
-            # self._client.fetchLedger,  # UNIFIED CCXT API
             {
-                'params': params,
+                "params": params,
             },
         )
         # {

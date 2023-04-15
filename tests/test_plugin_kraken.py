@@ -21,10 +21,15 @@ from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-from dali.plugin.input.rest.kraken import InputPlugin
+from dali.plugin.input.rest.kraken import (
+    InputPlugin,
+    _ID,
+    _BASE_ID,
+    _BASE,
+    _QUOTE,
+)
 
 
-# @pytest.mark.skip(reason="Failing parent project CI")
 def test_kraken(mocker: Any) -> None:
     """
     This tests withdraw, deposit, buy and a sell.
@@ -38,6 +43,12 @@ def test_kraken(mocker: Any) -> None:
     )
 
     client: Exchange = plugin._client
+
+    mocker.patch.object(client, "load_markets").return_value = None
+    client.markets_by_id = {  # type: ignore
+        "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
+        'XLTCXXBT': {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
+    }
 
     mocker.patch.object(client, "private_post_ledgers").return_value = {
         'error': [],
