@@ -167,6 +167,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
         self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
         self.__exchange_csv_reader: Dict[str, Any] = {}
+        # key: name of exchange, value: graph that prioritizes that exchange
         self.__exchange_graphs: Dict[str, MappedGraph[str]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         if exchange_locked:
@@ -409,7 +410,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             alt_market = base_asset + quote_asset
             alt_exchange_name = _ALT_MARKET_EXCHANGES_DICT[alt_market]
 
-            # TO BE IMPLEMENTED - Add markets to a priorityqueue inside MappedGraph to prioritize higher volume exchanges
+            # TO BE IMPLEMENTED - Add markets to a priority queue inside MappedGraph to prioritize higher volume exchanges
             current_markets[alt_market] = [alt_exchange_name]
 
             # Cache the exchange so that we can pull prices from it later
