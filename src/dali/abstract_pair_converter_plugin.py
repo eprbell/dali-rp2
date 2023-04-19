@@ -72,10 +72,9 @@ class MappedGraph(Graph[ValueType]):
         super().__init__(vertexes)
         self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
 
-    def add_vertex_by_name(self, name: str) -> Vertex[ValueType]:
-        new_vertex: Vertex[ValueType] = Vertex[ValueType](name=name)
-        super().add_vertex(new_vertex)
-        return new_vertex
+    def add_vertex(self, vertex: Vertex[ValueType]) -> None:
+        super().add_vertex(vertex)
+        self.__name_to_vertex[vertex.name] = vertex
 
     def get_vertex(self, name: str) -> Optional[Vertex[ValueType]]:
         return self.__name_to_vertex.get(name)
@@ -85,8 +84,8 @@ class MappedGraph(Graph[ValueType]):
         if existing_vertex:
             return existing_vertex
 
-        new_vertex: Vertex[ValueType] = self.add_vertex_by_name(name)
-        self.__name_to_vertex[name] = new_vertex
+        new_vertex: Vertex[ValueType] = Vertex[ValueType](name=name)
+        self.add_vertex(new_vertex)
         return new_vertex
 
     def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0) -> None:
