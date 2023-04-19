@@ -80,7 +80,7 @@ _WITHDRAWAL: str = "withdrawal"
 _TRADE_RECORD_LIMIT: int = 50
 
 _KRAKEN_FIAT_SET: Set[str] = {"AUD", "CAD", "EUR", "GBP", "JPY", "USD",
-                              "USDC", "USDT", "ZAUD", "ZCAD", "ZEUR", "ZGBP", "ZJPY", "ZUSD"}
+                              "ZAUD", "ZCAD", "ZEUR", "ZGBP", "ZJPY", "ZUSD"}
 
 _KRAKEN_FIAT_LIST = list(set(list(_KRAKEN_FIAT_SET) + list(_FIAT_SET)))
 
@@ -129,8 +129,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self._client.load_markets()
         self._client.markets_by_id.update({"BSVUSD": {_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}})
 
-        for dummy_key, value in self._client.markets_by_id.items():
-            self.base_id_to_base.update({value[_BASE_ID]: value[_BASE]})
+        for market in self._client.markets_by_id.values():
+            self.base_id_to_base.update({market[_BASE_ID]: market[_BASE]})
 
     @property
     def _client(self) -> kraken:

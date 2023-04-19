@@ -185,8 +185,6 @@ class Kraken:
 
         retry_count: int = 0
 
-        should_log = False
-
         while retry_count < len(_TIME_GRANULARITY):
             if (
                 timestamp < self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start
@@ -219,9 +217,6 @@ class Kraken:
                     for row in rows:
                         if int(row[self.__TIMESTAMP_INDEX]) != duration_timestamp:
                             continue
-                        if should_log:
-                            self.__logger.info(
-                                f"Found File={file_path} for {timestamp} %s", str(datetime.fromtimestamp(timestamp)))
                         return HistoricalBar(
                             duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
                             timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
@@ -234,7 +229,6 @@ class Kraken:
             except FileNotFoundError:
                 self.__logger.error(f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s",
                                     self.ISSUES_URL, datetime.fromtimestamp(timestamp))
-                should_log = True
             retry_count += 1
 
         return None
@@ -254,7 +248,7 @@ class Kraken:
 
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.info(f"Attempting to load %s from Kraken Google Drive for timestamp={timestamp}.", base_file)
+        self.__logger.info("Attempting to load %s from Kraken Google Drive for timestamp=%s.", base_file, timestamp)
         file_bytes = self._google_file_to_bytes(base_file)
 
         if file_bytes:
