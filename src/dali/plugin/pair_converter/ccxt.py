@@ -233,10 +233,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # else:
         # Graph building goes here.
 
-        if from_asset_vertex and to_asset_vertex:
-            pricing_path = current_graph.dijkstra(from_asset_vertex, to_asset_vertex, False)
-        else:
+        if not from_asset_vertex or not to_asset_vertex:
             raise RP2RuntimeError(f"The asset {from_asset} or {to_asset} is missing from graph")
+        pricing_path = current_graph.dijkstra(from_asset_vertex, to_asset_vertex, False)
 
         if pricing_path is None:
             self.__logger.debug("No path found for %s to %s. Please open an issue at %s.", from_asset, to_asset, self.issues_url)
