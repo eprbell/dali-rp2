@@ -418,7 +418,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
                 self.__exchanges[alt_exchange_name] = alt_exchange
 
-            # If the key doesn't exist, the MappedGraph will create a vertex and add it to the graph
+            # If the asset name doesn't exist, the MappedGraph will create a vertex with that name and add it to the graph
+            # If it does exist it will look it up in the dictionary by name and add the neighbor to that vertex.
             graph.add_neighbor(base_asset, quote_asset, _ALTERNATIVE_MARKET_WEIGHT)
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
@@ -440,7 +441,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
             # TO BE IMPLEMENTED - lazy build graph only if needed
 
-            # If the key doesn't exist, the GraphVertexesDict will create a vertex and add it to the graph
+            # If the asset name doesn't exist, the MappedGraph will create a vertex with that name and add it to the graph
+            # If it does exist it will look it up in the dictionary by name and add the neighbor to that vertex.
             current_graph.add_neighbor(market[_BASE], market[_QUOTE], _QUOTE_PRIORITY.get(market[_QUOTE], _STANDARD_WEIGHT))
 
         # Add alternative markets if they don't exist
