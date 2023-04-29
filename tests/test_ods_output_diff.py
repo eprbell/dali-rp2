@@ -33,7 +33,6 @@ OUTPUT_PATH: Path = ROOT_PATH / Path("output")
 
 
 class TestODSOutputDiff(unittest.TestCase):
-
     output_dir: Path
 
     @classmethod
@@ -54,7 +53,6 @@ class TestODSOutputDiff(unittest.TestCase):
         test_name: str,
         config: str,
     ) -> None:
-
         arguments: List[str] = [
             "dali_us",
             "-s",

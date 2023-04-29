@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.6.7 Developer Guide
+# DaLI for RP2 v0.6.8 Developer Guide
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -64,7 +64,7 @@ sudo apt-get install python3 python3-pip virtualenv
 
 Then install DaLI Python package requirements:
 ```
-cd <rp2_directory>
+cd <dali_directory>
 virtualenv -p python3 .venv
 . .venv/bin/activate
 .venv/bin/pip3 install -e '.[dev]'
@@ -78,7 +78,7 @@ brew install python3 virtualenv
 
 Then install DaLI Python package requirements:
 ```
-cd <rp2_directory>
+cd <dali_directory>
 virtualenv -p python3 .venv
 . .venv/bin/activate
 .venv/bin/pip3 install -e '.[dev]'
@@ -91,7 +91,7 @@ python -m pip install virtualenv
 
 Then install DaLI Python package requirements:
 ```
-cd <rp2_directory>
+cd <dali_directory>
 virtualenv -p python .venv
 .venv\Scripts\activate.ps1
 python -m pip install -e ".[dev]"

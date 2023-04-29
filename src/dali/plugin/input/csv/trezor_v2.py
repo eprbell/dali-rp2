@@ -16,12 +16,12 @@
 # CSV Format: timestamp, date, time, type, transaction_id, fee, fee unit, address, label, amount, amount unit, fiat, other
 
 import logging
+import re
 from csv import reader
 from datetime import datetime
-import re
-from dateutil.parser import parse
 from typing import List, Optional
 
+from dateutil.parser import parse
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
