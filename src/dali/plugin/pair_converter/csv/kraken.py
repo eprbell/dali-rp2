@@ -352,7 +352,7 @@ class Kraken:
                         )
                         raise RP2RuntimeError("Google Drive key invalid")
             if not data.get(_FILES):
-                self.__logger.debug("The file '%s' was not found on the Kraken Google Drive.")
+                self.__logger.debug("The file '%s' was not found on the Kraken Google Drive.", file_name)
                 return None
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
