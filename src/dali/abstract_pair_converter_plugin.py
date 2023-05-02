@@ -24,7 +24,7 @@ from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
 from rp2.rp2_decimal import ZERO, RP2Decimal
-from rp2.rp2_error import RP2RuntimeError, RP2TypeError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError, RP2ValueError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
@@ -68,9 +68,14 @@ class AssetPairAndTimestamp(NamedTuple):
 
 
 class MappedGraph(Graph[ValueType]):
-    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None) -> None:
+    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None, optimized_assets: Optional[Dict[str, None]] = None) -> None:
         super().__init__(vertexes)
         self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
+        self.__optimized_assets: Dict[str, None] = {} if optimized_assets is None else optimized_assets
+
+    def add_missing_vertex(self, name: str) -> None:
+        if not self.__name_to_vertex.get(name):
+            self.add_vertex(Vertex[ValueType](name=name))
 
     def add_vertex(self, vertex: Vertex[ValueType]) -> None:
         super().add_vertex(vertex)
@@ -87,6 +92,45 @@ class MappedGraph(Graph[ValueType]):
         new_vertex: Vertex[ValueType] = Vertex[ValueType](name=name)
         self.add_vertex(new_vertex)
         return new_vertex
+
+    def is_optimized(self, asset: str) -> bool:
+        return asset in self.__optimized_assets
+
+    # Optimized asset is the asset we are optimizing during this cloning.
+    # Optimized assets are tracked to prevent redundant cloning.
+    # Negative weights will get deleted.
+    def clone_with_optimization(self, optimized_asset: str, neighbor_weights: Dict[str, float]) -> "MappedGraph[ValueType]":
+        if optimized_asset in self.__optimized_assets:
+            raise RP2ValueError(
+                "You are trying to optimize an asset that has already been optimized."
+                "Use is_optimized() to check if an asset has already been optimized before cloning."
+            )
+
+        cloned_optimized_assets: Dict[str, None] = self.__optimized_assets
+        cloned_optimized_assets[optimized_asset] = None
+        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=cloned_optimized_assets)
+
+        for original_vertex in self.vertexes:
+            # Add existing neighbors
+            for neighbor in original_vertex.neighbors:
+                neighbor_weight: float
+                if original_vertex.name == optimized_asset:
+                    neighbor_weight = neighbor_weights.pop(neighbor.name, original_vertex.get_weight(neighbor))
+                else:
+                    neighbor_weight = original_vertex.get_weight(neighbor)
+
+                # Delete neighbor if negative weight
+                if neighbor_weight >= 0.0:
+                    cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor.name, neighbor_weight)
+                else:
+                    cloned_mapped_graph.add_missing_vertex(original_vertex.name)
+
+            # Add new neighbors
+            for neighbor_name in neighbor_weights.keys():
+                if original_vertex.name == optimized_asset:
+                    cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor_name, neighbor_weights[neighbor_name])
+
+        return cloned_mapped_graph
 
     def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0) -> None:
         vertex: Vertex[ValueType] = self.get_or_set_vertex(vertex_name)
