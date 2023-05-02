@@ -484,7 +484,7 @@ This plugin makes use of the CCXT plugin, but locks all routes to Binance.com.
 
 Initialize this plugin section as follows:
 <pre>
-[dali.plugin.pair_converter.ccxt</em>]
+[dali.plugin.pair_converter.ccxt_binance</em>]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 </pre>
@@ -507,7 +507,7 @@ This plugin makes use of the CCXT plugin, but locks all routes to Kraken(US).
 
 Initialize this plugin section as follows:
 <pre>
-[dali.plugin.pair_converter.ccxt</em>]
+[dali.plugin.pair_converter.ccxt_kraken</em>]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 google_api_key = <em>&lt;google_api_key&gt;</em>
