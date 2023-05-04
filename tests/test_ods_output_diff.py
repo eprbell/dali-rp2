@@ -19,6 +19,7 @@ from pathlib import Path
 from subprocess import run
 from typing import List
 
+import ezodf
 from ods_diff import ods_diff
 
 from dali.cache import CACHE_DIR
@@ -115,6 +116,16 @@ class TestODSOutputDiff(unittest.TestCase):
     #     full_golden_file_name: Path = GOLDEN_PATH / file_name
     #     diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
     #     self.assertFalse(diff, msg=diff)
+
+    def test_ods_sheet_size(self) -> None:
+        sizes = {"test_crypto_data.ods": {"BTC": 46}}
+        for basename, sheet_sizes in sizes.items():
+            filename = self.output_dir / basename
+            file: ezodf.document.PackagedDocument = ezodf.opendoc(str(filename))
+
+            for sheet in file.sheets:
+                assert sheet.name in sheet_sizes
+                assert file.sheets[sheet.name].nrows() == sheet_sizes[sheet.name]
 
 
 if __name__ == "__main__":
