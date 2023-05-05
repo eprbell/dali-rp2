@@ -26,6 +26,7 @@ from ccxt import (
     NetworkError,
     RequestTimeout,
     binance,
+    coinbasepro,
     gateio,
     huobi,
     kraken,
@@ -57,18 +58,32 @@ _FIVE_MINUTE: str = "5m"
 _FIFTEEN_MINUTE: str = "15m"
 _ONE_HOUR: str = "1h"
 _FOUR_HOUR: str = "4h"
+_SIX_HOUR: str = "6h"
 _ONE_DAY: str = "1d"
 _TIME_GRANULARITY: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _FOUR_HOUR, _ONE_DAY]
-_TIME_GRANULARITY_IN_SECONDS: List[int] = [60, 300, 900, 3600, 14400, 86400]
+_TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
+    _MINUTE: 60,
+    _FIVE_MINUTE: 300,
+    _FIFTEEN_MINUTE: 900,
+    _ONE_HOUR: 3600,
+    _FOUR_HOUR: 14400,
+    _SIX_HOUR: 21600,
+    _ONE_DAY: 86400,
+}
 
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
+_COINBASE_PRO: str = "Coinbase Pro"
 _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = _KRAKEN
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _COINBASE_PRO: coinbasepro, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken}
+_TIME_GRANULARITY_DICT: Dict[str, List[str]] = {
+    _COINBASE_PRO: [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _SIX_HOUR, _ONE_DAY],
+}
+
 
 # Delay in fractional seconds before making a request to avoid too many request errors
 # Kraken states it has a limit of 1 call per second, but this doesn't seem to be correct.
@@ -339,8 +354,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.debug("Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange)
                 return historical_bar
 
-        while retry_count < len(_TIME_GRANULARITY):
-            timeframe: str = _TIME_GRANULARITY[retry_count]
+        while retry_count < len(_TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)):
+            timeframe: str = _TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)[retry_count]
             request_count: int = 0
             historical_data: List[List[Union[int, float]]] = []
 
@@ -386,7 +401,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             # If there is no candle the list will be empty
             if historical_data:
                 result = HistoricalBar(
-                    duration=timedelta(seconds=_TIME_GRANULARITY_IN_SECONDS[retry_count]),
+                    duration=timedelta(seconds=_TIME_GRANULARITY_STRING_TO_SECONDS[timeframe]),
                     timestamp=timestamp,
                     open=RP2Decimal(str(historical_data[0][1])),
                     high=RP2Decimal(str(historical_data[0][2])),
