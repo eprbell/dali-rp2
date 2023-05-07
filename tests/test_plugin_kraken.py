@@ -45,10 +45,12 @@ def test_kraken(mocker: Any) -> None:
     client: Exchange = plugin._client
 
     mocker.patch.object(client, "load_markets").return_value = None
-    client.markets_by_id = {  # type: ignore
-        "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
-        'XLTCXXBT': {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
-    }
+    mocker.patch.object(client, "markets_by_id",
+                            {
+                                "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
+                                'XLTCXXBT': {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
+                            }
+                        )
 
     mocker.patch.object(client, "private_post_ledgers").return_value = {
         'error': [],
