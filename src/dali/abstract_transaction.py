@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from datetime import datetime
-from inspect import signature
-from typing import Callable, Dict, List, NamedTuple, Optional, Union
+from inspect import Parameter, signature
+from typing import Callable, Dict, List, Mapping, NamedTuple, Optional, Type, Union
 
 from dateutil.parser import parse
 from prezzemolo.utility import to_string
@@ -40,6 +40,8 @@ class DirectionTypeAndNotes(NamedTuple):
 
 
 class AbstractTransaction:
+    _parameter_cache: Dict[Type["AbstractTransaction"], Mapping[str, Parameter]] = {}
+
     @classmethod
     def _validate_string_field(cls, name: str, value: str, raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> str:
         if not isinstance(name, str):
@@ -165,7 +167,10 @@ class AbstractTransaction:
     # Build a dictionary of constructor initialization parameters. Return true if any of them have UNKNOWN value
     def _setup_constructor_parameter_dictionary(self, parameter_dictionary: Dict[str, Union[str, bool, Optional[str], Optional[bool]]]) -> bool:
         result: bool = False
-        for parameter in signature(self.__class__).parameters:
+        if self.__class__ not in self._parameter_cache:
+            self._parameter_cache[self.__class__] = signature(self.__class__).parameters
+
+        for parameter in self._parameter_cache[self.__class__]:
             value: str = getattr(self, parameter)
             parameter_dictionary[parameter] = value
             if is_internal_field(parameter) or parameter == Keyword.UNIQUE_ID.value:
