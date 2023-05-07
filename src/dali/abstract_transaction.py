@@ -16,11 +16,14 @@ from datetime import datetime
 from inspect import Parameter, signature
 from typing import Callable, Dict, List, Mapping, NamedTuple, Optional, Type, Union
 
+from backports.datetime_fromisoformat import MonkeyPatch
 from dateutil.parser import parse
 from prezzemolo.utility import to_string
 from rp2.rp2_error import RP2RuntimeError
 
 from dali.configuration import Keyword, is_internal_field, is_unknown
+
+MonkeyPatch.patch_fromisoformat()
 
 
 class StringAndDatetime(NamedTuple):
@@ -71,9 +74,12 @@ class AbstractTransaction:
     def _validate_timestamp_field(cls, name: str, value: str, raw_data: str) -> StringAndDatetime:
         value = cls._validate_string_field(name, value, raw_data, disallow_empty=True, disallow_unknown=True)
         try:
-            result: datetime = parse(value)
-        except RP2RuntimeError as exc:
-            raise RP2RuntimeError(f"Internal error parsing {name} as datetime: {value}\n{raw_data}\n{str(exc)}") from exc
+            result: datetime = datetime.fromisoformat(value)
+        except ValueError:
+            try:
+                result = parse(value)
+            except RP2RuntimeError as exc:
+                raise RP2RuntimeError(f"Internal error parsing {name} as datetime: {value}\n{raw_data}\n{str(exc)}") from exc
         if result.tzinfo is None:
             raise RP2RuntimeError(f"Internal error: {name} has no timezone info: {value}\n{raw_data}")
         if result.microsecond == 0:
