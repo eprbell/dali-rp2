@@ -13,14 +13,17 @@
 # limitations under the License.
 
 from datetime import datetime
-from inspect import signature
-from typing import Callable, Dict, List, NamedTuple, Optional, Union
+from inspect import Parameter, signature
+from typing import Callable, Dict, List, Mapping, NamedTuple, Optional, Type, Union
 
+from backports.datetime_fromisoformat import MonkeyPatch
 from dateutil.parser import parse
 from prezzemolo.utility import to_string
 from rp2.rp2_error import RP2RuntimeError
 
 from dali.configuration import Keyword, is_internal_field, is_unknown
+
+MonkeyPatch.patch_fromisoformat()
 
 
 class StringAndDatetime(NamedTuple):
@@ -40,6 +43,8 @@ class DirectionTypeAndNotes(NamedTuple):
 
 
 class AbstractTransaction:
+    _parameter_cache: Dict[Type["AbstractTransaction"], Mapping[str, Parameter]] = {}
+
     @classmethod
     def _validate_string_field(cls, name: str, value: str, raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> str:
         if not isinstance(name, str):
@@ -69,9 +74,12 @@ class AbstractTransaction:
     def _validate_timestamp_field(cls, name: str, value: str, raw_data: str) -> StringAndDatetime:
         value = cls._validate_string_field(name, value, raw_data, disallow_empty=True, disallow_unknown=True)
         try:
-            result: datetime = parse(value)
-        except RP2RuntimeError as exc:
-            raise RP2RuntimeError(f"Internal error parsing {name} as datetime: {value}\n{raw_data}\n{str(exc)}") from exc
+            result: datetime = datetime.fromisoformat(value)
+        except ValueError:
+            try:
+                result = parse(value)
+            except RP2RuntimeError as exc:
+                raise RP2RuntimeError(f"Internal error parsing {name} as datetime: {value}\n{raw_data}\n{str(exc)}") from exc
         if result.tzinfo is None:
             raise RP2RuntimeError(f"Internal error: {name} has no timezone info: {value}\n{raw_data}")
         if result.microsecond == 0:
@@ -165,7 +173,10 @@ class AbstractTransaction:
     # Build a dictionary of constructor initialization parameters. Return true if any of them have UNKNOWN value
     def _setup_constructor_parameter_dictionary(self, parameter_dictionary: Dict[str, Union[str, bool, Optional[str], Optional[bool]]]) -> bool:
         result: bool = False
-        for parameter in signature(self.__class__).parameters:
+        if self.__class__ not in self._parameter_cache:
+            self._parameter_cache[self.__class__] = signature(self.__class__).parameters
+
+        for parameter in self._parameter_cache[self.__class__]:
             value: str = getattr(self, parameter)
             parameter_dictionary[parameter] = value
             if is_internal_field(parameter) or parameter == Keyword.UNIQUE_ID.value:

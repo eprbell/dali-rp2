@@ -1,4 +1,4 @@
-# Copyright 2021 eprbell
+# Copyright 2023 Christopher Whelan
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Iterator
 
-class PackagedDocument:
-    def __init__(self, name: str) -> None: ...
+from .table import Table
 
-class Table:
-    def __init__(self, name: str) -> None: ...
-
-def opendoc(filename: str) -> PackagedDocument: ...
-def newdoc(doctype: str, filename: str, template: Optional[str]) -> PackagedDocument: ...
+class Sheets:
+    def __iter__(self) -> Iterator[Table]: ...
+    def __getitem__(self, key: str) -> Table: ...
