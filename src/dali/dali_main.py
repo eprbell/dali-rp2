@@ -157,6 +157,19 @@ def _dali_main_internal(country: AbstractCountry) -> None:
             pair_converter_list.append(CcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
             LOGGER.info("No pair converter plugins found in configuration file: using default pair converters.")
 
+        pair_converters_by_cache_key: Dict[str, AbstractPairConverterPlugin] = {}
+        for pair_converter in pair_converter_list:
+            cache_key = pair_converter.cache_key()
+            if cache_key in pair_converters_by_cache_key:
+                LOGGER.error(
+                    "Internal error: the following pair converter plugins both attempt to store at %s: %s, %s",
+                    cache_key,
+                    pair_converter.name(),
+                    pair_converters_by_cache_key[cache_key].name(),
+                )
+                sys.exit(1)
+            pair_converters_by_cache_key[cache_key] = pair_converter
+
         dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
 
         with ThreadPool(args.thread_count) as pool:

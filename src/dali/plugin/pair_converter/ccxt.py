@@ -158,6 +158,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
     ) -> None:
+        exchange_cache_modifier = default_exchange.replace(" ", "_") if default_exchange and exchange_locked else ""
+        fiat_priority_cache_modifier = fiat_priority if fiat_priority else ""
+        self.__cache_modifier = "_".join(x for x in [exchange_cache_modifier, fiat_priority_cache_modifier] if x)
+
         super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
@@ -179,7 +183,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return "CCXT-converter"
 
     def cache_key(self) -> str:
-        return self.name()
+        return self.name() + "_" + self.__cache_modifier if self.__cache_modifier else self.name()
 
     @property
     def exchanges(self) -> Dict[str, Exchange]:
