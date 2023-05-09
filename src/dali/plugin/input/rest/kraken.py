@@ -125,7 +125,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             }
         )
 
-    def _initilaize_markets(self) -> None:
+    def _initialize_markets(self) -> None:
         self._client.load_markets()
         self._client.markets_by_id.update({"BSVUSD": {_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}})
 
@@ -185,7 +185,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         if not self.base_id_to_base:
-            self._initilaize_markets()
+            self._initialize_markets()
 
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
