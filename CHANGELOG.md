@@ -14,6 +14,16 @@
 
 # RP2 Change Log
 
+## 0.6.9
+* new Dijkstra-based pair converter implementation (#142)
+* added Coinbase Pro-based CCXT pair converter (#150)
+* fixed a bug in cache setup of CCXT pair converters (#149)
+* fixed a bug in Bitbank fee-only transactions (#155)
+* fixed spreadsheet size, which was set to a large value regardless of how many rows it contained (#147)
+* added XYMUSDT alternative market to CCXT pair converter (#158)
+* various optimizations (#151, #152))
+* various documentation fixes (#144, #148)
+
 ## 0.6.8
 * Coinbase data loader: added a new flavor of transfer transaction that was slightly different from the other ones (#137)
 
