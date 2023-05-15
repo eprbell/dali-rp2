@@ -145,8 +145,12 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     @staticmethod
     def _rp2_timestamp_from_ms_epoch(epoch_timestamp: str) -> str:
-        rp2_time = datetime.fromtimestamp((int(epoch_timestamp) / _MS_IN_SECOND), timezone.utc)
+        epoch_in_seconds: int = int(epoch_timestamp) // _MS_IN_SECOND
+        return AbstractCcxtInputPlugin._rp2_timestamp_from_seconds_epoch(str(epoch_in_seconds))
 
+    @staticmethod
+    def _rp2_timestamp_from_seconds_epoch(epoch_timestamp: str) -> str:
+        rp2_time = datetime.fromtimestamp((float(epoch_timestamp)), timezone.utc)
         return rp2_time.strftime("%Y-%m-%d %H:%M:%S%z")
 
     # Parses the symbol (eg. 'BTC/USD') into base and quote assets, and formats notes for the transactions
@@ -216,7 +220,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                deposits = self.__safe_api_call(
+                deposits = self._safe_api_call(
                     self._client.fetch_deposits,
                     {
                         "code": pagination_details.symbol,
@@ -311,7 +315,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
 
-                trades: Iterable[Dict[str, Union[str, float]]] = self.__safe_api_call(
+                trades: Iterable[Dict[str, Union[str, float]]] = self._safe_api_call(
                     self._client.fetch_my_trades,
                     {
                         "symbol": pagination_details.symbol,
@@ -379,7 +383,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         try:
             while True:
                 pagination_details: PaginationDetails = next(pagination_detail_iterator)
-                withdrawals: Iterable[Dict[str, Union[str, float]]] = self.__safe_api_call(
+                withdrawals: Iterable[Dict[str, Union[str, float]]] = self._safe_api_call(
                     self._client.fetch_withdrawals,
                     {
                         "code": pagination_details.symbol,
@@ -437,7 +441,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             # End of pagination details
             pass
 
-    def __safe_api_call(
+    def _safe_api_call(
         self,
         function: Callable[..., Iterable[Dict[str, Union[str, float]]]],
         params: Dict[str, Any],
@@ -448,10 +452,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         # Most exceptions are caused by request limits of the underlying APIs
         while request_count < 9:
             try:
-                if "code" in params:
-                    results = function(**params)
-                else:
-                    results = function(**params)
+                results = function(**params)
                 break
             except (DDoSProtection, ExchangeError) as exc:
                 self.__logger.debug("Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc)

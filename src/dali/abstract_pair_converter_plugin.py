@@ -106,7 +106,11 @@ class AbstractPairConverterPlugin:
             raise RP2TypeError(
                 f"historical_price_type must be one of {', '.join(sorted(HISTORICAL_PRICE_KEYWORD_SET))}, instead it was: {historical_price_type}"
             )
-        result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
+        try:
+            result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
+        except EOFError:
+            LOGGER.error("EOFError: Cached file corrupted, no cache found.")
+            result = None
         self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()

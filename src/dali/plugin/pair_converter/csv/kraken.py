@@ -38,6 +38,7 @@ from dali.historical_bar import HistoricalBar
 # Google Drive parameters
 _ACCESS_NOT_CONFIGURED: str = "accessNotConfigured"
 _BAD_REQUEST: str = "badRequest"
+_INVALID_VALUE: str = "invalid"
 _ERROR: str = "error"
 _ERRORS: str = "errors"
 _FILES: str = "files"
@@ -90,6 +91,7 @@ class _PairStartEnd(NamedTuple):
 
 
 class Kraken:
+    ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __CACHE_DIRECTORY: str = ".dali_cache/kraken/"
@@ -209,10 +211,12 @@ class Kraken:
             file_name: str = f"{base_asset + quote_asset}_{file_timestamp}_{_TIME_GRANULARITY[retry_count]}.csv.gz"
             file_path: str = path.join(self.__CACHE_DIRECTORY, file_name)
             self.__logger.debug("Retrieving %s -> %s at %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp)
-            with gopen(file_path, "rt") as file:
-                rows = reader(file)
-                for row in rows:
-                    if int(row[self.__TIMESTAMP_INDEX]) == duration_timestamp:
+            try:
+                with gopen(file_path, "rt") as file:
+                    rows = reader(file)
+                    for row in rows:
+                        if int(row[self.__TIMESTAMP_INDEX]) != duration_timestamp:
+                            continue
                         return HistoricalBar(
                             duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
                             timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
@@ -222,7 +226,9 @@ class Kraken:
                             close=RP2Decimal(row[self.__CLOSE]),
                             volume=RP2Decimal(row[self.__VOLUME]),
                         )
-
+            except FileNotFoundError:
+                self.__logger.error(f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s",
+                                    self.ISSUES_URL, datetime.fromtimestamp(timestamp))
             retry_count += 1
 
         return None
@@ -242,7 +248,7 @@ class Kraken:
 
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.info("Attempting to load %s from Kraken Google Drive.", base_file)
+        self.__logger.info("Attempting to load %s from Kraken Google Drive for timestamp=%s.", base_file, timestamp)
         file_bytes = self._google_file_to_bytes(base_file)
 
         if file_bytes:
@@ -351,8 +357,17 @@ class Kraken:
                             error[_MESSAGE],
                         )
                         raise RP2RuntimeError("Google Drive key invalid")
+                    if error[_REASON] == _INVALID_VALUE:
+                        self.__logger.error(
+                            """Invalid parameters to google API call.\nparams=%s\nMessage=%s\n
+                            """,
+                            params,
+                            error[_MESSAGE],
+                        )
+                        raise RP2RuntimeError("Google Drive not authorized")
+
             if not data.get(_FILES):
-                self.__logger.debug("The file '%s' was not found on the Kraken Google Drive.", file_name)
+                self.__logger.error("No matching files for '%s' on the Kraken Google Drive. data=%s", file_name, data)
                 return None
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
