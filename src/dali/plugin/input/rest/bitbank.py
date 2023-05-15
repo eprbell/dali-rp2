@@ -121,7 +121,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         if RP2Decimal(str(transaction[_FEE][_COST])) < ZERO:
             fee_income = InTransaction(
                 plugin=self.plugin_name(),
-                unique_id=f"{transaction[_ID]}",
+                unique_id=f"{transaction[_ID]}/fee",
                 raw_data=json.dumps(transaction),
                 timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
                 asset=transaction[_FEE][_CURRENCY],

@@ -34,6 +34,7 @@
 * **[Pair Converter Plugin Sections](#pair-converter-plugin-sections)**
   * [CCXT](#ccxt)
   * [Binance Locked CCXT](#binance-locked-ccxt)
+  * [Coinbase Pro Locked CCXT](#coinbase-pro-locked-ccxt)
   * [Kraken Locked CCXT](#kraken-locked-ccxt)
   * [Historic Crypto](#historic-crypto)
 * **[Builtin Sections](#builtin-sections)**
@@ -520,6 +521,28 @@ Be aware that:
 * The router only uses Binance.com and the fiat exchange rates to build the graph to calculate the route.
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 * Binance.com might not be available in certain territories.
+
+
+### Coinbase Pro Locked CCXT
+This plugin makes use of the CCXT plugin, but locks all routes to Coinbase Pro.
+
+Initialize this plugin section as follows:
+<pre>
+[dali.plugin.pair_converter.ccxt_coinbase_pro</em>]
+historical_price_type = <em>&lt;historical_price_type&gt;</em>
+fiat_priority = <em>&lt;fiat_priority&gt;</em>
+</pre>
+
+Where:
+* `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
+* `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
+
+The Kraken Locked CCXT plugin still makes use of fiat exchange rate routing. Pricing will resolve to any major fiat currency even if it doesn't have a market (ie. not used to trade with) on Coinbase Pro.
+
+Be aware that:
+* Exchange rates for fiat transactions are based on the daily rate and not minute or hourly rates.
+* The router only uses Coinbase Pro and the fiat exchange rates to build the graph to calculate the route.
+* `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 
 
 ### Kraken Locked CCXT
