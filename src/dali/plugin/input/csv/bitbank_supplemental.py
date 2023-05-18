@@ -129,28 +129,29 @@ class InputPlugin(AbstractInputPlugin):
             header = next(lines)
             self.__logger.debug("Header: %s", header)
             for line in lines:
-                raw_data: str = self.__DELIMITER.join(line)
-                self.__logger.debug("Transaction: %s", raw_data)
+                if line[self.__STATUS] == "DONE":
+                    raw_data: str = self.__DELIMITER.join(line)
+                    self.__logger.debug("Transaction: %s", raw_data)
 
-                jst_timezone = PytzTimezone("Asia/Tokyo")
-                jst_datetime: datetime = jst_timezone.localize(datetime.strptime(line[self.__TIMESTAMP_INDEX], "%Y/%m/%d %H:%M:%S"))
-                utc_timestamp: str = jst_datetime.astimezone(DatetimeTimezone.utc).strftime("%Y-%m-%d %H:%M:%S%z")
+                    jst_timezone = PytzTimezone("Asia/Tokyo")
+                    jst_datetime: datetime = jst_timezone.localize(datetime.strptime(line[self.__TIMESTAMP_INDEX], "%Y/%m/%d %H:%M:%S"))
+                    utc_timestamp: str = jst_datetime.astimezone(DatetimeTimezone.utc).strftime("%Y-%m-%d %H:%M:%S%z")
 
-                result.append(
-                    IntraTransaction(
-                        plugin=self.__BITBANK_PLUGIN,
-                        unique_id=line[self.__TX_ID],
-                        raw_data=raw_data,
-                        timestamp=utc_timestamp,
-                        asset=self.__withdrawals_code,
-                        from_exchange=self.__BITBANK,
-                        from_holder=self.account_holder,
-                        to_exchange=Keyword.UNKNOWN.value,
-                        to_holder=Keyword.UNKNOWN.value,
-                        spot_price=Keyword.UNKNOWN.value,
-                        crypto_sent=str(line[self.__TOTAL]),
-                        crypto_received=Keyword.UNKNOWN.value,
+                    result.append(
+                        IntraTransaction(
+                            plugin=self.__BITBANK_PLUGIN,
+                            unique_id=line[self.__TX_ID],
+                            raw_data=raw_data,
+                            timestamp=utc_timestamp,
+                            asset=self.__withdrawals_code,
+                            from_exchange=self.__BITBANK,
+                            from_holder=self.account_holder,
+                            to_exchange=Keyword.UNKNOWN.value,
+                            to_holder=Keyword.UNKNOWN.value,
+                            spot_price=Keyword.UNKNOWN.value,
+                            crypto_sent=str(line[self.__TOTAL]),
+                            crypto_received=Keyword.UNKNOWN.value,
+                        )
                     )
-                )
 
         return result
