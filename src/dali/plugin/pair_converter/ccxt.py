@@ -388,6 +388,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     request_count += 3
                 except (ExchangeNotAvailable, NetworkError, RequestTimeout) as exc_na:
                     request_count += 1
+                    if "restricted location" in str(exc_na):
+                        raise RP2RuntimeError(f"Geolocked API when attempting to use the {exchange} exchange") from exc_na
                     if request_count > 9:
                         if exchange == _BINANCE:
                             self.__logger.info(
