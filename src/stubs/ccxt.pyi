@@ -81,6 +81,10 @@ class liquid(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
+class upbit(Exchange):
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
+    options: Dict[str, str]
+
 ## Errors
 
 class BaseError(Exception): ...
