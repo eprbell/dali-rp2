@@ -22,26 +22,22 @@
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Union, Set, Tuple, Any
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from ccxt import Exchange, kraken
-from rp2.logger import create_logger
 from rp2.abstract_country import AbstractCountry
-from rp2.rp2_decimal import RP2Decimal, ZERO
+from rp2.logger import create_logger
+from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError
 
-from dali.abstract_ccxt_input_plugin import (
-    AbstractCcxtInputPlugin,
-)
-from dali.ccxt_pagination import (
-    AbstractPaginationDetailSet,
-)
+from dali.abstract_ccxt_input_plugin import AbstractCcxtInputPlugin
 from dali.abstract_transaction import AbstractTransaction
+from dali.cache import load_from_cache, save_to_cache
+from dali.ccxt_pagination import AbstractPaginationDetailSet
+from dali.configuration import _FIAT_SET, Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-from dali.configuration import Keyword, _FIAT_SET
-from dali.cache import load_from_cache, save_to_cache
 
 # keywords
 _AMOUNT: str = "amount"
@@ -79,8 +75,7 @@ _WITHDRAWAL: str = "withdrawal"
 # Record Limits
 _TRADE_RECORD_LIMIT: int = 50
 
-_KRAKEN_FIAT_SET: Set[str] = {"AUD", "CAD", "EUR", "GBP", "JPY", "USD",
-                              "ZAUD", "ZCAD", "ZEUR", "ZGBP", "ZJPY", "ZUSD"}
+_KRAKEN_FIAT_SET: Set[str] = {"AUD", "CAD", "EUR", "GBP", "JPY", "USD", "ZAUD", "ZCAD", "ZEUR", "ZGBP", "ZJPY", "ZUSD"}
 
 _KRAKEN_FIAT_LIST = list(set(list(_KRAKEN_FIAT_SET) + list(_FIAT_SET)))
 
@@ -190,8 +185,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         (trade_history, ledger) = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
-    def _compute_transaction_set(self, trade_history: Dict[str, Dict[str, str]],
-                                 ledger: Dict[str, Dict[str, str]]) -> List[AbstractTransaction]:
+    def _compute_transaction_set(self, trade_history: Dict[str, Dict[str, str]], ledger: Dict[str, Dict[str, str]]) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         unhandled_types: Dict[str, str] = {}
@@ -245,8 +239,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
                 if RP2Decimal(record[_AMOUNT]) > ZERO:
                     crypto_in: str = str(amount)
-                    fiat_in_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                        trade_history[record[_REFID]][_FEE]))
+                    fiat_in_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(trade_history[record[_REFID]][_FEE]))
                     fiat_in_with_fee: str = trade_history[record[_REFID]][_COST]
                     result.append(
                         InTransaction(
@@ -270,8 +263,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 else:
                     crypto_out_no_fee: str = str(amount)
                     crypto_out_with_fee: str = str(amount + RP2Decimal(record[_FEE]))
-                    fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                        trade_history[record[_REFID]][_FEE]))
+                    fiat_out_no_fee: str = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(trade_history[record[_REFID]][_FEE]))
 
                     result.append(
                         OutTransaction(
@@ -298,8 +290,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 spot_price = Keyword.UNKNOWN.value
                 crypto_out_no_fee = str(amount)
                 crypto_out_with_fee = str(amount + RP2Decimal(record[_FEE]))
-                fiat_out_no_fee = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(
-                    trade_history[record[_REFID]][_FEE]))
+                fiat_out_no_fee = str(RP2Decimal(trade_history[record[_REFID]][_COST]) - RP2Decimal(trade_history[record[_REFID]][_FEE]))
 
                 result.append(
                     OutTransaction(
@@ -348,17 +339,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 # ignorable in terms of in/out/intra
                 pass
             else:
-                self.__logger.error(
-                    f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s",
-                    raw_data, self.ISSUES_URL)
+                self.__logger.error(f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
                 unhandled_types.update({record[_TYPE]: ledger_id})
 
             self.__logger.debug("unknown types of the ledger=%s", str(unhandled_types))
 
         return result
 
-    def _process_implicit_api(self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction],
-                              intra_transactions: List[IntraTransaction]) -> None:
+    def _process_implicit_api(
+        self, in_transactions: List[InTransaction], out_transactions: List[OutTransaction], intra_transactions: List[IntraTransaction]
+    ) -> None:
         pass
 
     def _process_trade_history(self, index: int = 0) -> Dict[str, Dict[str, str]]:

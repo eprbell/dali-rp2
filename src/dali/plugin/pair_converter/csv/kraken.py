@@ -227,8 +227,9 @@ class Kraken:
                             volume=RP2Decimal(row[self.__VOLUME]),
                         )
             except FileNotFoundError:
-                self.__logger.error(f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s",
-                                    self.ISSUES_URL, datetime.fromtimestamp(timestamp))
+                self.__logger.error(
+                    f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s", self.ISSUES_URL, datetime.fromtimestamp(timestamp)
+                )
             retry_count += 1
 
         return None
