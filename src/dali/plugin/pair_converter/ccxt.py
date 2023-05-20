@@ -26,6 +26,7 @@ from ccxt import (
     NetworkError,
     RequestTimeout,
     binance,
+    binanceus,
     coinbasepro,
     gateio,
     huobi,
@@ -76,6 +77,7 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
 
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
+_BINANCEUS: str = "Binance US"
 _COINBASE_PRO: str = "Coinbase Pro"
 _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
@@ -85,7 +87,7 @@ _COINBASE: str = "Coinbase"
 _OKEX: str = "Okex"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = _KRAKEN
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _COINBASE_PRO: coinbasepro, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken, _UPBIT: upbit, _COINBASE: coinbase, _OKEX: okex}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _BINANCEUS: binanceus, _COINBASE_PRO: coinbasepro, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken, _UPBIT: upbit, _COINBASE: coinbase, _OKEX: okex}
 _TIME_GRANULARITY_DICT: Dict[str, List[str]] = {
     _COINBASE_PRO: [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _SIX_HOUR, _ONE_DAY],
 }
@@ -108,7 +110,7 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "XYMUSDT": _GATE,
     "ATDUSDT": _GATE,
     "BETHETH": _BINANCE,
-    "BNBUSDT": _BINANCE,
+    "BNBUSDT": _BINANCEUS,
     "BSVUSDT": _GATE,
     "BOBAUSDT": _GATE,
     "BUSDUSDT": _BINANCE,
