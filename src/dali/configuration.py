@@ -206,6 +206,7 @@ DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
     },
 }
 
+
 def is_builtin_section_name(section_name: str) -> bool:
     return section_name in BUILTIN_CONFIGURATION_SECTIONS
 

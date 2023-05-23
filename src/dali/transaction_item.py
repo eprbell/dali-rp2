@@ -17,31 +17,27 @@ from enum import Enum
 
 
 class Transaction_Item:
-    def __init__(
-        self,
-        disallow_empty: bool,
-        disallow_unknown: bool,
-        transaction_item_type: Keyword 
-    ) -> None:
+    def __init__(self, disallow_empty: bool, disallow_unknown: bool, transaction_item_type: Keyword) -> None:
         self.__disallow_empty: bool = disallow_empty
         self.__disallow_unknown: bool = disallow_unknown
-        self.__transaction_item_type: Keyword = transaction_item_type 
+        self.__transaction_item_type: Keyword = transaction_item_type
 
     @property
     def disallow_empty(self) -> bool:
         return self.__disallow_empty
 
-    @property 
+    @property
     def disallow_unknown(self) -> bool:
         return self.__disallow_unknown
-    
-    @property 
+
+    @property
     def transaction_item_type(self) -> Keyword:
         return self.__transaction_item_type
 
+
 class TRANSACTION_ITEM_TYPE(Enum):
     __members__: Transaction_Item
-    PLUGIN = Transaction_Item(True, True, Keyword.PLUGIN) 
+    PLUGIN = Transaction_Item(True, True, Keyword.PLUGIN)
     UNIQUE_ID = Transaction_Item(True, False, Keyword.UNIQUE_ID)
     RAW_DATA = Transaction_Item(True, True, Keyword.RAW_DATA)
     TIMESTAMP = Transaction_Item(True, True, Keyword.TIMESTAMP)
