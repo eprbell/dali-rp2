@@ -38,3 +38,13 @@ class Transaction_Item:
     @property 
     def transaction_item_type(self) -> Keyword:
         return self.__transaction_item_type
+
+class TRANSACTION_ITEM_TYPE(Enum):
+    __members__: Transaction_Item
+    PLUGIN = Transaction_Item(True, True, Keyword.PLUGIN) 
+    UNIQUE_ID = Transaction_Item(True, False, Keyword.UNIQUE_ID)
+    RAW_DATA = Transaction_Item(True, True, Keyword.RAW_DATA)
+    TIMESTAMP = Transaction_Item(True, True, Keyword.TIMESTAMP)
+    ASSET = Transaction_Item(True, True, Keyword.ASSET)
+    NOTES = Transaction_Item(False, True, Keyword.NOTES)
+    FIAT_TICKER = Transaction_Item(True, True, Keyword.FIAT_TICKER)

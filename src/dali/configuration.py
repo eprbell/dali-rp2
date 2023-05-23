@@ -14,7 +14,6 @@
 
 from enum import Enum
 from typing import Dict, Optional, Set, Union
-from dali.transaction_item import Transaction_Item
 from rp2.rp2_error import RP2ValueError
 
 
@@ -206,16 +205,6 @@ DEFAULT_CONFIGURATION: Dict[str, Union[Dict[str, int], Dict[str, str]]] = {
         Keyword.NOTES.value: 13,
     },
 }
-
-class TRANSACTION_ITEM_TYPE(Enum):
-    __members__: Transaction_Item
-    PLUGIN = Transaction_Item(True, True, Keyword.PLUGIN) 
-    UNIQUE_ID = Transaction_Item(True, False, Keyword.UNIQUE_ID)
-    RAW_DATA = Transaction_Item(True, True, Keyword.RAW_DATA)
-    TIMESTAMP = Transaction_Item(True, True, Keyword.TIMESTAMP)
-    ASSET = Transaction_Item(True, True, Keyword.ASSET)
-    NOTES = Transaction_Item(False, True, Keyword.NOTES)
-    FIAT_TICKER = Transaction_Item(True, True, Keyword.FIAT_TICKER)
 
 def is_builtin_section_name(section_name: str) -> bool:
     return section_name in BUILTIN_CONFIGURATION_SECTIONS
