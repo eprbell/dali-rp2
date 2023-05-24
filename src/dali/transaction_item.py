@@ -19,9 +19,14 @@ from dali.configuration import Keyword
 
 
 class TransactionItem:
-    def __init__(self, disallow_empty: bool, disallow_unknown: bool, transaction_item_type: Keyword) -> None:
+    def __init__(self, disallow_empty: bool,
+                 disallow_unknown: bool,
+                 required: bool,
+                 transaction_item_type: Keyword
+                 ) -> None:
         self.__disallow_empty: bool = disallow_empty
         self.__disallow_unknown: bool = disallow_unknown
+        self.__required: bool = required
         self.__transaction_item_type: Keyword = transaction_item_type
 
     @property
@@ -33,52 +38,57 @@ class TransactionItem:
         return self.__disallow_unknown
 
     @property
+    def required(self) -> bool:
+        return self.__required
+
+    @property
     def transaction_item_type(self) -> Keyword:
         return self.__transaction_item_type
 
 
 AbstractTransactionItems: Dict[str, TransactionItem] = dict(
-    PLUGIN=TransactionItem(True, True, Keyword.PLUGIN),
-    UNIQUE_ID=TransactionItem(True, False, Keyword.UNIQUE_ID),
-    RAW_DATA=TransactionItem(True, True, Keyword.RAW_DATA),
-    TIMESTAMP=TransactionItem(True, True, Keyword.TIMESTAMP),
-    ASSET=TransactionItem(True, True, Keyword.ASSET),
-    NOTES=TransactionItem(False, True, Keyword.NOTES),
-    FIAT_TICKER=TransactionItem(True, True, Keyword.FIAT_TICKER),
-)
-
-OutTransactionItems: Dict[str, TransactionItem] = dict(
-    EXCHANGE=TransactionItem(True, True, Keyword.EXCHANGE),
-    HOLDER=TransactionItem(True, True, Keyword.HOLDER),
-    TRANSACTION_TYPE=TransactionItem(True, True, Keyword.TRANSACTION_TYPE),
-    SPOT_PRICE=TransactionItem(True, False, Keyword.SPOT_PRICE),
-    CRYPTO_OUT_NO_FEE=TransactionItem(True, True, Keyword.CRYPTO_OUT_NO_FEE),
-    CRYPTO_FEE=TransactionItem(True, True, Keyword.CRYPTO_FEE),
-    CRYPTO_OUT_WITH_FEE=TransactionItem(False, True, Keyword.CRYPTO_OUT_WITH_FEE),
-    FIAT_OUT_NO_FEE=TransactionItem(False, True, Keyword.FIAT_OUT_NO_FEE),
-    FIAT_FEE=TransactionItem(False, True, Keyword.FIAT_FEE),
+    PLUGIN=TransactionItem(True, True, True, Keyword.PLUGIN),
+    # TODO I'm still confused  about whether this is actually required as the docs state it is not for an IntraTransaction, but I don't see how it would get through the checks without failing. 
+    UNIQUE_ID=TransactionItem(True, False, True, Keyword.UNIQUE_ID),
+    RAW_DATA=TransactionItem(True, True, True, Keyword.RAW_DATA),
+    TIMESTAMP=TransactionItem(True, True, True, Keyword.TIMESTAMP),
+    ASSET=TransactionItem(True, True, True, Keyword.ASSET),
+    NOTES=TransactionItem(False, True, False, Keyword.NOTES),
+    FIAT_TICKER=TransactionItem(True, True, False, Keyword.FIAT_TICKER),
 )
 
 InTransactionItems: Dict[str, TransactionItem] = dict(
-    EXCHANGE=TransactionItem(True, True, Keyword.EXCHANGE),
-    HOLDER=TransactionItem(True, True, Keyword.HOLDER),
-    TRANSACTION_TYPE=TransactionItem(True, True, Keyword.TRANSACTION_TYPE),
-    SPOT_PRICE=TransactionItem(True, False, Keyword.SPOT_PRICE),
-    CRYPTO_IN=TransactionItem(True, True, Keyword.CRYPTO_IN),
-    CRYPTO_FEE=TransactionItem(False, True, Keyword.CRYPTO_FEE),
-    FIAT_IN_NO_FEE=TransactionItem(False, True, Keyword.FIAT_IN_NO_FEE),
-    FIAT_IN_WITH_FEE=TransactionItem(False, True, Keyword.FIAT_IN_WITH_FEE),
-    FIAT_FEE=TransactionItem(False, True, Keyword.FIAT_FEE),
+    EXCHANGE=TransactionItem(True, True, True, Keyword.EXCHANGE),
+    HOLDER=TransactionItem(True, True, True, Keyword.HOLDER),
+    TRANSACTION_TYPE=TransactionItem(True, True, True, Keyword.TRANSACTION_TYPE),
+    SPOT_PRICE=TransactionItem(True, False, True, Keyword.SPOT_PRICE),
+    CRYPTO_IN=TransactionItem(True, True, True, Keyword.CRYPTO_IN),
+    CRYPTO_FEE=TransactionItem(False, True, False, Keyword.CRYPTO_FEE),
+    FIAT_IN_NO_FEE=TransactionItem(False, True, False, Keyword.FIAT_IN_NO_FEE),
+    FIAT_IN_WITH_FEE=TransactionItem(False, True, False, Keyword.FIAT_IN_WITH_FEE),
+    FIAT_FEE=TransactionItem(False, True, False, Keyword.FIAT_FEE),
+)
+
+OutTransactionItems: Dict[str, TransactionItem] = dict(
+    EXCHANGE=TransactionItem(True, True, True, Keyword.EXCHANGE),
+    HOLDER=TransactionItem(True, True, True, Keyword.HOLDER),
+    TRANSACTION_TYPE=TransactionItem(True, True, True, Keyword.TRANSACTION_TYPE),
+    SPOT_PRICE=TransactionItem(True, False, True, Keyword.SPOT_PRICE),
+    CRYPTO_OUT_NO_FEE=TransactionItem(True, True, True, Keyword.CRYPTO_OUT_NO_FEE),
+    CRYPTO_FEE=TransactionItem(True, True, True, Keyword.CRYPTO_FEE),
+    CRYPTO_OUT_WITH_FEE=TransactionItem(False, True, False, Keyword.CRYPTO_OUT_WITH_FEE),
+    FIAT_OUT_NO_FEE=TransactionItem(False, True, False, Keyword.FIAT_OUT_NO_FEE),
+    FIAT_FEE=TransactionItem(False, True, True, Keyword.FIAT_FEE),
 )
 
 IntraTransactionItems: Dict[str, TransactionItem] = dict(
-    FROM_EXCHANGE=TransactionItem(True, False, Keyword.FROM_EXCHANGE),
-    FROM_HOLDER=TransactionItem(True, False, Keyword.FROM_HOLDER),
-    TO_EXCHANGE=TransactionItem(True, False, Keyword.TO_EXCHANGE),
-    TO_HOLDER=TransactionItem(True, False, Keyword.TO_HOLDER),
-    SPOT_PRICE=TransactionItem(False, False, Keyword.SPOT_PRICE),
-    CRYPTO_SENT=TransactionItem(True, False, Keyword.CRYPTO_SENT),
-    CRYPTO_RECEIVED=TransactionItem(True, False, Keyword.CRYPTO_RECEIVED),
+    FROM_EXCHANGE=TransactionItem(True, False, True, Keyword.FROM_EXCHANGE),
+    FROM_HOLDER=TransactionItem(True, False, True, Keyword.FROM_HOLDER),
+    TO_EXCHANGE=TransactionItem(True, False, True, Keyword.TO_EXCHANGE),
+    TO_HOLDER=TransactionItem(True, False, True, Keyword.TO_HOLDER),
+    SPOT_PRICE=TransactionItem(False, False, False, Keyword.SPOT_PRICE),
+    CRYPTO_SENT=TransactionItem(True, False, True, Keyword.CRYPTO_SENT),
+    CRYPTO_RECEIVED=TransactionItem(True, False, True, Keyword.CRYPTO_RECEIVED),
 )
 
 
