@@ -136,9 +136,6 @@ def _dali_main_internal(country: AbstractCountry) -> None:
 
             elif hasattr(plugin_module, "InputPlugin"):
                 plugin_configuration = _validate_plugin_configuration(ini_config, section_name, signature(plugin_module.InputPlugin))
-                if Keyword.NATIVE_FIAT.value not in plugin_configuration:
-                    LOGGER.error("No '%s' parameter in plugin '%s' constructor", Keyword.NATIVE_FIAT.value, normalized_section_name)
-                    sys.exit(1)
                 plugin_configuration[Keyword.NATIVE_FIAT.value] = dali_configuration[Keyword.NATIVE_FIAT.value]
                 input_plugin: AbstractInputPlugin = plugin_module.InputPlugin(**plugin_configuration)
                 LOGGER.debug("InputPlugin object: '%s'", input_plugin)
