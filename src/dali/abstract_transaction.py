@@ -88,13 +88,13 @@ class AbstractTransaction:
 
     @classmethod
     def _validate_optional_string_field(cls, name: str, value: Optional[str], raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> Optional[str]:
-        if not value:
+        if value is None:
             return None
         return cls._validate_string_field(name, value, raw_data, disallow_empty, disallow_unknown)
 
     @classmethod
     def _validate_optional_numeric_field(cls, name: str, value: Optional[str], raw_data: str, disallow_empty: bool, disallow_unknown: bool) -> Optional[str]:
-        if not value:
+        if value is None:
             return None
         return cls._validate_numeric_field(name, value, raw_data, disallow_empty, disallow_unknown)
 
