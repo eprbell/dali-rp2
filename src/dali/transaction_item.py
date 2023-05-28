@@ -46,7 +46,7 @@ class TransactionItem:
         return self.__transaction_item_type
 
 
-AbstractTransactionItems: Dict[str, TransactionItem] = dict(
+_abstract_transaction_items: Dict[str, TransactionItem] = dict(
     PLUGIN=TransactionItem(True, True, True, Keyword.PLUGIN),
     # TODO I'm still confused  about whether this is actually required as the docs state it is not for an IntraTransaction, but I don't see how it would get through the checks without failing. 
     UNIQUE_ID=TransactionItem(True, False, True, Keyword.UNIQUE_ID),
@@ -57,7 +57,7 @@ AbstractTransactionItems: Dict[str, TransactionItem] = dict(
     FIAT_TICKER=TransactionItem(True, True, False, Keyword.FIAT_TICKER),
 )
 
-InTransactionItems: Dict[str, TransactionItem] = dict(
+_in_transaction_items: Dict[str, TransactionItem] = dict(
     EXCHANGE=TransactionItem(True, True, True, Keyword.EXCHANGE),
     HOLDER=TransactionItem(True, True, True, Keyword.HOLDER),
     TRANSACTION_TYPE=TransactionItem(True, True, True, Keyword.TRANSACTION_TYPE),
@@ -69,7 +69,7 @@ InTransactionItems: Dict[str, TransactionItem] = dict(
     FIAT_FEE=TransactionItem(False, True, False, Keyword.FIAT_FEE),
 )
 
-OutTransactionItems: Dict[str, TransactionItem] = dict(
+_out_transaction_items: Dict[str, TransactionItem] = dict(
     EXCHANGE=TransactionItem(True, True, True, Keyword.EXCHANGE),
     HOLDER=TransactionItem(True, True, True, Keyword.HOLDER),
     TRANSACTION_TYPE=TransactionItem(True, True, True, Keyword.TRANSACTION_TYPE),
@@ -81,7 +81,7 @@ OutTransactionItems: Dict[str, TransactionItem] = dict(
     FIAT_FEE=TransactionItem(False, True, True, Keyword.FIAT_FEE),
 )
 
-IntraTransactionItems: Dict[str, TransactionItem] = dict(
+_intra_transaction_items: Dict[str, TransactionItem] = dict(
     FROM_EXCHANGE=TransactionItem(True, False, True, Keyword.FROM_EXCHANGE),
     FROM_HOLDER=TransactionItem(True, False, True, Keyword.FROM_HOLDER),
     TO_EXCHANGE=TransactionItem(True, False, True, Keyword.TO_EXCHANGE),
@@ -94,9 +94,15 @@ IntraTransactionItems: Dict[str, TransactionItem] = dict(
 
 class TransactionDirection(Enum):
     __members__: Dict[str, TransactionItem]
-    IN = InTransactionItems
+    IN = _in_transaction_items
+    OUT = _out_transaction_items
+    INTRA = _intra_transaction_items
 
 
-class TransactionItems:
-    def __init__(self, transaction_direction: TransactionDirection) -> None:
-        self.__transaction_item_types: Dict[str, TransactionItem] = {**AbstractTransactionItems, **transaction_direction.value}
+def _combine_dicts(transaction_direction: TransactionDirection) -> Dict[str, TransactionItem]:
+    return {**_abstract_transaction_items, **transaction_direction.value}
+
+
+InTransactionItems = _combine_dicts(TransactionDirection.IN)
+OutTransactionItems = _combine_dicts(TransactionDirection.OUT)
+IntraTransactionItems = _combine_dicts(TransactionDirection.INTRA)
