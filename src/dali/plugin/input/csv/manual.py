@@ -33,6 +33,7 @@ from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
+from dali.transaction_item import TransactionItem, InTransactionItems, OutTransactionItems, IntraTransactionItems
 
 
 class InputPlugin(AbstractInputPlugin):
@@ -137,12 +138,12 @@ class InputPlugin(AbstractInputPlugin):
         self.__out_csv_file: str = out_csv_file
         self.__intra_csv_file: str = intra_csv_file
 
-        self.__in_required_columns: Dict[int, str] = {in_timestamp: Keyword.TIMESTAMP, in_asset: Keyword.ASSET, in_exchange: Keyword.EXCHANGE, in_holder: Keyword.HOLDER, in_transaction_type: Keyword.TRANSACTION_TYPE, in_spot_price: Keyword.SPOT_PRICE, in_crypto_in: Keyword.CRYPTO_IN}
-        self.__in_optional_columns: Dict[int, str] = {in_unique_id: Keyword.UNIQUE_ID, in_crypto_fee: Keyword.CRYPTO_FEE, in_fiat_in_no_fee: Keyword.FIAT_IN_NO_FEE, in_fiat_in_with_fee: Keyword.FIAT_IN_WITH_FEE, in_fiat_fee:Keyword.FIAT_FEE, in_fiat_ticker: Keyword.FIAT_TICKER, in_notes:Keyword.NOTES}
-        self.__out_required_columns: Dict[int, str] = {out_timestamp: Keyword.TIMESTAMP, out_asset: Keyword.ASSET, out_exchange: Keyword.EXCHANGE, out_holder: Keyword.HOLDER, out_transaction_type: Keyword.TRANSACTION_TYPE, out_spot_price: Keyword.SPOT_PRICE, out_crypto_out_no_fee: Keyword.CRYPTO_OUT_NO_FEE, out_crypto_fee: Keyword.CRYPTO_FEE}
-        self.__out_optional_columns: Dict[int, str] = {out_unique_id: Keyword.UNIQUE_ID, out_crypto_out_with_fee: Keyword.CRYPTO_OUT_WITH_FEE, out_fiat_out_no_fee: Keyword.FIAT_OUT_NO_FEE, out_fiat_fee: Keyword.FIAT_FEE, out_fiat_ticker: Keyword.FIAT_TICKER, out_notes: Keyword.NOTES}
-        self.__intra_required_columns: Dict[int, str] = {intra_unique_id: Keyword.UNIQUE_ID, intra_timestamp: Keyword.TIMESTAMP, intra_asset: Keyword.ASSET}  
-        self.__intra_optional_columns: Dict[int, str] = {intra_from_exchange: Keyword.FROM_EXCHANGE, intra_from_holder: Keyword.FROM_HOLDER, intra_to_exchange: Keyword.TO_EXCHANGE, intra_to_holder: Keyword.TO_HOLDER, intra_spot_price: Keyword.SPOT_PRICE, intra_crypto_sent: Keyword.CRYPTO_SENT, intra_crypto_received: Keyword.CRYPTO_RECEIVED, intra_fiat_ticker: Keyword.FIAT_TICKER, intra_notes: Keyword.NOTES}
+        self.__in_required_columns: Dict[str, TransactionItem] = {key: value for key, value in InTransactionItems.items() if value.required}
+        self.__in_optional_columns: Dict[str, TransactionItem] = {key: value for key, value in InTransactionItems.items() if not value.required}
+        self.__out_required_columns: Dict[str, TransactionItem] = {key: value for key, value in OutTransactionItems.items() if value.required}
+        self.__out_optional_columns: Dict[str, TransactionItem] = {key: value for key, value in OutTransactionItems.items() if not value.required}
+        self.__intra_required_columns: Dict[str, TransactionItem] = {key: value for key, value in IntraTransactionItems.items() if value.required}
+        self.__intra_optional_columns: Dict[str, TransactionItem] = {key: value for key, value in IntraTransactionItems.items() if not value.required}
 
         self.__logger: logging.Logger = create_logger(self.__MANUAL)
 
