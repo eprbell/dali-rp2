@@ -250,9 +250,10 @@ class Kraken:
             self.__logger.debug("Retrieving cached bar for %s, %s at %s", base_asset, quote_asset, epoch_timestamp)
             return self._retrieve_cached_bar(base_asset, quote_asset, epoch_timestamp)
 
+    def _download_and_chunk(self, base_asset: str, quote_asset: str) -> bool:
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.info("Attempting to load %s from Kraken Google Drive for timestamp=%s.", base_file, timestamp)
+        self.__logger.info("Attempting to load %s from Kraken Google Drive.", base_file)
         file_bytes = self._google_file_to_bytes(base_file)
 
         if file_bytes:
@@ -261,7 +262,7 @@ class Kraken:
                 all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
                 if len(all_timespans_for_pair) == 0:
                     self.__logger.debug("Market not found in Kraken files. Skipping file read.")
-                    return None
+                    return False
 
                 csv_files: Dict[str, str] = {}
                 for file_name in all_timespans_for_pair:
@@ -272,9 +273,9 @@ class Kraken:
                     pool.starmap(self._split_chunks_size_n, zip(list(csv_files.keys()), list(csv_files.values())))
 
             save_to_cache(self.cache_key(), self.__cached_pairs)
-            return self._retrieve_cached_bar(base_asset, quote_asset, epoch_timestamp)
+            return True
 
-        return None
+        return False
 
     # isolated in order to be mocked
     def _google_file_to_bytes(self, file_name: str) -> Optional[bytes]:
