@@ -43,6 +43,7 @@ from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
     AssetPairAndTimestamp,
     MappedGraph,
+    TransactionManifest,
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
@@ -215,6 +216,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # key: name of exchange, value: graph that prioritizes that exchange
         self.__exchange_graphs: Dict[str, MappedGraph[str]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
+        self.__manifest: Optional[TransactionManifest] = None
         if exchange_locked:
             self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
         else:
@@ -225,6 +227,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
     def cache_key(self) -> str:
         return self.name() + "_" + self.__cache_modifier if self.__cache_modifier else self.name()
+
+    def optimize(self, transaction_manifest: TransactionManifest) -> None:
+        self.__manifest = transaction_manifest
 
     @property
     def exchanges(self) -> Dict[str, Exchange]:
@@ -531,6 +536,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             graph.add_neighbor(base_asset, quote_asset, _ALTERNATIVE_MARKET_WEIGHT)
 
     def _add_exchange_to_memcache(self, exchange: str) -> None:
+    def _generate_unoptimized_graph(self, exchange: str) -> MappedGraph[str]:
         if exchange not in self.__exchanges:
             # initializes the cctx exchange instance which is used to get the historical data
             # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
@@ -558,10 +564,12 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self._add_alternative_markets(current_graph, current_markets)
 
         self._add_fiat_edges_to_graph(current_graph, current_markets)
-        self.__logger.debug("Added graph for %s : %s", current_exchange, current_graph)
+        self.__logger.debug("Created unoptimized graph for %s : %s", exchange, current_graph)
         self.__exchanges[exchange] = current_exchange
         self.__exchange_markets[exchange] = current_markets
-        self.__exchange_graphs[exchange] = current_graph
+
+        return current_graph
+
     # Isolated to be mocked
     def _get_request_delay(self, exchange: str) -> float:
         return _REQUEST_DELAYDICT.get(exchange, 0)
