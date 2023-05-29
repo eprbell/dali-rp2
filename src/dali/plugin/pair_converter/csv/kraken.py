@@ -169,18 +169,21 @@ class Kraken:
             elif position == _PAIR_START:
                 pair_start = int(chunk[0][self.__TIMESTAMP_INDEX])
 
-            chunk_filename: str = f'{pair}_{file_timestamp}_{duration_in_minutes}.{"csv.gz"}'
-            chunk_filepath: str = path.join(self.__CACHE_DIRECTORY, chunk_filename)
+            self._write_chunk_to_disk(pair, file_timestamp, duration_in_minutes, chunk)
 
-            with gopen(chunk_filepath, "wt", encoding="utf-8", newline="") as chunk_file:
-                csv_writer = writer(chunk_file)
-                for row in chunk:
-                    csv_writer.writerow(row)
 
         if pair_start:
             self.__cached_pairs[pair_duration] = _PairStartEnd(start=pair_start, end=pair_end)
 
     def _retrieve_cached_bar(self, base_asset: str, quote_asset: str, timestamp: int) -> Optional[HistoricalBar]:
+    def _write_chunk_to_disk(self, pair: str, file_timestamp: str, duration_in_minutes: str, chunk: List[List[str]]) -> None:
+        chunk_filename: str = f'{pair}_{file_timestamp}_{duration_in_minutes}.{"csv.gz"}'
+        chunk_filepath: str = path.join(self.__CACHE_DIRECTORY, chunk_filename)
+
+        with gopen(chunk_filepath, "wt", encoding="utf-8", newline="") as chunk_file:
+            csv_writer = writer(chunk_file)
+            for row in chunk:
+                csv_writer.writerow(row)
         pair_name: str = base_asset + quote_asset
 
         retry_count: int = 0
