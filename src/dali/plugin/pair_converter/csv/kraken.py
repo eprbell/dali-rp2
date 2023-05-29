@@ -22,15 +22,15 @@ from io import BytesIO
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
 from os import makedirs, path
-from typing import Any, Dict, Generator, List, NamedTuple, Optional, Tuple, cast
+from typing import Any, Dict, Generator, List, NamedTuple, Optional, Set, Tuple, cast
 from zipfile import ZipFile
 
 import requests
 from requests.models import Response
 from requests.sessions import Session
 from rp2.logger import create_logger
-from rp2.rp2_decimal import RP2Decimal
-from rp2.rp2_error import RP2RuntimeError
+from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.historical_bar import HistoricalBar
@@ -76,7 +76,9 @@ _FIFTEEN_MINUTE: str = "15"
 _ONE_HOUR: str = "60"
 _TWELVE_HOUR: str = "720"
 _ONE_DAY: str = "1440"
-_TIME_GRANULARITY: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _TWELVE_HOUR, _ONE_DAY]
+_ONE_WEEK: str = "10080"  # Emulated
+_TIME_GRANULARITY: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _TWELVE_HOUR, _ONE_DAY, _ONE_WEEK]
+_TIME_GRANULARITY_SET: Set[str] = set(_TIME_GRANULARITY)
 
 # Chunking variables
 _PAIR_START: str = "start"
@@ -171,6 +173,33 @@ class Kraken:
 
             self._write_chunk_to_disk(pair, file_timestamp, duration_in_minutes, chunk)
 
+            # Emulate 1 week candle
+            if duration_in_minutes == _ONE_DAY:
+                week_chunk = []
+                for i in range(0, len(chunk), 7):
+                    seven_chunks = chunk[i : i + 7]
+
+                    # We want to make sure we have a full week for the averages and accurate pricing
+                    if len(seven_chunks) < 7:
+                        break
+
+                    # The timestamp of the first row becomes the timestamp for the weekly row
+                    col_sums: List[str] = [chunk[0][self.__TIMESTAMP_INDEX]]
+
+                    # We don't want/need to add up the timestamp column
+                    for col in range(self.__OPEN, self.__TRADES + 1):
+                        col_sum = str(sum((RP2Decimal(row[col]) for row in seven_chunks), ZERO))
+
+                        # Average all prices
+                        if col in range(self.__OPEN, (self.__CLOSE + 1)):
+                            col_sum = str(RP2Decimal(col_sum) / RP2Decimal("7"))
+                        col_sums.append(col_sum)
+                    week_chunk.append(col_sums)
+
+                # Same file_timestamp is okay since _ONE_DAY uses _MAX_MULTIPLIER
+                self._write_chunk_to_disk(pair, file_timestamp, _ONE_WEEK, week_chunk)
+                if pair_start:
+                    self.__cached_pairs[pair + _ONE_WEEK] = _PairStartEnd(start=pair_start, end=pair_end)
 
         if pair_start:
             self.__cached_pairs[pair_duration] = _PairStartEnd(start=pair_start, end=pair_end)
