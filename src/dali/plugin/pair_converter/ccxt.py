@@ -13,10 +13,10 @@
 # limitations under the License.
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from inspect import Signature, signature
 from time import sleep, time
-from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Union
+from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union
 
 from ccxt import (
     DDoSProtection,
@@ -34,10 +34,11 @@ from ccxt import (
     okex,
     upbit,
 )
+from prezzemolo.avl_tree import AVLTree
 from prezzemolo.vertex import Vertex
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
-from rp2.rp2_error import RP2RuntimeError
+from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 
 from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
@@ -213,8 +214,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
         self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
         self.__exchange_csv_reader: Dict[str, Any] = {}
-        # key: name of exchange, value: graph that prioritizes that exchange
-        self.__exchange_graphs: Dict[str, MappedGraph[str]] = {}
+        # key: name of exchange, value: AVLTree of all snapshots of the graph
+        # TO BE IMPLEMENTED - Combine all graphs into one graph where assets can 'teleport' between exchanges
+        #   This will eliminate the need for markets and this dict, replacing it with just one AVLTree
+        self.__exchange_datetime_graph_tree_dict: Dict[str, AVLTree[datetime, MappedGraph[str]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         self.__manifest: Optional[TransactionManifest] = None
         if exchange_locked:
@@ -240,8 +243,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return self.__exchange_markets
 
     @property
-    def exchange_graphs(self) -> Dict[str, MappedGraph[str]]:
-        return self.__exchange_graphs
+    def exchange_datetime_graph_tree_dict(self) -> Dict[str, AVLTree[datetime, MappedGraph[str]]]:
+        return self.__exchange_datetime_graph_tree_dict
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         self.__logger.debug("Converting %s to %s", from_asset, to_asset)
@@ -258,17 +261,22 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             exchange = self.__default_exchange
 
         # The exchange could have been added as an alt; if so markets wouldn't have been built
-        if exchange not in self.__exchanges or exchange not in self.__exchange_markets:
+        if exchange not in self.__exchange_datetime_graph_tree_dict or exchange not in self.__exchange_markets:
             if self.__exchange_locked:
-                self._add_exchange_to_memcache(self.__default_exchange)
+                self._cache_graph_snapshots(self.__default_exchange)
             elif exchange in _EXCHANGE_DICT:
-                self._add_exchange_to_memcache(exchange)
+                self._cache_graph_snapshots(exchange)
             else:
                 self.__logger.error("WARNING: Unrecognized Exchange: %s. Please open an issue at %s", exchange, self.issues_url)
                 return None
 
         current_markets = self.__exchange_markets[exchange]
-        current_graph = self.__exchange_graphs[exchange]
+        current_graph = self.__exchange_datetime_graph_tree_dict[exchange].find_max_value_less_than(timestamp)
+        if current_graph is None:
+            raise RP2RuntimeError(
+                "Internal Error: Graph snapshot doesn't exist. Either you are trying to route a price before "
+                "the graph is optimized or an incorrect manifest was sent to CCXT pair converter."
+            )
         from_asset_vertex: Optional[Vertex[str]] = current_graph.get_vertex(from_asset)
         to_asset_vertex: Optional[Vertex[str]] = current_graph.get_vertex(to_asset)
         market_symbol = from_asset + to_asset
@@ -293,6 +301,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         pricing_path_list: List[str] = [v.name for v in pricing_path]
         self.__logger.debug("Found path - %s", pricing_path_list)
+
+        for asset in pricing_path_list:
+            if not current_graph.is_optimized(asset):
+                raise RP2RuntimeError(f"Internal Error: The asset {asset} is not optimized.")
 
         conversion_route: List[AssetPairAndHistoricalPrice] = []
         last_node: Optional[str] = None
@@ -535,7 +547,38 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             # If it does exist it will look it up in the dictionary by name and add the neighbor to that vertex.
             graph.add_neighbor(base_asset, quote_asset, _ALTERNATIVE_MARKET_WEIGHT)
 
-    def _add_exchange_to_memcache(self, exchange: str) -> None:
+    def _cache_graph_snapshots(self, exchange: str) -> None:
+        # TO BE IMPLEMENTED - If asset is missing from manifest, warn user and reoptimize.
+        if self.__exchange_datetime_graph_tree_dict.get(exchange):
+            raise RP2ValueError(
+                f"Internal Error: You have already generated graph snapshots for exchange - {exchange}. " f"Optimization can only be performed once."
+            )
+
+        if self.__manifest:
+            unoptimized_graph: MappedGraph[str] = self._generate_unoptimized_graph(exchange)
+        else:
+            # TO BE IMPLEMENTED - Set a default start time of the earliest possible crypto trade.
+            raise RP2ValueError("INTERNAL ERROR: No manifest provided for the CCXT pair converter plugin. Unable to optimize the graph.")
+
+        optimizations: Dict[datetime, Dict[str, Dict[str, float]]]
+        optimizations = self._optimize_assets_for_exchange(
+            unoptimized_graph,
+            self.__manifest.first_transaction_datetime,
+            self.__manifest.assets,
+            exchange,
+        )
+        self.__logger.debug("Optimizations created for graph: %s", optimizations)
+
+        exchange_tree: AVLTree[datetime, MappedGraph[str]] = AVLTree[datetime, MappedGraph[str]]()
+        for timestamp, optimization in optimizations.items():
+            graph_snapshot: MappedGraph[str] = unoptimized_graph.clone_with_optimization(optimization)
+            exchange_tree.insert_node(timestamp, graph_snapshot)
+            self.__logger.debug("Added graph snapshot AVLTree for %s for timestamp: %s", exchange, timestamp)
+
+        self.__exchange_datetime_graph_tree_dict[exchange] = exchange_tree
+
+        # Add unoptimized_graph to the last week?
+
     def _generate_unoptimized_graph(self, exchange: str) -> MappedGraph[str]:
         if exchange not in self.__exchanges:
             # initializes the cctx exchange instance which is used to get the historical data
