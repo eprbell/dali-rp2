@@ -63,7 +63,8 @@ _ONE_HOUR: str = "1h"
 _FOUR_HOUR: str = "4h"
 _SIX_HOUR: str = "6h"
 _ONE_DAY: str = "1d"
-_TIME_GRANULARITY: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _FOUR_HOUR, _ONE_DAY]
+_ONE_WEEK: str = "1w"
+_TIME_GRANULARITY: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _FOUR_HOUR, _ONE_DAY, _ONE_WEEK]
 _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
     _MINUTE: 60,
     _FIVE_MINUTE: 300,
@@ -72,6 +73,7 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
     _FOUR_HOUR: 14400,
     _SIX_HOUR: 21600,
     _ONE_DAY: 86400,
+    _ONE_WEEK: 604800,
 }
 
 # Currently supported exchanges
@@ -95,9 +97,12 @@ _EXCHANGE_DICT: Dict[str, Any] = {
     _OKEX: okex,
     _UPBIT: upbit,
 }
+_COINBASE_PRO_GRANULARITY_LIST: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _SIX_HOUR, _ONE_DAY, _ONE_WEEK]
 _TIME_GRANULARITY_DICT: Dict[str, List[str]] = {
-    _COINBASE_PRO: [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _SIX_HOUR, _ONE_DAY],
+    _COINBASE_PRO: _COINBASE_PRO_GRANULARITY_LIST,
 }
+_NONSTANDARD_GRANULARITY_EXCHANGE_SET: Set[str] = set(_TIME_GRANULARITY_DICT.keys())
+_TIME_GRANULARITY_SET: Set[str] = set(_TIME_GRANULARITY) | set(_COINBASE_PRO_GRANULARITY_LIST)
 
 
 # Delay in fractional seconds before making a request to avoid too many request errors
@@ -338,18 +343,42 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return result
 
     def find_historical_bar(self, from_asset: str, to_asset: str, timestamp: datetime, exchange: str) -> Optional[HistoricalBar]:
-        result: Optional[HistoricalBar] = None
-        retry_count: int = 0
-        current_exchange: Any = self.__exchanges[exchange]
-        ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
         key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange)
         historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)
-        csv_pricing: Any = _CSV_PRICING_DICT.get(exchange)
-        csv_reader: Any = None
 
         if historical_bar is not None:
             self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
+
+        historical_bars: Optional[List[HistoricalBar]] = self.find_historical_bars(from_asset, to_asset, timestamp, exchange)
+
+        if historical_bars:
+            returned_bar: HistoricalBar = historical_bars[0]
+            if (timestamp - returned_bar.timestamp).total_seconds() > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_DAY]:
+                raise RP2ValueError(
+                    "INTERNAL ERROR: The time difference between the requested and returned timestamps is "
+                    "greater than a day. The graph probably hasn't been optimized."
+                )
+            self._add_bar_to_cache(key=key, historical_bar=returned_bar)
+            return returned_bar
+        return None
+
+    def find_historical_bars(
+        self, from_asset: str, to_asset: str, timestamp: datetime, exchange: str, all_bars: bool = False, timespan: str = _MINUTE
+    ) -> Optional[List[HistoricalBar]]:
+        result: List[HistoricalBar] = []
+        retry_count: int = 0
+        if timespan in _TIME_GRANULARITY_SET:
+            if exchange in _NONSTANDARD_GRANULARITY_EXCHANGE_SET:
+                retry_count = _TIME_GRANULARITY_DICT[exchange].index(timespan)
+            else:
+                retry_count = _TIME_GRANULARITY.index(timespan)
+        else:
+            raise RP2ValueError("INTERNAL ERROR: Invalid timespan passed to find_historical_bars.")
+        current_exchange: Any = self.__exchanges[exchange]
+        ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
+        csv_pricing: Any = _CSV_PRICING_DICT.get(exchange)
+        csv_reader: Any = None
 
         if self.__exchange_csv_reader.get(exchange):
             csv_reader = self.__exchange_csv_reader[exchange]
@@ -368,16 +397,28 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 csv_reader = csv_pricing()
 
         if csv_reader:
-            csv_bar: Optional[HistoricalBar] = csv_reader.find_historical_bar(from_asset, to_asset, timestamp)
+            csv_bar: Optional[List[HistoricalBar]]
+            if all_bars:
+                csv_bar = csv_reader.find_historical_bars(from_asset, to_asset, timestamp, True, _ONE_WEEK)
+            else:
+                csv_bar = [csv_reader.find_historical_bar(from_asset, to_asset, timestamp)]
 
-            if csv_bar:
-                self._add_bar_to_cache(key=AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange), historical_bar=csv_bar)
+            # We might want to add a function that adds bars to cache here.
 
-            historical_bar = self._get_bar_from_cache(key)
             self.__exchange_csv_reader[exchange] = csv_reader
-            if historical_bar is not None:
-                self.__logger.debug("Retrieved bar cache - %s for %s/%s->%s for %s", historical_bar, key.timestamp, key.from_asset, key.to_asset, key.exchange)
-                return historical_bar
+            if csv_bar is not None and csv_bar[0] is not None:
+                if all_bars:
+                    ms_timestamp = int(csv_bar[-1].timestamp.timestamp() * _MS_IN_SECOND)
+                    self.__logger.debug(
+                        "Retrieved bars up to %s from cache for %s/%s for %s. Continuing with REST API.",
+                        ms_timestamp,
+                        from_asset,
+                        to_asset,
+                        exchange,
+                    )
+                else:
+                    self.__logger.debug("Retrieved bar from cache - %s for %s/%s->%s for %s", csv_bar, timestamp, from_asset, to_asset, exchange)
+                    return csv_bar
 
         while retry_count < len(_TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)):
             timeframe: str = _TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)[retry_count]
@@ -388,15 +429,21 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             while request_count < 9:
                 try:
                     # Excessive calls to the API within a certain window might get an IP temporarily banned
-                    if _REQUEST_DELAYDICT.get(exchange, 0) > 0:
+                    if self._get_request_delay(exchange) > 0:
                         current_time = time()
-                        second_delay = max(0, _REQUEST_DELAYDICT[exchange] - (current_time - self.__exchange_last_request.get(exchange, 0)))
+                        second_delay = max(0, self._get_request_delay(exchange) - (current_time - self.__exchange_last_request.get(exchange, 0)))
                         self.__logger.debug("Delaying for %s seconds", second_delay)
                         sleep(second_delay)
                         self.__exchange_last_request[exchange] = time()
 
                     # this is where we pull the historical prices from the underlying exchange
-                    historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
+                    if all_bars:
+                        # If this is over the exchange's limit CCXT will reduce to the max allowed
+                        historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1500)
+                        if len(historical_data) > 0:
+                            ms_timestamp = int(historical_data[-1][0]) + 1
+                    else:
+                        historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
                     break
                 except (DDoSProtection, ExchangeError) as exc:
                     self.__logger.debug(
@@ -423,25 +470,45 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
                     sleep(10)
 
+            if len(historical_data) > 0:
+                returned_timestamp = datetime.fromtimestamp(int(historical_data[0][0]) / _MS_IN_SECOND, timezone.utc)
+                if (returned_timestamp - timestamp).total_seconds() > _TIME_GRANULARITY_STRING_TO_SECONDS[timeframe] and not all_bars:
+                    raise RP2ValueError("INTERNAL ERROR: Requesting a spot price before the market is available. Graph is not optimized appropriately.")
+
             # If there is no candle the list will be empty
             if historical_data:
-                result = HistoricalBar(
-                    duration=timedelta(seconds=_TIME_GRANULARITY_STRING_TO_SECONDS[timeframe]),
-                    timestamp=timestamp,
-                    open=RP2Decimal(str(historical_data[0][1])),
-                    high=RP2Decimal(str(historical_data[0][2])),
-                    low=RP2Decimal(str(historical_data[0][3])),
-                    close=RP2Decimal(str(historical_data[0][4])),
-                    volume=RP2Decimal(str(historical_data[0][5])),
-                )
-                break
+                if not all_bars:
+                    result = [
+                        HistoricalBar(
+                            duration=timedelta(seconds=_TIME_GRANULARITY_STRING_TO_SECONDS[timeframe]),
+                            timestamp=timestamp,
+                            open=RP2Decimal(str(historical_data[0][1])),
+                            high=RP2Decimal(str(historical_data[0][2])),
+                            low=RP2Decimal(str(historical_data[0][3])),
+                            close=RP2Decimal(str(historical_data[0][4])),
+                            volume=RP2Decimal(str(historical_data[0][5])),
+                        )
+                    ]
+                    break
 
-            retry_count += 1
+                for historical_bar in historical_data:
+                    result.append(
+                        HistoricalBar(
+                            duration=timedelta(seconds=_TIME_GRANULARITY_STRING_TO_SECONDS[timeframe]),
+                            timestamp=datetime.fromtimestamp(int(historical_bar[0]) / _MS_IN_SECOND, timezone.utc),
+                            open=RP2Decimal(str(historical_bar[1])),
+                            high=RP2Decimal(str(historical_bar[2])),
+                            low=RP2Decimal(str(historical_bar[3])),
+                            close=RP2Decimal(str(historical_bar[4])),
+                            volume=RP2Decimal(str(historical_bar[5])),
+                        )
+                    )
+            elif all_bars:
+                break  # If historical_data is empty we have hit the end of records and need to return
+            else:
+                retry_count += 1  # If the singular bar was not found, we need to repeat with a wider timespan
 
-        # Save the individual pair to cache
-        if result is not None:
-            self.__logger.debug("Saving bar - %s for %s/%s->%s from %s", result, key.timestamp, key.from_asset, key.to_asset, key.exchange)
-            self._add_bar_to_cache(key, result)
+        # We might want to add a function that adds bars to cache here.
 
         return result
 
@@ -495,3 +562,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__exchanges[exchange] = current_exchange
         self.__exchange_markets[exchange] = current_markets
         self.__exchange_graphs[exchange] = current_graph
+    # Isolated to be mocked
+    def _get_request_delay(self, exchange: str) -> float:
+        return _REQUEST_DELAYDICT.get(exchange, 0)
