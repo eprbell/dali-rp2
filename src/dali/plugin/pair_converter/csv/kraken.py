@@ -204,7 +204,6 @@ class Kraken:
         if pair_start:
             self.__cached_pairs[pair_duration] = _PairStartEnd(start=pair_start, end=pair_end)
 
-    def _retrieve_cached_bar(self, base_asset: str, quote_asset: str, timestamp: int) -> Optional[HistoricalBar]:
     def _write_chunk_to_disk(self, pair: str, file_timestamp: str, duration_in_minutes: str, chunk: List[List[str]]) -> None:
         chunk_filename: str = f'{pair}_{file_timestamp}_{duration_in_minutes}.{"csv.gz"}'
         chunk_filepath: str = path.join(self.__CACHE_DIRECTORY, chunk_filename)
@@ -213,26 +212,28 @@ class Kraken:
             csv_writer = writer(chunk_file)
             for row in chunk:
                 csv_writer.writerow(row)
+
+    def _retrieve_cached_bars(
+        self, base_asset: str, quote_asset: str, timestamp: int, all_bars: bool = False, timespan: str = _MINUTE
+    ) -> Optional[List[HistoricalBar]]:
         pair_name: str = base_asset + quote_asset
 
-        retry_count: int = 0
+        if timespan in _TIME_GRANULARITY_SET:
+            retry_count: int = _TIME_GRANULARITY.index(timespan)
+        else:
+            raise RP2ValueError("INTERNAL ERROR: Invalid timespan passed to _retrieve_cached_bars.")
 
         while retry_count < len(_TIME_GRANULARITY):
-            if (
-                timestamp < self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start
-                or timestamp > self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].end
-            ):
-                self.__logger.debug(
-                    "Out of range - %s < %s or %s > %s",
-                    timestamp,
-                    self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start,
-                    timestamp,
-                    self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].end,
-                )
+            window_start: int = self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start
+            window_end: int = self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].end
+
+            if timestamp < window_start or timestamp > window_end:
+                self.__logger.debug("Out of range - %s < %s or %s > %s", timestamp, window_start, timestamp, window_end)
                 retry_count += 1
                 continue
 
             duration_chunk_size = _CHUNK_SIZE * min(int(_TIME_GRANULARITY[retry_count]), _MAX_MULTIPLIER)
+            result: List[HistoricalBar] = []
             file_timestamp: int = (timestamp // duration_chunk_size) * duration_chunk_size
 
             # Floor the timestamp to find the price
@@ -240,33 +241,65 @@ class Kraken:
                 int(_TIME_GRANULARITY[retry_count]) * _SECONDS_IN_MINUTE
             )
 
-            file_name: str = f"{base_asset + quote_asset}_{file_timestamp}_{_TIME_GRANULARITY[retry_count]}.csv.gz"
-            file_path: str = path.join(self.__CACHE_DIRECTORY, file_name)
-            self.__logger.debug("Retrieving %s -> %s at %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp)
-            try:
-                with gopen(file_path, "rt") as file:
-                    rows = reader(file)
-                    for row in rows:
-                        if int(row[self.__TIMESTAMP_INDEX]) != duration_timestamp:
-                            continue
-                        return HistoricalBar(
-                            duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
-                            timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
-                            open=RP2Decimal(row[self.__OPEN]),
-                            high=RP2Decimal(row[self.__HIGH]),
-                            low=RP2Decimal(row[self.__LOW]),
-                            close=RP2Decimal(row[self.__CLOSE]),
-                            volume=RP2Decimal(row[self.__VOLUME]),
-                        )
-            except FileNotFoundError:
-                self.__logger.error(
-                    f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s", self.ISSUES_URL, datetime.fromtimestamp(timestamp)
-                )
+            while file_timestamp < window_end:
+                file_name: str = f"{base_asset + quote_asset}_{file_timestamp}_{_TIME_GRANULARITY[retry_count]}.csv.gz"
+                file_path: str = path.join(self.__CACHE_DIRECTORY, file_name)
+                if all_bars:
+                    self.__logger.debug(
+                        "Retrieving bars for %s -> %s starting from %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp
+                    )
+                else:
+                    self.__logger.debug("Retrieving %s -> %s at %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp)
+                try:
+                    with gopen(file_path, "rt") as file:
+                        rows = reader(file)
+                        for row in rows:
+                            if all_bars and int(row[self.__TIMESTAMP_INDEX]) >= duration_timestamp:
+                                result.append(
+                                    HistoricalBar(
+                                        duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
+                                        timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
+                                        open=RP2Decimal(row[self.__OPEN]),
+                                        high=RP2Decimal(row[self.__HIGH]),
+                                        low=RP2Decimal(row[self.__LOW]),
+                                        close=RP2Decimal(row[self.__CLOSE]),
+                                        volume=RP2Decimal(row[self.__VOLUME]),
+                                    )
+                                )
+                            elif int(row[self.__TIMESTAMP_INDEX]) == duration_timestamp:
+                                return [
+                                    HistoricalBar(
+                                        duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
+                                        timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
+                                        open=RP2Decimal(row[self.__OPEN]),
+                                        high=RP2Decimal(row[self.__HIGH]),
+                                        low=RP2Decimal(row[self.__LOW]),
+                                        close=RP2Decimal(row[self.__CLOSE]),
+                                        volume=RP2Decimal(row[self.__VOLUME]),
+                                    )
+                                ]
+                except FileNotFoundError:
+                    self.__logger.error(
+                        f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s", self.ISSUES_URL, datetime.fromtimestamp(timestamp)
+                    )
+
+                file_timestamp += duration_chunk_size
+
+            if result:
+                return result
             retry_count += 1
 
         return None
 
     def find_historical_bar(self, base_asset: str, quote_asset: str, timestamp: datetime) -> Optional[HistoricalBar]:
+        historical_bars: Optional[List[HistoricalBar]] = self.find_historical_bars(base_asset, quote_asset, timestamp)
+        if historical_bars:
+            return historical_bars[0]
+        return None
+
+    def find_historical_bars(
+        self, base_asset: str, quote_asset: str, timestamp: datetime, all_bars: bool = False, timespan: str = _MINUTE
+    ) -> Optional[List[HistoricalBar]]:
         epoch_timestamp = int(timestamp.timestamp())
         self.__logger.debug("Retrieving bar for %s%s at %s", base_asset, quote_asset, epoch_timestamp)
 
@@ -277,7 +310,12 @@ class Kraken:
         # Attempt to load smallest duration
         if self.__cached_pairs.get(base_asset + quote_asset + "1"):
             self.__logger.debug("Retrieving cached bar for %s, %s at %s", base_asset, quote_asset, epoch_timestamp)
-            return self._retrieve_cached_bar(base_asset, quote_asset, epoch_timestamp)
+            return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
+
+        if self._download_and_chunk(base_asset, quote_asset):
+            return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
+
+        return None
 
     def _download_and_chunk(self, base_asset: str, quote_asset: str) -> bool:
         base_file: str = f"{base_asset}_OHLCVT.zip"
