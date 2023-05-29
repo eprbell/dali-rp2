@@ -573,3 +573,88 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
     # Isolated to be mocked
     def _get_request_delay(self, exchange: str) -> float:
         return _REQUEST_DELAYDICT.get(exchange, 0)
+
+    def _optimize_assets_for_exchange(
+        self, unoptimized_graph: MappedGraph[str], start_date: datetime, assets: Set[str], exchange: str
+    ) -> Dict[datetime, Dict[str, Dict[str, float]]]:
+        optimization_candidates: Set[Vertex[str]] = set()
+        market_starts: Dict[str, Dict[str, datetime]] = {}
+        for asset in assets:
+            current_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(asset)
+            if current_vertex is None:
+                raise RP2ValueError("Internal Error: Attempting to optimize a vertex that doesn't exist.")
+
+            optimization_candidates.add(current_vertex)
+            children: Optional[Set[Vertex[str]]] = unoptimized_graph.get_all_children_of_vertex(current_vertex)
+            if children:
+                self.__logger.debug("For vertex - %s, found all the children - %s", current_vertex.name, [child.name for child in children])
+                optimization_candidates.update(children)
+
+        self.__logger.debug("Checking if any of the following candidates are optimized - %s", [candidate.name for candidate in optimization_candidates])
+        unoptimized_assets = {candidate.name for candidate in optimization_candidates if not unoptimized_graph.is_optimized(candidate.name)}
+        self.__logger.debug("Found unoptimized assets %s", unoptimized_assets)
+
+        child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
+        optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}
+        for child_name in unoptimized_assets:
+            child_bars[child_name] = {}
+            bar_check: Optional[List[HistoricalBar]] = None
+            market_starts[child_name] = {}
+            child_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(child_name)
+            child_neighbors: Iterator[Vertex[str]] = child_vertex.neighbors if child_vertex is not None else iter([])
+            for neighbor in child_neighbors:
+                bar_check = self.find_historical_bars(
+                    child_name, neighbor.name, start_date, self.__exchange_markets[exchange][child_name + neighbor.name][0], True, _ONE_WEEK
+                )
+                if bar_check is not None:
+                    child_bars[child_name][neighbor.name] = bar_check
+                    timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
+                    # Find the start of the market if it is after the first transaction
+                    if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
+                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp
+                    else:
+                        market_starts[child_name][neighbor.name] = start_date
+                else:
+                    raise RP2RuntimeError(
+                        f"Internal Error: No bars found for pair {child_name}/{neighbor.name} on exchange - {exchange}. Can not optimize graph."
+                    )
+
+            # Convert bar dict into dict with optimizations
+            # First we sort the bars
+            for crypto_asset, neighbor_assets in child_bars.items():
+                for neighbor_asset, historical_bars in neighbor_assets.items():
+                    for historical_bar in historical_bars:
+                        timestamp: datetime = historical_bar.timestamp
+                        volume: RP2Decimal = historical_bar.volume
+                        if timestamp not in optimizations:
+                            optimizations[timestamp] = {}
+                        if crypto_asset not in optimizations[timestamp]:
+                            optimizations[timestamp][crypto_asset] = {}
+                        if timestamp < market_starts[crypto_asset].get(neighbor_asset, start_date):
+                            optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
+                        else:
+                            optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
+
+            previous_assets: Optional[Dict[str, Dict[str, float]]] = None
+            timestamps_to_delete: List[datetime] = []
+            # Next, we assign weights based on the rank of the volume
+            for timestamp, snapshot_assets in optimizations.items():
+                for asset, neighbors in snapshot_assets.items():
+                    ranked_neighbors: Dict[str, float] = dict(sorted(iter(neighbors.items()), key=lambda x: x[1], reverse=True))
+                    weight: float = 1.0
+                    for neighbor_name, neighbor_volume in ranked_neighbors.items():
+                        if neighbor_volume != -1.0:
+                            neighbors[neighbor_name] = weight
+                            weight += 1.0
+
+                # mark duplicate successive snapshots
+                if snapshot_assets == previous_assets:
+                    timestamps_to_delete.append(timestamp)
+
+                previous_assets = snapshot_assets
+
+            # delete duplicates
+            for timestamp in timestamps_to_delete:
+                del optimizations[timestamp]
+
+        return optimizations
