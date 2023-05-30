@@ -636,7 +636,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
         # No limit on the date range
-        # fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
+        # fiat (payments and deposits) takes the 'beginTime' param in contrast to other functions that take 'startTime'
         fiat_payments = self._client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))
         # {
         #   "code": "000000",
@@ -674,7 +674,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as withdrawls, but with _TRANSACTION_TYPE set to 0 (for deposits)
-        fiat_deposits = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self._start_time_ms, _END_TIME: now_time}))
+        fiat_deposits = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -685,8 +685,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #          "indicatedAmount": "15.00",
         #          "amount": "15.00",
         #          "totalFee": "0.00",
-        #          "method": "card",
-        #          "status": "Failed",
+        #          "method": "Card",
+        #          "status": "Failed",  // Processing, Failed, Successful, Finished, Refunding, Refunded, Refund Failed, Order Partial credit Stopped
         #          "createTime": 1627501026000,
         #          "updateTime": 1627501027000
         #        }
@@ -708,7 +708,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_withdrawls by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as deposits, but with _TRANSACTION_TYPE set to 1 (for withdrawls)
-        fiat_withdrawals = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _START_TIME: self._start_time_ms, _END_TIME: now_time}))
+        fiat_withdrawals = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -719,8 +719,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #          "indicatedAmount": "15.00",
         #          "amount": "15.00",
         #          "totalFee": "0.00",
-        #          "method": "card",
-        #          "status": "Failed",
+        #          "method": "Card",
+        #          "status": "Failed",  // Processing, Failed, Successful, Finished, Refunding, Refunded, Refund Failed, Order Partial credit Stopped
         #          "createTime": 1627501026000,
         #          "updateTime": 1627501027000
         #        }
@@ -875,7 +875,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self._logger.debug("Fiat Order (%s): %s", transaction_type.value, json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
-        if transaction[_STATUS] == "Completed":
+        if transaction[_STATUS] == "Successful":
             amount: RP2Decimal = RP2Decimal(transaction[_INDICATED_AMOUNT])
             fee: RP2Decimal = RP2Decimal(transaction[_TOTAL_FEE])
             notes = f"{notes + '; ' if notes else ''}Fiat {transaction_type.value} of {transaction[_FIAT_CURRENCY]}"
