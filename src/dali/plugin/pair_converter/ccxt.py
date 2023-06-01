@@ -32,6 +32,7 @@ from ccxt import (
     kraken,
     upbit,
     coinbase,
+    okex,
 )
 from prezzemolo.vertex import Vertex
 from rp2.logger import create_logger
@@ -81,9 +82,10 @@ _HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
 _UPBIT: str = "Upbit"
 _COINBASE: str = "Coinbase"
+_OKEX: str = "Okex"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = _KRAKEN
-_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _COINBASE_PRO: coinbasepro, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken, _UPBIT: upbit, _COINBASE: coinbase}
+_EXCHANGE_DICT: Dict[str, Any] = {_BINANCE: binance, _COINBASE_PRO: coinbasepro, _GATE: gateio, _HUOBI: huobi, _KRAKEN: kraken, _UPBIT: upbit, _COINBASE: coinbase, _OKEX: okex}
 _TIME_GRANULARITY_DICT: Dict[str, List[str]] = {
     _COINBASE_PRO: [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _SIX_HOUR, _ONE_DAY],
 }
@@ -101,6 +103,7 @@ _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
 
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
+    "ASTUSDT": _OKEX,
     "ARKKRW": _UPBIT,
     "XYMUSDT": _GATE,
     "ATDUSDT": _GATE,
@@ -118,6 +121,7 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
 }
 
 _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
+    "AST": "USDT",
     "ARK": "KRW",
     "XYM": "USDT",
     "ATD": "USDT",
