@@ -142,10 +142,15 @@ _LOCKED_SAVINGS = "Locked Savings"
 _LOCKED_STAKING = "Locked Staking"
 _SOLO_AIRDROP = "SOLO airdrop"
 _GENERAL_STAKING = "STAKING"
+# More types added
+_CASH_VOUCHER = "Cash Voucher"
+_LAUNCHPAD = "launchpad"
+_SAVINGS_TRAIL_FUND = "Savings Trail Fund"
 
 _AIRDROP_LIST = [_SOLO_AIRDROP]
-_INTEREST_LIST = [_FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS]
-_STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING]
+_INTEREST_LIST = [_FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS, _SAVINGS_TRAIL_FUND]
+_STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING, _LAUNCHPAD]
+_INCOME_LIST = [_CASH_VOUCHER]
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
@@ -793,12 +798,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def _process_dividend(self, dividend: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         self._logger.debug("Dividend: %s", json.dumps(dividend))
-        if dividend[_EN_INFO] in _STAKING_LIST or re.search("[dD]istribution", dividend[_EN_INFO]) or re.search("staking", dividend[_EN_INFO]):
+        if dividend[_EN_INFO] in _STAKING_LIST or re.search("[dD]istribution", dividend[_EN_INFO]) or re.search("[sS]taking", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.STAKING, notes)
         if dividend[_EN_INFO] in _INTEREST_LIST:
             return self._process_gain(dividend, Keyword.INTEREST, notes)
-        if dividend[_EN_INFO] in _AIRDROP_LIST or re.search("[aA]irdrop", dividend[_EN_INFO]):
+        if dividend[_EN_INFO] in _AIRDROP_LIST or re.search("[aA]ir[df]rop", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.AIRDROP, notes)
+        if dividend[_EN_INFO] in _INCOME_LIST:
+            return self._process_gain(dividend, Keyword.INCOME, notes)
         self._logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_EN_INFO], self.ISSUES_URL)
         return ProcessOperationResult(in_transactions=[], out_transactions=[], intra_transactions=[])
 
