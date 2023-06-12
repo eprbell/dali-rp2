@@ -27,7 +27,6 @@ from ccxt import (
     RequestTimeout,
     binance,
     binanceus,
-    coinbase,
     coinbasepro,
     gateio,
     huobi,
@@ -78,7 +77,6 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
 _BINANCEUS: str = "Binance US"
-_COINBASE: str = "Coinbase"
 _COINBASE_PRO: str = "Coinbase Pro"
 _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
@@ -90,7 +88,6 @@ _DEFAULT_EXCHANGE: str = _KRAKEN
 _EXCHANGE_DICT: Dict[str, Any] = {
     _BINANCE: binance,
     _BINANCEUS: binanceus,
-    _COINBASE: coinbase,
     _COINBASE_PRO: coinbasepro,
     _GATE: gateio,
     _HUOBI: huobi,
