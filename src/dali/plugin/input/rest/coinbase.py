@@ -633,9 +633,10 @@ class InputPlugin(AbstractInputPlugin):
                         # Incoming money from another Coinbase user. Marking it as income conservatively, but it could be
                         # a gift or other type: if so the user needs to explicitly recast it with a transaction hint
                         self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, f"From: {transaction[_FROM][_EMAIL]}")
-                    elif (
-                        # Coinbase Earn transactions
-                        transaction[_DETAILS][_SUBTITLE].endswith("Coinbase Earn")
+                    elif transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
+                        self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, "Coinbase EARN")
+                        # Other Coinbase Earn transactions 
+                    elif (transaction[_DETAILS][_SUBTITLE].endswith("Coinbase Earn")
                         or transaction[_DESCRIPTION] == "Earn Task"
                     ):
                         self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, "Coinbase EARN")
