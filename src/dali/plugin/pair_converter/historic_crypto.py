@@ -19,6 +19,7 @@ from Historic_Crypto import HistoricalData
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
+
 from dali.historical_bar import HistoricalBar
 from dali.transaction_manifest import TransactionManifest
 
@@ -29,6 +30,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
     def cache_key(self) -> str:
         return self.name()
+
+    def optimize(self, transaction_manifest: TransactionManifest) -> None:
+        pass
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         result: Optional[HistoricalBar] = None
