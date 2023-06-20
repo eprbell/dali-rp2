@@ -17,11 +17,11 @@
 ## Table of Contents
 * **[Introduction](#introduction)**
 * **[Data Loader Plugin Sections](#data-loader-plugin-sections)**
-  * [Binance.com Section (REST)](#binance-com-section-rest)
+  * [Binance.com Section (REST)](#binancecom-section-rest)
   * [Bitbank Section (REST)](#bitbank-section-rest)
   * [Coinbase Section (REST)](#coinbase-section-rest)
   * [Coinbase Pro Section (REST)](#coinbase-pro-section-rest)
-  * [Binance.com Supplemental Section (CSV)](#binance.com-supplemental-section-csv)
+  * [Binance.com Supplemental Section (CSV)](#binancecom-supplemental-section-csv)
   * [Bitbank Supplemental Section (CSV)](#bitbank-supplemental-section-csv)
   * [Coincheck Supplemental Section (CSV)](#coincheck-supplemental-section-csv)
   * [Ledger Section (CSV)](#ledger-section-csv)
@@ -498,6 +498,19 @@ Be aware that:
 * The router uses the exchange listed in the transaction data to build the graph to calculate the route. If no exchange is listed, the current default is Kraken(US).
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 * Some exchanges, in particular Binance.com, might not be available in certain territories.
+
+#### A Special Note for Prices from Kraken Exchange
+Prices for the latest quarter from the Kraken exchange may be inaccurate due to the restrictions of the Kraken REST API. Only the latest 720 bars can be retrieved, so different candles must be used depending on how old the transaction is from the time you are pulling the pricing data. The following chart provides a rough estimate of what candles are used for which timeframe.
+
+transaction age    | candle used
+-------------------|-------------
+0 - 12 hours old   |          1m
+.5 - 2.5 days old  |          5m
+2.5 - 7.5 days old |         15m
+7.5 - 30 days old  |          1h
+1 - 4 months old   |          4h
+
+Accuracy will improve once new CSV data is released, which is typically 2 weeks after the end of a quarter. Also, the Kraken REST API is very slow. It may take 20-30 seconds per transaction to retrieve prices for the latest quarter.
 
 
 ### Binance Locked CCXT
