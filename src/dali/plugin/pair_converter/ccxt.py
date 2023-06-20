@@ -440,6 +440,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         # Save the individual pair to cache
         if result is not None:
+            self.__logger.debug("Saving bar - %s for %s/%s->%s from %s", result, key.timestamp, key.from_asset, key.to_asset, key.exchange)
             self._add_bar_to_cache(key, result)
 
         return result
