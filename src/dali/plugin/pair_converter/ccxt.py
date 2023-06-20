@@ -27,6 +27,7 @@ from ccxt import (
     RequestTimeout,
     binance,
     binanceus,
+    bitfinex,
     coinbasepro,
     gateio,
     huobi,
@@ -34,6 +35,7 @@ from ccxt import (
     okex,
     upbit,
 )
+from dateutil.relativedelta import relativedelta
 from prezzemolo.avl_tree import AVLTree
 from prezzemolo.vertex import Vertex
 from rp2.logger import create_logger
@@ -44,11 +46,11 @@ from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
     AssetPairAndTimestamp,
     MappedGraph,
-    TransactionManifest,
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
+from dali.transaction_manifest import TransactionManifest
 
 # Native format keywords
 _ID: str = "id"
@@ -81,6 +83,7 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
 # Currently supported exchanges
 _BINANCE: str = "Binance.com"
 _BINANCEUS: str = "Binance US"
+_BITFINEX: str = "Bitfinex"
 _COINBASE_PRO: str = "Coinbase Pro"
 _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
@@ -92,6 +95,7 @@ _DEFAULT_EXCHANGE: str = _KRAKEN
 _EXCHANGE_DICT: Dict[str, Any] = {
     _BINANCE: binance,
     _BINANCEUS: binanceus,
+    _BITFINEX: bitfinex,
     _COINBASE_PRO: coinbasepro,
     _GATE: gateio,
     _HUOBI: huobi,
@@ -112,7 +116,7 @@ _TIME_GRANULARITY_SET: Set[str] = set(_TIME_GRANULARITY) | set(_COINBASE_PRO_GRA
 # It appears Kraken public API is limited to around 12 calls per minute.
 # There also appears to be a limit of how many calls per 2 hour time period.
 # Being authenticated lowers this limit.
-_REQUEST_DELAYDICT: Dict[str, float] = {_KRAKEN: 5.1}
+_REQUEST_DELAYDICT: Dict[str, float] = {_KRAKEN: 5.1, _BITFINEX: 5.0}
 
 # CSV Pricing classes
 _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
@@ -130,9 +134,9 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "BUSDUSDT": _BINANCE,
     "EDGUSDT": _GATE,
     "ETHWUSD": _KRAKEN,
-    "NEXOUSDT": _BINANCE,
+    "NEXOUSDT": _BITFINEX,  # To be replaced with Huobi once a CSV plugin is available
     "SGBUSD": _KRAKEN,
-    "SOLOUSDT": _HUOBI,
+    "SOLOUSDT": _GATE,  # To be replaced with Binance or Huobi once a CSV plugin is available
     "USDTUSD": _KRAKEN,
 }
 
@@ -184,6 +188,8 @@ _GOOGLE_API_KEY: str = "google_api_key"
 _STANDARD_WEIGHT: float = 50
 _ALTERNATIVE_MARKET_WEIGHT: float = 51
 
+_KRAKEN_PRICE_EXPLAINATION_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md#a-special-note-for-prices-from-kraken-exchange"
+
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
@@ -217,13 +223,15 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # key: name of exchange, value: AVLTree of all snapshots of the graph
         # TO BE IMPLEMENTED - Combine all graphs into one graph where assets can 'teleport' between exchanges
         #   This will eliminate the need for markets and this dict, replacing it with just one AVLTree
-        self.__exchange_datetime_graph_tree_dict: Dict[str, AVLTree[datetime, MappedGraph[str]]] = {}
+        self.__exchange_2_graph_tree: Dict[str, AVLTree[datetime, MappedGraph[str]]] = {}
         self.__exchange_last_request: Dict[str, float] = {}
         self.__manifest: Optional[TransactionManifest] = None
+        self.__transaction_count: int = 0
         if exchange_locked:
             self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
         else:
             self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
+        self.__kraken_warning: bool = False
 
     def name(self) -> str:
         return "CCXT-converter"
@@ -244,7 +252,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
     @property
     def exchange_datetime_graph_tree_dict(self) -> Dict[str, AVLTree[datetime, MappedGraph[str]]]:
-        return self.__exchange_datetime_graph_tree_dict
+        return self.__exchange_2_graph_tree
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         self.__logger.debug("Converting %s to %s", from_asset, to_asset)
@@ -261,7 +269,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             exchange = self.__default_exchange
 
         # The exchange could have been added as an alt; if so markets wouldn't have been built
-        if exchange not in self.__exchange_datetime_graph_tree_dict or exchange not in self.__exchange_markets:
+        if exchange not in self.__exchange_2_graph_tree or exchange not in self.__exchange_markets:
             if self.__exchange_locked:
                 self._cache_graph_snapshots(self.__default_exchange)
             elif exchange in _EXCHANGE_DICT:
@@ -271,11 +279,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 return None
 
         current_markets = self.__exchange_markets[exchange]
-        current_graph = self.__exchange_datetime_graph_tree_dict[exchange].find_max_value_less_than(timestamp)
+        current_graph = self.__exchange_2_graph_tree[exchange].find_max_value_less_than(timestamp)
         if current_graph is None:
             raise RP2RuntimeError(
-                "Internal Error: Graph snapshot doesn't exist. Either you are trying to route a price before "
-                "the graph is optimized or an incorrect manifest was sent to CCXT pair converter."
+                "Internal error: The graph snapshot does not exist. It appears that an attempt is being made to route "
+                "a price before the graph has been optimized, or an incorrect manifest was sent to the CCXT pair converter."
             )
         from_asset_vertex: Optional[Vertex[str]] = current_graph.get_vertex(from_asset)
         to_asset_vertex: Optional[Vertex[str]] = current_graph.get_vertex(to_asset)
@@ -373,7 +381,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             returned_bar: HistoricalBar = historical_bars[0]
             if (timestamp - returned_bar.timestamp).total_seconds() > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_DAY]:
                 raise RP2ValueError(
-                    "INTERNAL ERROR: The time difference between the requested and returned timestamps is "
+                    "Internal error: The time difference between the requested and returned timestamps is "
                     "greater than a day. The graph probably hasn't been optimized."
                 )
             self._add_bar_to_cache(key=key, historical_bar=returned_bar)
@@ -385,13 +393,14 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
     ) -> Optional[List[HistoricalBar]]:
         result: List[HistoricalBar] = []
         retry_count: int = 0
+        self.__transaction_count += 1
         if timespan in _TIME_GRANULARITY_SET:
             if exchange in _NONSTANDARD_GRANULARITY_EXCHANGE_SET:
                 retry_count = _TIME_GRANULARITY_DICT[exchange].index(timespan)
             else:
                 retry_count = _TIME_GRANULARITY.index(timespan)
         else:
-            raise RP2ValueError("INTERNAL ERROR: Invalid timespan passed to find_historical_bars.")
+            raise RP2ValueError("Internal error: Invalid timespan passed to find_historical_bars.")
         current_exchange: Any = self.__exchanges[exchange]
         ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
         csv_pricing: Any = _CSV_PRICING_DICT.get(exchange)
@@ -425,19 +434,35 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__exchange_csv_reader[exchange] = csv_reader
             if csv_bar is not None and csv_bar[0] is not None:
                 if all_bars:
-                    ms_timestamp = int(csv_bar[-1].timestamp.timestamp() * _MS_IN_SECOND)
+                    timestamp = csv_bar[-1].timestamp + timedelta(milliseconds=1)
+                    ms_timestamp = int(timestamp.timestamp() * _MS_IN_SECOND)
                     self.__logger.debug(
                         "Retrieved bars up to %s from cache for %s/%s for %s. Continuing with REST API.",
-                        ms_timestamp,
+                        str(ms_timestamp),
                         from_asset,
                         to_asset,
                         exchange,
                     )
+                    result = csv_bar
                 else:
                     self.__logger.debug("Retrieved bar from cache - %s for %s/%s->%s for %s", csv_bar, timestamp, from_asset, to_asset, exchange)
                     return csv_bar
 
-        while retry_count < len(_TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)):
+        within_last_week: bool = False
+
+        # Get bundles of bars if they exist, saving us from making a call to the API
+        if all_bars:
+            cached_bundle: Optional[List[HistoricalBar]] = self._get_bundle_from_cache(AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange))
+            if cached_bundle:
+                result.extend(cached_bundle)
+                timestamp = cached_bundle[-1].timestamp + timedelta(milliseconds=1)
+                ms_timestamp = int(timestamp.timestamp() * _MS_IN_SECOND)
+
+            # If the bundle of bars is within the last week, we don't need to pull new optimization data.
+            if result and (datetime.now(timezone.utc) - result[-1].timestamp).total_seconds() > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
+                within_last_week = True
+
+        while (retry_count < len(_TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY))) and not within_last_week:
             timeframe: str = _TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)[retry_count]
             request_count: int = 0
             historical_data: List[List[Union[int, float]]] = []
@@ -455,12 +480,18 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
                     # this is where we pull the historical prices from the underlying exchange
                     if all_bars:
-                        # If this is over the exchange's limit CCXT will reduce to the max allowed
                         historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1500)
                         if len(historical_data) > 0:
                             ms_timestamp = int(historical_data[-1][0]) + 1
                     else:
                         historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
+                        self.__logger.debug(
+                            "Got historical_data: %s with ms_timestamp - %s with exchange %s with timeframe - %s",
+                            historical_data,
+                            ms_timestamp,
+                            type(current_exchange),
+                            timeframe,
+                        )
                     break
                 except (DDoSProtection, ExchangeError) as exc:
                     self.__logger.debug(
@@ -490,7 +521,52 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             if len(historical_data) > 0:
                 returned_timestamp = datetime.fromtimestamp(int(historical_data[0][0]) / _MS_IN_SECOND, timezone.utc)
                 if (returned_timestamp - timestamp).total_seconds() > _TIME_GRANULARITY_STRING_TO_SECONDS[timeframe] and not all_bars:
-                    raise RP2ValueError("INTERNAL ERROR: Requesting a spot price before the market is available. Graph is not optimized appropriately.")
+                    if retry_count == len(_TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)) - 1:  # If this is the last try
+                        # raise RP2ValueError(f"Internal error: Requested a spot price for {timestamp} but
+                        # got {returned_timestamp}. Graph is not optimized appropriately.")
+                        self.__logger.info(
+                            "For %s/%s requested candle for %s (ms %s) doesn't match the returned timestamp %s. It is assumed the asset was not tradeable at "
+                            "the time of acquisition, so the first weekly candle is used for pricing. Please check the price of %s at %s.",
+                            from_asset,
+                            to_asset,
+                            timestamp,
+                            ms_timestamp,
+                            returned_timestamp,
+                            from_asset,
+                            timestamp,
+                        )
+                    else:
+                        self.__logger.debug(
+                            "For %s/%s requested candle for %s (ms %s), but got %s. Continuing with larger timeframe.",
+                            from_asset,
+                            to_asset,
+                            timestamp,
+                            ms_timestamp,
+                            returned_timestamp,
+                        )
+                        retry_count += 1
+                        continue
+
+                # If this isn't the smallest timeframe, which is 1m on most exchanges, and this isn't the weekly candle which is the maximum timeframe
+                # and addressed with the message above.
+                if retry_count > 0 and timeframe != "1w":
+                    if exchange == "Kraken" and not self.__kraken_warning:
+                        self.__logger.info(
+                            "Prices from the Kraken exchange for the latest quarter may not be accurate until CSV data is available. For more "
+                            "information visit the following URL: %s",
+                            _KRAKEN_PRICE_EXPLAINATION_URL,
+                        )
+                        self.__kraken_warning = True
+                    elif exchange != "Kraken":  # This is a different exchange that is having pricing issues, so warn the user.
+                        self.__logger.info(
+                            "The most accurate candle was not able to be used for pricing the asset %s at %s. The %s candle for %s was used. "
+                            "The price may be inaccurate. If you feel like you're getting this message in error, please open an issue at %s",
+                            from_asset,
+                            timestamp,
+                            timeframe,
+                            returned_timestamp,
+                            self.issues_url,
+                        )
 
             # If there is no candle the list will be empty
             if historical_data:
@@ -521,11 +597,13 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         )
                     )
             elif all_bars:
+                self._add_bundle_to_cache(AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange), result)
                 break  # If historical_data is empty we have hit the end of records and need to return
             else:
                 retry_count += 1  # If the singular bar was not found, we need to repeat with a wider timespan
 
-        # We might want to add a function that adds bars to cache here.
+        if self.__transaction_count % _CACHE_INTERVAL == 0:
+            self.save_historical_price_cache()
 
         return result
 
@@ -549,7 +627,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
     def _cache_graph_snapshots(self, exchange: str) -> None:
         # TO BE IMPLEMENTED - If asset is missing from manifest, warn user and reoptimize.
-        if self.__exchange_datetime_graph_tree_dict.get(exchange):
+        if self.__exchange_2_graph_tree.get(exchange):
             raise RP2ValueError(
                 f"Internal Error: You have already generated graph snapshots for exchange - {exchange}. " f"Optimization can only be performed once."
             )
@@ -558,8 +636,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             unoptimized_graph: MappedGraph[str] = self._generate_unoptimized_graph(exchange)
         else:
             # TO BE IMPLEMENTED - Set a default start time of the earliest possible crypto trade.
-            raise RP2ValueError("INTERNAL ERROR: No manifest provided for the CCXT pair converter plugin. Unable to optimize the graph.")
+            raise RP2ValueError("Internal error: No manifest provided for the CCXT pair converter plugin. Unable to optimize the graph.")
 
+        # Key: name of asset being optimized, value: key -> neighboring asset, value -> weight of the connection
         optimizations: Dict[datetime, Dict[str, Dict[str, float]]]
         optimizations = self._optimize_assets_for_exchange(
             unoptimized_graph,
@@ -571,13 +650,24 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         exchange_tree: AVLTree[datetime, MappedGraph[str]] = AVLTree[datetime, MappedGraph[str]]()
         for timestamp, optimization in optimizations.items():
-            graph_snapshot: MappedGraph[str] = unoptimized_graph.clone_with_optimization(optimization)
+            # Since weeks don't align across exchanges, optimizations from previous graphs, which may correspond to different
+            # sources with different starting days for weeks (e.g. source A starts on Monday, source B starts on Thursday)
+            previous_graph: Optional[MappedGraph[str]] = exchange_tree.find_max_value_less_than(timestamp)
+            graph_snapshot: MappedGraph[str]
+            if previous_graph:
+                graph_snapshot = previous_graph.clone_with_optimization(optimization)
+            else:
+                graph_snapshot = unoptimized_graph.clone_with_optimization(optimization)
             exchange_tree.insert_node(timestamp, graph_snapshot)
             self.__logger.debug("Added graph snapshot AVLTree for %s for timestamp: %s", exchange, timestamp)
 
-        self.__exchange_datetime_graph_tree_dict[exchange] = exchange_tree
+        self.__exchange_2_graph_tree[exchange] = exchange_tree
 
         # Add unoptimized_graph to the last week?
+
+    def _find_following_monday(self, timestamp: datetime) -> datetime:
+        following_monday: datetime = timestamp + timedelta(days=-timestamp.weekday(), weeks=1)
+        return following_monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
     def _generate_unoptimized_graph(self, exchange: str) -> MappedGraph[str]:
         if exchange not in self.__exchanges:
@@ -622,23 +712,34 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
     ) -> Dict[datetime, Dict[str, Dict[str, float]]]:
         optimization_candidates: Set[Vertex[str]] = set()
         market_starts: Dict[str, Dict[str, datetime]] = {}
+        # Weekly candles can start on any weekday depending on the exchange, we pull a week early to make sure we pull a full week.
+        week_start_date = start_date - timedelta(weeks=1)
+
+        # Gather all valid candidates for optimization
         for asset in assets:
             current_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(asset)
+
+            # Some assets might not be available on this particular exchange
             if current_vertex is None:
-                raise RP2ValueError("Internal Error: Attempting to optimize a vertex that doesn't exist.")
+                continue
 
             optimization_candidates.add(current_vertex)
+
+            # Find all the neighbors of this vertex and all their neighbors as a set
             children: Optional[Set[Vertex[str]]] = unoptimized_graph.get_all_children_of_vertex(current_vertex)
             if children:
                 self.__logger.debug("For vertex - %s, found all the children - %s", current_vertex.name, [child.name for child in children])
                 optimization_candidates.update(children)
 
+        # This prevents the algo from optimizing fiat assets which do not need optimization
         self.__logger.debug("Checking if any of the following candidates are optimized - %s", [candidate.name for candidate in optimization_candidates])
         unoptimized_assets = {candidate.name for candidate in optimization_candidates if not unoptimized_graph.is_optimized(candidate.name)}
         self.__logger.debug("Found unoptimized assets %s", unoptimized_assets)
 
         child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
         optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}
+
+        # Retrieve historical week bars/candles to use for optimization
         for child_name in unoptimized_assets:
             child_bars[child_name] = {}
             bar_check: Optional[List[HistoricalBar]] = None
@@ -646,58 +747,99 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             child_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(child_name)
             child_neighbors: Iterator[Vertex[str]] = child_vertex.neighbors if child_vertex is not None else iter([])
             for neighbor in child_neighbors:
-                bar_check = self.find_historical_bars(
-                    child_name, neighbor.name, start_date, self.__exchange_markets[exchange][child_name + neighbor.name][0], True, _ONE_WEEK
-                )
-                if bar_check is not None:
-                    child_bars[child_name][neighbor.name] = bar_check
-                    timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
-                    # Find the start of the market if it is after the first transaction
-                    if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
-                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp
-                    else:
-                        market_starts[child_name][neighbor.name] = start_date
-                else:
-                    raise RP2RuntimeError(
-                        f"Internal Error: No bars found for pair {child_name}/{neighbor.name} on exchange - {exchange}. Can not optimize graph."
+                if neighbor in optimization_candidates:
+                    bar_check = self.find_historical_bars(
+                        child_name, neighbor.name, week_start_date, self.__exchange_markets[exchange][child_name + neighbor.name][0], True, _ONE_WEEK
                     )
 
-            # Convert bar dict into dict with optimizations
-            # First we sort the bars
-            for crypto_asset, neighbor_assets in child_bars.items():
-                for neighbor_asset, historical_bars in neighbor_assets.items():
-                    for historical_bar in historical_bars:
-                        timestamp: datetime = historical_bar.timestamp
-                        volume: RP2Decimal = historical_bar.volume
-                        if timestamp not in optimizations:
-                            optimizations[timestamp] = {}
-                        if crypto_asset not in optimizations[timestamp]:
-                            optimizations[timestamp][crypto_asset] = {}
-                        if timestamp < market_starts[crypto_asset].get(neighbor_asset, start_date):
-                            optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
-                        else:
-                            optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
+                # if not None or empty list []
+                if bar_check:
+                    # We pad the first part of the graph in case an asset has been airdropped or otherwise given to a user before a
+                    # market becomes available. Later, when the price is retrieved, the timestamps won't match and the user will be warned.
+                    no_market_padding: HistoricalBar = HistoricalBar(
+                        duration=bar_check[0].duration,
+                        timestamp=bar_check[0].timestamp - timedelta(weeks=1),
+                        open=bar_check[0].open,
+                        high=bar_check[0].high,
+                        low=bar_check[0].low,
+                        close=bar_check[0].close,
+                        volume=bar_check[0].volume,
+                    )
+                    bar_check = [no_market_padding] + bar_check
 
-            previous_assets: Optional[Dict[str, Dict[str, float]]] = None
-            timestamps_to_delete: List[datetime] = []
-            # Next, we assign weights based on the rank of the volume
-            for timestamp, snapshot_assets in optimizations.items():
-                for asset, neighbors in snapshot_assets.items():
-                    ranked_neighbors: Dict[str, float] = dict(sorted(iter(neighbors.items()), key=lambda x: x[1], reverse=True))
-                    weight: float = 1.0
-                    for neighbor_name, neighbor_volume in ranked_neighbors.items():
-                        if neighbor_volume != -1.0:
-                            neighbors[neighbor_name] = weight
-                            weight += 1.0
+                    child_bars[child_name][neighbor.name] = bar_check
+                    timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
 
-                # mark duplicate successive snapshots
-                if snapshot_assets == previous_assets:
-                    timestamps_to_delete.append(timestamp)
+                    # Find the start of the market if it is after the first transaction
+                    # pad it by one week for untradeable assets
+                    if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
+                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp - timedelta(weeks=1)
+                    else:
+                        market_starts[child_name][neighbor.name] = week_start_date - timedelta(weeks=1)
+                else:
+                    # This is a bogus market, either the exchange is misreporting it or it is not available from first transaction datetime
+                    # By setting the start date far into the future this market will be deleted from the graph snapshots
+                    market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
 
-                previous_assets = snapshot_assets
+        # Save all the bundles of bars we just retrieved
+        self.save_historical_price_cache()
 
-            # delete duplicates
-            for timestamp in timestamps_to_delete:
-                del optimizations[timestamp]
+        # Convert bar dict into dict with optimizations
+        # First we sort the bars
+        for crypto_asset, neighbor_assets in child_bars.items():
+            for neighbor_asset, historical_bars in neighbor_assets.items():
+                for historical_bar in historical_bars:
+                    timestamp: datetime = historical_bar.timestamp
+                    volume: RP2Decimal = historical_bar.volume
 
-        return optimizations
+                    # sort bars first by timestamp, then asset, then the asset's neighbor and it's volume
+                    if timestamp not in optimizations:
+                        optimizations[timestamp] = {}
+                    if crypto_asset not in optimizations[timestamp]:
+                        optimizations[timestamp][crypto_asset] = {}
+
+                    # This deletes markets before they start by setting the weight to a negative
+                    if timestamp < market_starts[crypto_asset].get(neighbor_asset, start_date):
+                        optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
+                    else:
+                        optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
+
+        # Sort the optimizations by timestamp
+        # while caching the graph snapshots, the partial optimizations will be layered on to the previous
+        # timestamp's optimizations
+        sorted_optimizations = dict(sorted(optimizations.items(), key=lambda x: x[0]))
+
+        # Copy over assets from previous timestamps so there are no holes in the graph
+        composite_optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}
+        previous_timestamp: Optional[datetime] = None
+
+        for timestamp, optimization_dict in sorted_optimizations.items():
+            if previous_timestamp is None:
+                composite_optimizations[timestamp] = optimization_dict
+            else:
+                composite_optimizations[timestamp] = sorted_optimizations[previous_timestamp].copy()
+                composite_optimizations[timestamp].update(sorted_optimizations[timestamp])
+
+        previous_assets: Optional[Dict[str, Dict[str, float]]] = None
+        timestamps_to_delete: List[datetime] = []
+        # Next, we assign weights based on the rank of the volume
+        for timestamp, snapshot_assets in composite_optimizations.items():
+            for asset, neighbors in snapshot_assets.items():
+                ranked_neighbors: Dict[str, float] = dict(sorted(iter(neighbors.items()), key=lambda x: x[1], reverse=True))
+                weight: float = 1.0
+                for neighbor_name, neighbor_volume in ranked_neighbors.items():
+                    if neighbor_volume != -1.0:
+                        neighbors[neighbor_name] = weight
+                        weight += 1.0
+
+            # mark duplicate successive snapshots
+            if snapshot_assets == previous_assets:
+                timestamps_to_delete.append(timestamp)
+
+            previous_assets = snapshot_assets
+
+        # delete duplicates
+        for timestamp in timestamps_to_delete:
+            del composite_optimizations[timestamp]
+
+        return composite_optimizations

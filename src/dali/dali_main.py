@@ -51,6 +51,7 @@ from dali.plugin.pair_converter.ccxt import (
 from dali.plugin.pair_converter.historic_crypto import (
     PairConverterPlugin as HistoricCryptoPairConverterPlugin,
 )
+from dali.transaction_manifest import TransactionManifest
 from dali.transaction_resolver import resolve_transactions
 
 _VERSION: str = "0.6.9"

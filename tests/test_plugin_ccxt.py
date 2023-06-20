@@ -22,16 +22,14 @@ from prezzemolo.avl_tree import AVLTree
 from prezzemolo.vertex import Vertex
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
-from dali.abstract_pair_converter_plugin import (
-    AssetPairAndTimestamp,
-    MappedGraph,
-    TransactionManifest,
-)
+from dali.abstract_pair_converter_plugin import AssetPairAndTimestamp, MappedGraph
 from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
+from dali.in_transaction import InTransaction
 from dali.plugin.pair_converter.ccxt import PairConverterPlugin
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
+from dali.transaction_manifest import TransactionManifest
 
 # Default exchange
 TEST_EXCHANGE: str = "Kraken"
@@ -152,16 +150,10 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
 LOW_VOLUME: RP2Decimal = RP2Decimal("1")
 HIGH_VOLUME: RP2Decimal = RP2Decimal("100")
 
-# Manifests
-FIRST_TRANSACTION_EPOCH: int = 1504541580
-NO_ASSET_MANIFEST: TransactionManifest = TransactionManifest(
-    assets=set(), exchanges=set(), first_transaction_datetime=datetime.fromtimestamp(FIRST_TRANSACTION_EPOCH, timezone.utc)
-)
-
 
 class TestCcxtPlugin:
     @pytest.fixture
-    def test_vertex_list(self) -> List[Vertex[str]]:
+    def vertex_list(self) -> List[Vertex[str]]:
         beth: Vertex[str] = Vertex[str](name="BETH")
         btc: Vertex[str] = Vertex[str](name="BTC")
         eth: Vertex[str] = Vertex[str](name="ETH")
@@ -183,23 +175,23 @@ class TestCcxtPlugin:
         return [beth, btc, eth, gbp, jpy, usdc, usdt, usd]
 
     @pytest.fixture
-    def test_graph_optimized(self, test_vertex_list: List[Vertex[str]]) -> MappedGraph[str]:
-        return MappedGraph[str](test_vertex_list, {"BETH", "BTC", "ETH", "GBP", "JPY", "USDC", "USDT", "USD"})
+    def graph_optimized(self, vertex_list: List[Vertex[str]]) -> MappedGraph[str]:
+        return MappedGraph[str](vertex_list, {"BETH", "BTC", "ETH", "GBP", "JPY", "USDC", "USDT", "USD"})
 
     @pytest.fixture
-    def test_graph_fiat_optimized(self, test_vertex_list: List[Vertex[str]]) -> MappedGraph[str]:
-        return MappedGraph[str](test_vertex_list, {"GBP", "JPY", "USD"})
+    def graph_fiat_optimized(self, vertex_list: List[Vertex[str]]) -> MappedGraph[str]:
+        return MappedGraph[str](vertex_list, {"GBP", "JPY", "USD"})
 
     @pytest.fixture
-    def test_tree(self, test_graph_optimized: MappedGraph[str]) -> AVLTree[datetime, MappedGraph[str]]:
-        test_tree: AVLTree[datetime, MappedGraph[str]] = AVLTree()
+    def simple_tree(self, graph_optimized: MappedGraph[str]) -> AVLTree[datetime, MappedGraph[str]]:
+        simple_tree: AVLTree[datetime, MappedGraph[str]] = AVLTree()
 
         # The original unoptimized graph is placed at the earliest possible time
-        test_tree.insert_node(datetime.fromtimestamp(1504541580, timezone.utc), test_graph_optimized)
+        simple_tree.insert_node(datetime.fromtimestamp(1504541580, timezone.utc), graph_optimized)
 
-        return test_tree
+        return simple_tree
 
-    def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any, test_graph_optimized: MappedGraph[str]) -> None:
+    def __btcusdt_mock(self, plugin: PairConverterPlugin, mocker: Any, graph_optimized: MappedGraph[str]) -> None:
         exchange = kraken(
             {
                 "apiKey": "key",
@@ -382,23 +374,23 @@ class TestCcxtPlugin:
             symbol, timeframe, symbol_generators=symbol_generators
         )
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
-        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = test_graph_optimized
+        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
 
     def __btcusdt_mock_unoptimized(
-        self, plugin: PairConverterPlugin, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]
+        self, plugin: PairConverterPlugin, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]
     ) -> None:
-        self.__btcusdt_mock(plugin, mocker, test_graph_optimized)
+        self.__btcusdt_mock(plugin, mocker, graph_optimized)
 
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_datetime_graph_tree_dict", {TEST_EXCHANGE: test_tree})
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
 
-    def test_unknown_exchange(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_unknown_exchange(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        self.__btcusdt_mock_unoptimized(plugin, mocker, test_graph_optimized, test_tree)
+        self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
 
         data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "BTC", "USD", "Bogus Exchange")
         assert data
 
-    def test_historical_prices(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_historical_prices(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
         if os.path.exists(cache_path):
@@ -406,7 +398,7 @@ class TestCcxtPlugin:
 
         # Reinstantiate plugin now that cache is gone
         plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        self.__btcusdt_mock_unoptimized(plugin, mocker, test_graph_optimized, test_tree)
+        self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
 
         data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
 
@@ -453,9 +445,9 @@ class TestCcxtPlugin:
         data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", TEST_EXCHANGE)
         assert data is None
 
-    def test_missing_fiat_pair(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_missing_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        self.__btcusdt_mock_unoptimized(plugin, mocker, test_graph_optimized, test_tree)
+        self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
 
         mocker.patch.object(plugin, "_get_fiat_exchange_rate").return_value = HistoricalBar(
             duration=timedelta(seconds=86400),
@@ -479,7 +471,7 @@ class TestCcxtPlugin:
 
     # Some crypto assets have no fiat or stable coin pair; they are only paired with BTC or ETH (e.g. EZ or BETH)
     # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
-    def test_no_fiat_pair(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_no_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
 
         exchange = kraken(
@@ -536,8 +528,8 @@ class TestCcxtPlugin:
             ],
         ]
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
-        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = test_graph_optimized
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_datetime_graph_tree_dict", {TEST_EXCHANGE: test_tree})
+        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
 
         data = plugin.get_historic_bar_from_native_source(BETHETH_TIMESTAMP, "BETH", "USD", TEST_EXCHANGE)
 
@@ -550,7 +542,7 @@ class TestCcxtPlugin:
         assert data.volume == BETHETH_VOLUME + ETHUSDT_VOLUME + USDTUSD_VOLUME
 
     # Test to make sure the default stable coin is not used with a fiat market that does exist on the exchange
-    def test_nonusd_fiat_pair(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_nonusd_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange="Binance.com")
         alt_exchange = binance(
             {
@@ -586,8 +578,8 @@ class TestCcxtPlugin:
             ],
         ]
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
-        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = test_graph_optimized
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_datetime_graph_tree_dict", {TEST_EXCHANGE: test_tree})
+        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
 
         data = plugin.get_historic_bar_from_native_source(BTCGBP_TIMESTAMP, "BTC", "GBP", TEST_EXCHANGE)
 
@@ -600,7 +592,7 @@ class TestCcxtPlugin:
         assert data.volume == BTCGBP_VOLUME
 
     # Plugin should hand off the handling of a fiat to fiat pair to the fiat converter
-    def test_fiat_pair(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         exchange = binance(
             {
@@ -611,8 +603,8 @@ class TestCcxtPlugin:
 
         # Need to be mocked to prevent logger spam
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: ["WHATEVER"]})
-        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = test_graph_optimized
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_datetime_graph_tree_dict", {TEST_EXCHANGE: test_tree})
+        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
 
         mocker.patch.object(plugin, "_get_fiat_exchange_rate").return_value = HistoricalBar(
             duration=timedelta(seconds=86400),
@@ -635,7 +627,7 @@ class TestCcxtPlugin:
         assert data.close == EUR_USD_RATE
         assert data.volume == ZERO
 
-    def test_kraken_csv(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_kraken_csv(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
 
         cache_path = os.path.join(CACHE_DIR, "Test-" + plugin.cache_key())
@@ -688,8 +680,8 @@ class TestCcxtPlugin:
             ],
         ]
         mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
-        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = test_graph_optimized
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_datetime_graph_tree_dict", {TEST_EXCHANGE: test_tree})
+        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
 
         data = plugin.get_historic_bar_from_native_source(KRAKEN_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
 
@@ -701,7 +693,7 @@ class TestCcxtPlugin:
         assert data.close == BTCUSDT_CLOSE * KRAKEN_CLOSE
         assert data.volume == BTCUSDT_VOLUME + KRAKEN_VOLUME
 
-    def test_locked_exchange(self, mocker: Any, test_graph_optimized: MappedGraph[str], test_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_locked_exchange(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange=LOCKED_EXCHANGE, exchange_locked=True)
         # Name is changed to exchange_instance to avoid conflicts with the side effect function `add_exchange_side_effect`
         exchange_instance = kraken(
@@ -746,26 +738,40 @@ class TestCcxtPlugin:
             mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {LOCKED_EXCHANGE: exchange_instance})
             mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {LOCKED_EXCHANGE: LOCKED_MARKETS})
 
-            return test_graph_optimized
+            return graph_optimized
 
         mocker.patch.object(plugin, "_cache_graph_snapshots", autospec=True).side_effect = add_exchange_side_effect
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_datetime_graph_tree_dict", {LOCKED_EXCHANGE: test_tree})
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {LOCKED_EXCHANGE: simple_tree})
 
         data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "BTC", "USD", "not-kraken")
 
         assert data
         assert mocker.patch.object(plugin, "_cache_graph_snapshots").called_once_with(LOCKED_EXCHANGE)
 
-    def test_optimization_of_graph(self, mocker: Any, test_graph_fiat_optimized: MappedGraph[str]) -> None:
+    def test_optimization_of_graph(self, mocker: Any, graph_fiat_optimized: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
 
-        self.__btcusdt_mock(plugin, mocker, test_graph_fiat_optimized)
+        self.__btcusdt_mock(plugin, mocker, graph_fiat_optimized)
 
-        test_manifest: TransactionManifest = TransactionManifest(
-            assets={"BTC"},
-            exchanges={"Kraken"},
-            first_transaction_datetime=datetime.fromtimestamp(1504541500, timezone.utc),
+        transaction: InTransaction = InTransaction(
+            plugin="Plugin",
+            unique_id=Keyword.UNKNOWN.value,
+            raw_data="raw",
+            timestamp=datetime.fromtimestamp(1504541500, timezone.utc).strftime("%Y-%m-%d %H:%M:%S%z"),
+            asset="BTC",
+            exchange="Kraken",
+            holder="test",
+            transaction_type=Keyword.BUY.value,
+            spot_price=Keyword.UNKNOWN.value,
+            crypto_in="1",
+            crypto_fee=None,
+            fiat_in_no_fee=None,
+            fiat_in_with_fee=None,
+            fiat_fee=None,
+            notes="notes",
         )
+
+        test_manifest: TransactionManifest = TransactionManifest([transaction], 1, "USD")
 
         plugin.optimize(test_manifest)
 

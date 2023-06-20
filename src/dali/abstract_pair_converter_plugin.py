@@ -24,12 +24,13 @@ from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
 from rp2.rp2_decimal import ZERO, RP2Decimal
-from rp2.rp2_error import RP2RuntimeError, RP2TypeError, RP2ValueError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
+from dali.transaction_manifest import TransactionManifest
 
 # exchangerates.host keywords
 _SUCCESS: str = "success"
@@ -67,12 +68,6 @@ class AssetPairAndTimestamp(NamedTuple):
     exchange: str
 
 
-class TransactionManifest(NamedTuple):
-    assets: Set[str]
-    exchanges: Set[str]
-    first_transaction_datetime: datetime
-
-
 class MappedGraph(Graph[ValueType]):
     def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None, optimized_assets: Optional[Set[str]] = None) -> None:
         super().__init__(vertexes)
@@ -83,10 +78,14 @@ class MappedGraph(Graph[ValueType]):
         if not self.__name_to_vertex.get(name):
             self.add_vertex(Vertex[ValueType](name=name))
 
-    def get_all_children_of_vertex(self, vertex: Vertex[ValueType]) -> Set[Vertex[ValueType]]:
+    def get_all_children_of_vertex(self, vertex: Vertex[ValueType], visited: Optional[Set[Vertex[ValueType]]] = None) -> Set[Vertex[ValueType]]:
+        # We need to keep track of the visited vertexes to prevent infinite recursion
+        visited = set() if visited is None else visited
         children = set(vertex.neighbors)
+        visited.add(vertex)
         for neighbor in vertex.neighbors:
-            children.update(self.get_all_children_of_vertex(neighbor) or set())
+            if neighbor not in visited:
+                children.update(self.get_all_children_of_vertex(neighbor, visited))
         return children
 
     def add_vertex(self, vertex: Vertex[ValueType]) -> None:
@@ -110,7 +109,8 @@ class MappedGraph(Graph[ValueType]):
         return new_vertex
 
     def is_optimized(self, asset: str) -> bool:
-        return asset in self.__optimized_assets
+        LOGGER.debug("Checking if %s is in %s", asset, self.__optimized_assets)
+        return bool(asset in self.__optimized_assets)
 
     @property
     def optimized_assets(self) -> Set[str]:
@@ -121,8 +121,7 @@ class MappedGraph(Graph[ValueType]):
     # Negative weights will get deleted.
     def clone_with_optimization(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
 
-        # wrapping optimized_assets in set() makes a deep copy
-        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=set(self.optimized_assets))
+        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=self.__optimized_assets.copy())
 
         for original_vertex in self.vertexes:
             # Add existing neighbors
@@ -170,8 +169,12 @@ class AbstractPairConverterPlugin:
             raise RP2TypeError(
                 f"historical_price_type must be one of {', '.join(sorted(HISTORICAL_PRICE_KEYWORD_SET))}, instead it was: {historical_price_type}"
             )
-        result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
-        self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
+        try:
+            result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
+        except EOFError:
+            LOGGER.error("EOFError: Cached file corrupted, no cache found.")
+            result = None
+        self.__cache: Dict[AssetPairAndTimestamp, Any] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
         self.__fiat_list: List[str] = []
@@ -198,6 +201,13 @@ class AbstractPairConverterPlugin:
 
     def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
         return self.__cache.get(self._floor_key(key))
+
+    # All bundle timestamps have 1 millisecond added to them, so will not conflict with the floored timestamps of single bars
+    def _add_bundle_to_cache(self, key: AssetPairAndTimestamp, historical_bars: List[HistoricalBar]) -> None:
+        self.__cache[key] = historical_bars
+
+    def _get_bundle_from_cache(self, key: AssetPairAndTimestamp) -> Optional[List[HistoricalBar]]:
+        return cast(List[HistoricalBar], self.__cache.get(key))
 
     # The most granular pricing available is 1 minute, to reduce the size of cache and increase the reuse of pricing data
     def _floor_key(self, key: AssetPairAndTimestamp) -> AssetPairAndTimestamp:

@@ -59,15 +59,15 @@ class bitbank(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
+class bitfinex(Exchange):
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
+    options: Dict[str, str]
+
 class coinbase(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
 class coinbasepro(Exchange):
-    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
-    options: Dict[str, str]
-
-class ftx(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
