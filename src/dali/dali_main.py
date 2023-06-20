@@ -155,8 +155,18 @@ def _dali_main_internal(country: AbstractCountry) -> None:
             pair_converter_list.append(CcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
             LOGGER.info("No pair converter plugins found in configuration file: using default pair converters.")
 
+        with ThreadPool(args.thread_count) as pool:
+            result_list = pool.map(_input_plugin_helper, input_plugin_args_list)
+
+        transactions: List[AbstractTransaction] = [transaction for result in result_list for transaction in result]
+
+        LOGGER.info("Building manifest to optimize price calculation with the pair converters.")
+        manifest = TransactionManifest(transactions, args.thread_count, country.currency_iso_code.upper())
+
+        # Check if pair converter has unique cache key and optimize plugin
         pair_converters_by_cache_key: Dict[str, AbstractPairConverterPlugin] = {}
         for pair_converter in pair_converter_list:
+            pair_converter.optimize(manifest)
             cache_key = pair_converter.cache_key()
             if cache_key in pair_converters_by_cache_key:
                 LOGGER.error(
@@ -169,11 +179,6 @@ def _dali_main_internal(country: AbstractCountry) -> None:
             pair_converters_by_cache_key[cache_key] = pair_converter
 
         dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
-
-        with ThreadPool(args.thread_count) as pool:
-            result_list = pool.map(_input_plugin_helper, input_plugin_args_list)
-
-        transactions: List[AbstractTransaction] = [transaction for result in result_list for transaction in result]
 
         LOGGER.info("Resolving transactions")
         resolved_transactions: List[AbstractTransaction] = resolve_transactions(transactions, dali_configuration, args.read_spot_price_from_web)
