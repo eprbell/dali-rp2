@@ -14,7 +14,7 @@
 
 from datetime import datetime, timedelta
 from json import JSONDecodeError
-from typing import Any, Dict, List, NamedTuple, Optional, cast
+from typing import Any, Dict, List, NamedTuple, Optional, Set, cast
 
 import requests
 from prezzemolo.graph import Graph
@@ -67,24 +67,40 @@ class AssetPairAndTimestamp(NamedTuple):
     exchange: str
 
 
+class TransactionManifest(NamedTuple):
+    assets: Set[str]
+    exchanges: Set[str]
+    first_transaction_datetime: datetime
+
+
 class MappedGraph(Graph[ValueType]):
-    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None, optimized_assets: Optional[Dict[str, None]] = None) -> None:
+    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None, optimized_assets: Optional[Set[str]] = None) -> None:
         super().__init__(vertexes)
         self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
-        self.__optimized_assets: Dict[str, None] = {} if optimized_assets is None else optimized_assets
+        self.__optimized_assets: Set[str] = set() if optimized_assets is None else optimized_assets
 
-    def add_missing_vertex(self, name: str) -> None:
+    def add_vertex_if_missing(self, name: str) -> None:
         if not self.__name_to_vertex.get(name):
             self.add_vertex(Vertex[ValueType](name=name))
+
+    def get_all_children_of_vertex(self, vertex: Vertex[ValueType]) -> Set[Vertex[ValueType]]:
+        children = set(vertex.neighbors)
+        for neighbor in vertex.neighbors:
+            children.update(self.get_all_children_of_vertex(neighbor) or set())
+        return children
 
     def add_vertex(self, vertex: Vertex[ValueType]) -> None:
         super().add_vertex(vertex)
         self.__name_to_vertex[vertex.name] = vertex
 
     def get_vertex(self, name: str) -> Optional[Vertex[ValueType]]:
+        if not isinstance(name, str):
+            raise RP2TypeError(f"Internal Error: parameter {name} is not a str.")
         return self.__name_to_vertex.get(name)
 
     def get_or_set_vertex(self, name: str) -> Vertex[ValueType]:
+        if not isinstance(name, str):
+            raise RP2TypeError(f"Internal Error: parameter {name} is not a str.")
         existing_vertex: Optional[Vertex[ValueType]] = self.get_vertex(name)
         if existing_vertex:
             return existing_vertex
@@ -96,47 +112,51 @@ class MappedGraph(Graph[ValueType]):
     def is_optimized(self, asset: str) -> bool:
         return asset in self.__optimized_assets
 
-    # Optimized asset is the asset we are optimizing during this cloning.
-    # Optimized assets are tracked to prevent redundant cloning.
-    # Negative weights will get deleted.
-    def clone_with_optimization(self, optimized_asset: str, neighbor_weights: Dict[str, float]) -> "MappedGraph[ValueType]":
-        if optimized_asset in self.__optimized_assets:
-            raise RP2ValueError(
-                "You are trying to optimize an asset that has already been optimized."
-                "Use is_optimized() to check if an asset has already been optimized before cloning."
-            )
+    @property
+    def optimized_assets(self) -> Set[str]:
+        return self.__optimized_assets
 
-        cloned_optimized_assets: Dict[str, None] = self.__optimized_assets
-        cloned_optimized_assets[optimized_asset] = None
-        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=cloned_optimized_assets)
+    # Optimization contains a dict with a key of the optimized asset and a value of a dict with the optimized weights for each neighbor
+    # Optimized assets are tracked to prevent requesting prices for unoptimized assets
+    # Negative weights will get deleted.
+    def clone_with_optimization(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
+
+        # wrapping optimized_assets in set() makes a deep copy
+        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=set(self.optimized_assets))
 
         for original_vertex in self.vertexes:
             # Add existing neighbors
             for neighbor in original_vertex.neighbors:
                 neighbor_weight: float
-                if original_vertex.name == optimized_asset:
-                    neighbor_weight = neighbor_weights.pop(neighbor.name, original_vertex.get_weight(neighbor))
+                optimized: bool = False
+                if original_vertex.name in set(optimization.keys()):
+                    neighbor_weight = optimization[original_vertex.name].pop(neighbor.name, original_vertex.get_weight(neighbor))
+                    optimized = True
                 else:
                     neighbor_weight = original_vertex.get_weight(neighbor)
 
                 # Delete neighbor if negative weight
                 if neighbor_weight >= 0.0:
-                    cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor.name, neighbor_weight)
+                    cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor.name, neighbor_weight, optimized)
                 else:
-                    cloned_mapped_graph.add_missing_vertex(original_vertex.name)
+                    cloned_mapped_graph.add_vertex_if_missing(original_vertex.name)
 
             # Add new neighbors
-            for neighbor_name in neighbor_weights.keys():
-                if original_vertex.name == optimized_asset:
-                    cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor_name, neighbor_weights[neighbor_name])
+            for optimized_asset, neighbor_weights in optimization.items():
+                for neighbor_name in neighbor_weights.keys():
+                    if original_vertex.name == optimized_asset:
+                        cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor_name, neighbor_weights[neighbor_name])
 
         return cloned_mapped_graph
 
-    def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0) -> None:
+    # Marking weights as optimized prevents REST API calls to re-optimize them
+    def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0, optimized: bool = False) -> None:
         vertex: Vertex[ValueType] = self.get_or_set_vertex(vertex_name)
         neighbor: Vertex[ValueType] = self.get_or_set_vertex(neighbor_name)
         if not vertex.has_neighbor(neighbor):
             vertex.add_neighbor(neighbor, weight)
+        if optimized:
+            self.__optimized_assets.add(vertex_name)
 
 
 class AbstractPairConverterPlugin:
@@ -150,11 +170,7 @@ class AbstractPairConverterPlugin:
             raise RP2TypeError(
                 f"historical_price_type must be one of {', '.join(sorted(HISTORICAL_PRICE_KEYWORD_SET))}, instead it was: {historical_price_type}"
             )
-        try:
-            result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
-        except EOFError:
-            LOGGER.error("EOFError: Cached file corrupted, no cache found.")
-            result = None
+        result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
         self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
@@ -172,6 +188,9 @@ class AbstractPairConverterPlugin:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def cache_key(self) -> str:
+        raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
+
+    def optimize(self, transaction_manifest: TransactionManifest) -> None:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
@@ -289,6 +308,7 @@ class AbstractPairConverterPlugin:
                         fiat,
                         to_be_added_fiat,
                         self.__fiat_priority.get(fiat, _STANDARD_WEIGHT),
+                        True,  # use set optimization
                     )
 
                 LOGGER.debug("Added to assets for %s: %s", fiat, to_fiat_list)
