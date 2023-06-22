@@ -39,7 +39,7 @@ from dateutil.relativedelta import relativedelta
 from prezzemolo.avl_tree import AVLTree
 from prezzemolo.vertex import Vertex
 from rp2.logger import create_logger
-from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 
 from dali.abstract_pair_converter_plugin import (
@@ -206,6 +206,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         fiat_priority: Optional[str] = None,
         google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
+        untradeable_assets: Optional[str] = None,
     ) -> None:
         exchange_cache_modifier = default_exchange.replace(" ", "_") if default_exchange and exchange_locked else ""
         fiat_priority_cache_modifier = fiat_priority if fiat_priority else ""
@@ -232,6 +233,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         else:
             self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
         self.__kraken_warning: bool = False
+        self.__untradeable_assets: Set[str] = set(untradeable_assets.split(", ")) if untradeable_assets is not None else set()
 
     def name(self) -> str:
         return "CCXT-converter"
@@ -300,6 +302,17 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         # Graph building goes here.
 
         if not from_asset_vertex or not to_asset_vertex:
+            if from_asset in self.__untradeable_assets:
+                self.__logger.info("Untradeable asset found - %s. Assigning ZERO price.", from_asset)
+                return HistoricalBar(
+                    duration=timedelta(seconds=604800),
+                    timestamp=timestamp,
+                    open=ZERO,
+                    high=ZERO,
+                    low=ZERO,
+                    close=ZERO,
+                    volume=ZERO,
+                )
             raise RP2RuntimeError(f"The asset {from_asset} or {to_asset} is missing from graph")
         pricing_path = current_graph.dijkstra(from_asset_vertex, to_asset_vertex, False)
 

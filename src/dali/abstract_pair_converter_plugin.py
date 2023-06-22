@@ -120,7 +120,6 @@ class MappedGraph(Graph[ValueType]):
     # Optimized assets are tracked to prevent requesting prices for unoptimized assets
     # Negative weights will get deleted.
     def clone_with_optimization(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
-
         cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=self.__optimized_assets.copy())
 
         for original_vertex in self.vertexes:

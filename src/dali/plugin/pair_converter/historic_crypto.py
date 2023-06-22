@@ -19,7 +19,6 @@ from Historic_Crypto import HistoricalData
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
-
 from dali.historical_bar import HistoricalBar
 from dali.transaction_manifest import TransactionManifest
 
