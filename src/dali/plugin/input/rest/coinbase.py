@@ -635,10 +635,8 @@ class InputPlugin(AbstractInputPlugin):
                         self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, f"From: {transaction[_FROM][_EMAIL]}")
                     elif transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
                         self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, "Coinbase EARN")
-                        # Other Coinbase Earn transactions 
-                    elif (transaction[_DETAILS][_SUBTITLE].endswith("Coinbase Earn")
-                        or transaction[_DESCRIPTION] == "Earn Task"
-                    ):
+                        # Other Coinbase Earn transactions
+                    elif transaction[_DETAILS][_SUBTITLE].endswith("Coinbase Earn") or transaction[_DESCRIPTION] == "Earn Task":
                         self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, "Coinbase EARN")
                 else:
                     intra_transaction_list.append(
