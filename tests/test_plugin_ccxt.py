@@ -786,7 +786,7 @@ class TestCcxtPlugin:
         assert optimized_data.volume == BTCUSDC_VOLUME + USDCUSD_VOLUME
 
         # Testing for graph compression
-        exchange_tree: AVLTree[datetime, MappedGraph[str]] = plugin.exchange_datetime_graph_tree_dict[TEST_EXCHANGE]
+        exchange_tree: AVLTree[datetime, MappedGraph[str]] = plugin.exchange_2_graph_tree[TEST_EXCHANGE]
         assert exchange_tree._get_height(exchange_tree.root) == 2  # pylint: disable=protected-access
 
         # Testing if separate snapshot was correctly made

@@ -253,7 +253,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return self.__exchange_markets
 
     @property
-    def exchange_datetime_graph_tree_dict(self) -> Dict[str, AVLTree[datetime, MappedGraph[str]]]:
+    def exchange_2_graph_tree(self) -> Dict[str, AVLTree[datetime, MappedGraph[str]]]:
         return self.__exchange_2_graph_tree
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
@@ -535,8 +535,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 returned_timestamp = datetime.fromtimestamp(int(historical_data[0][0]) / _MS_IN_SECOND, timezone.utc)
                 if (returned_timestamp - timestamp).total_seconds() > _TIME_GRANULARITY_STRING_TO_SECONDS[timeframe] and not all_bars:
                     if retry_count == len(_TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)) - 1:  # If this is the last try
-                        # raise RP2ValueError(f"Internal error: Requested a spot price for {timestamp} but
-                        # got {returned_timestamp}. Graph is not optimized appropriately.")
                         self.__logger.info(
                             "For %s/%s requested candle for %s (ms %s) doesn't match the returned timestamp %s. It is assumed the asset was not tradeable at "
                             "the time of acquisition, so the first weekly candle is used for pricing. Please check the price of %s at %s.",
