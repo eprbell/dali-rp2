@@ -12,29 +12,56 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
-
-from prezzemolo.vertex import Vertex
-
 from dali.abstract_pair_converter_plugin import MappedGraph
 
 
 class TestAbstractPairConverterPlugin:
     def test_mapped_graph_class(self) -> None:
-        current_graph: MappedGraph[str] = MappedGraph[str]()
+        current_graph = MappedGraph[str]()
 
-        first_vertex = current_graph.get_or_set_vertex("first vertex")
-        second_vertex = current_graph.get_or_set_vertex("second vertex")
+        first_parent = current_graph.get_or_set_vertex("first parent")
+        first_child = current_graph.get_or_set_vertex("first child")
+        second_parent = current_graph.get_or_set_vertex("second parent")
+        second_child = current_graph.get_or_set_vertex("second child")
 
-        first_vertex.add_neighbor(second_vertex, 1.0)
+        first_parent.add_neighbor(first_child, 1.0)
+        first_parent.add_neighbor(second_child, 2.0)
+        second_parent.add_neighbor(first_child, 1.0)
+        second_parent.add_neighbor(second_child, 2.0)
 
-        first_vertex_in_graph: Optional[Vertex[str]] = current_graph.get_vertex("first vertex")
-        second_vertex_in_graph: Optional[Vertex[str]] = current_graph.get_vertex("second vertex")
+        first_parent_in_graph = current_graph.get_vertex("first parent")
+        first_child_in_graph = current_graph.get_vertex("first child")
 
-        assert first_vertex in list(current_graph.vertexes)
-        assert second_vertex in list(current_graph.vertexes)
-        assert first_vertex.name == "first vertex"
-        assert second_vertex.name == "second vertex"
-        assert first_vertex_in_graph
-        assert second_vertex_in_graph
-        assert first_vertex_in_graph.has_neighbor(second_vertex_in_graph)
+        assert first_parent in list(current_graph.vertexes)
+        assert first_child in list(current_graph.vertexes)
+        assert first_parent.name == "first parent"
+        assert first_child.name == "first child"
+        assert first_parent_in_graph
+        assert first_child_in_graph
+        assert first_parent_in_graph.has_neighbor(first_child_in_graph)
+        assert not current_graph.is_optimized(first_parent_in_graph.name)
+        assert not current_graph.is_optimized(first_child_in_graph.name)
+
+        optimizations = {
+            "first parent": {"first child": 2.0, "second child": 1.0},
+            "second parent": {"first child": 4.0, "second child": 3.0},
+        }
+
+        cloned_graph = current_graph.clone_with_optimization(optimizations)
+
+        first_parent_in_clone = cloned_graph.get_vertex("first parent")
+        first_child_in_clone = cloned_graph.get_vertex("first child")
+        second_parent_in_clone = cloned_graph.get_vertex("second parent")
+        second_child_in_clone = cloned_graph.get_vertex("second child")
+
+        assert first_parent_in_clone is not first_parent_in_graph
+        assert first_child_in_clone is not first_child_in_graph
+        assert cloned_graph.optimized_assets is not current_graph.optimized_assets
+        assert first_parent_in_clone
+        assert first_child_in_clone
+        assert second_parent_in_clone
+        assert second_child_in_clone
+        assert first_parent_in_clone.get_weight(first_child_in_clone) == 2.0
+        assert first_parent_in_clone.get_weight(second_child_in_clone) == 1.0
+        assert second_parent_in_clone.get_weight(first_child_in_clone) == 4.0
+        assert second_parent_in_clone.get_weight(second_child_in_clone) == 3.0
