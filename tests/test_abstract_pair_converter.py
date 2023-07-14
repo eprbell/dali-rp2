@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dali.abstract_pair_converter_plugin import MappedGraph
+from dali.mapped_graph import MappedGraph
 
 
 class TestAbstractPairConverterPlugin:

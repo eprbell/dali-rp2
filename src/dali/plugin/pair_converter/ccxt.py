@@ -45,10 +45,10 @@ from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
     AssetPairAndTimestamp,
-    MappedGraph,
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
+from dali.mapped_graph import MappedGraph
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 from dali.transaction_manifest import TransactionManifest
 

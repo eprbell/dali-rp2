@@ -17,9 +17,6 @@ from json import JSONDecodeError
 from typing import Any, Dict, List, NamedTuple, Optional, Set, cast
 
 import requests
-from prezzemolo.graph import Graph
-from prezzemolo.utility import ValueType
-from prezzemolo.vertex import Vertex
 from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
@@ -30,6 +27,7 @@ from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
+from dali.mapped_graph import MappedGraph
 from dali.transaction_manifest import TransactionManifest
 
 # exchangerates.host keywords
@@ -66,95 +64,6 @@ class AssetPairAndTimestamp(NamedTuple):
     from_asset: str
     to_asset: str
     exchange: str
-
-
-class MappedGraph(Graph[ValueType]):
-    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None, optimized_assets: Optional[Set[str]] = None) -> None:
-        super().__init__(vertexes)
-        self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
-        self.__optimized_assets: Set[str] = set() if optimized_assets is None else optimized_assets
-
-    def add_vertex_if_missing(self, name: str) -> None:
-        if not self.__name_to_vertex.get(name):
-            self.add_vertex(Vertex[ValueType](name=name))
-
-    def get_all_children_of_vertex(self, vertex: Vertex[ValueType], visited: Optional[Set[Vertex[ValueType]]] = None) -> Set[Vertex[ValueType]]:
-        # We need to keep track of the visited vertexes to prevent infinite recursion
-        visited = set() if visited is None else visited
-        children = set(vertex.neighbors)
-        visited.add(vertex)
-        for neighbor in vertex.neighbors:
-            if neighbor not in visited:
-                children.update(self.get_all_children_of_vertex(neighbor, visited))
-        return children
-
-    def add_vertex(self, vertex: Vertex[ValueType]) -> None:
-        super().add_vertex(vertex)
-        self.__name_to_vertex[vertex.name] = vertex
-
-    def get_vertex(self, name: str) -> Optional[Vertex[ValueType]]:
-        if not isinstance(name, str):
-            raise RP2TypeError(f"Internal Error: parameter {name} is not a str.")
-        return self.__name_to_vertex.get(name)
-
-    def get_or_set_vertex(self, name: str) -> Vertex[ValueType]:
-        if not isinstance(name, str):
-            raise RP2TypeError(f"Internal Error: parameter {name} is not a str.")
-        existing_vertex: Optional[Vertex[ValueType]] = self.get_vertex(name)
-        if existing_vertex:
-            return existing_vertex
-
-        new_vertex: Vertex[ValueType] = Vertex[ValueType](name=name)
-        self.add_vertex(new_vertex)
-        return new_vertex
-
-    def is_optimized(self, asset: str) -> bool:
-        LOGGER.debug("Checking if %s is in %s", asset, self.__optimized_assets)
-        return bool(asset in self.__optimized_assets)
-
-    @property
-    def optimized_assets(self) -> Set[str]:
-        return self.__optimized_assets
-
-    # Optimization contains a dict with a key of the optimized asset and a value of a dict with the optimized weights for each neighbor
-    # Optimized assets are tracked to prevent requesting prices for unoptimized assets
-    # Negative weights will get deleted.
-    def clone_with_optimization(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
-        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=self.__optimized_assets.copy())
-
-        for original_vertex in self.vertexes:
-            # Add existing neighbors
-            for neighbor in original_vertex.neighbors:
-                neighbor_weight: float
-                optimized: bool = False
-                if original_vertex.name in set(optimization.keys()):
-                    neighbor_weight = optimization[original_vertex.name].pop(neighbor.name, original_vertex.get_weight(neighbor))
-                    optimized = True
-                else:
-                    neighbor_weight = original_vertex.get_weight(neighbor)
-
-                # Delete neighbor if negative weight
-                if neighbor_weight >= 0.0:
-                    cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor.name, neighbor_weight, optimized)
-                else:
-                    cloned_mapped_graph.add_vertex_if_missing(original_vertex.name)
-
-            # Add new neighbors
-            for optimized_asset, neighbor_weights in optimization.items():
-                for neighbor_name in neighbor_weights.keys():
-                    if original_vertex.name == optimized_asset:
-                        cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor_name, neighbor_weights[neighbor_name])
-
-        return cloned_mapped_graph
-
-    # Marking weights as optimized prevents REST API calls to re-optimize them
-    def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0, optimized: bool = False) -> None:
-        vertex: Vertex[ValueType] = self.get_or_set_vertex(vertex_name)
-        neighbor: Vertex[ValueType] = self.get_or_set_vertex(neighbor_name)
-        if not vertex.has_neighbor(neighbor):
-            vertex.add_neighbor(neighbor, weight)
-        if optimized:
-            self.__optimized_assets.add(vertex_name)
 
 
 class AbstractPairConverterPlugin:

@@ -22,11 +22,12 @@ from prezzemolo.avl_tree import AVLTree
 from prezzemolo.vertex import Vertex
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
-from dali.abstract_pair_converter_plugin import AssetPairAndTimestamp, MappedGraph
+from dali.abstract_pair_converter_plugin import AssetPairAndTimestamp
 from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.in_transaction import InTransaction
+from dali.mapped_graph import MappedGraph
 from dali.plugin.pair_converter.ccxt import PairConverterPlugin
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 from dali.transaction_manifest import TransactionManifest
