@@ -33,10 +33,12 @@ from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 from dali.transaction_manifest import TransactionManifest
 
 # Default exchange
-TEST_EXCHANGE: str = "Kraken"
+ALIAS_EXCHANGE: str = "alias"
 ALT_EXCHANGE: str = "Binance.com"
+FIAT_EXCHANGE: str = "fiat"
 LOCKED_EXCHANGE: str = "Kraken"
-FIAT_EXHANGE: str = "fiat"
+PIONEX_EXCHANGE: str = "Pionex"
+TEST_EXCHANGE: str = "Kraken"
 TEST_MARKETS: Dict[str, List[str]] = {
     "BTCUSDT": [ALT_EXCHANGE],
     "BTCUSDC": [ALT_EXCHANGE],
@@ -45,8 +47,10 @@ TEST_MARKETS: Dict[str, List[str]] = {
     "ETHUSDT": [ALT_EXCHANGE],
     "USDCUSD": [TEST_EXCHANGE],
     "USDTUSD": [TEST_EXCHANGE],
-    "USDJPY": [FIAT_EXHANGE],
+    "USDJPY": [FIAT_EXCHANGE],
+    "XBTBTC": [ALIAS_EXCHANGE],
 }
+PIONEX_MARKETS: Dict[str, List[str]] = {"MBTCBTC": [ALIAS_EXCHANGE]}
 LOCKED_MARKETS: Dict[str, List[str]] = {
     "BTCUSDT": [TEST_EXCHANGE],
     "USDTUSD": [TEST_EXCHANGE],
@@ -177,11 +181,15 @@ class TestCcxtPlugin:
 
     @pytest.fixture
     def graph_optimized(self, vertex_list: List[Vertex[str]]) -> MappedGraph[str]:
-        return MappedGraph[str](vertex_list, {"BETH", "BTC", "ETH", "GBP", "JPY", "USDC", "USDT", "USD"})
+        return MappedGraph[str](TEST_EXCHANGE, vertex_list, {"BETH", "BTC", "ETH", "GBP", "JPY", "USDC", "USDT", "USD"})
+
+    @pytest.fixture
+    def pionex_graph_optimized(self, vertex_list: List[Vertex[str]]) -> MappedGraph[str]:
+        return MappedGraph[str](PIONEX_EXCHANGE, vertex_list, {"BETH", "BTC", "ETH", "GBP", "JPY", "USDC", "USDT", "USD"})
 
     @pytest.fixture
     def graph_fiat_optimized(self, vertex_list: List[Vertex[str]]) -> MappedGraph[str]:
-        return MappedGraph[str](vertex_list, {"GBP", "JPY", "USD"})
+        return MappedGraph[str](TEST_EXCHANGE, vertex_list, {"GBP", "JPY", "USD"})
 
     @pytest.fixture
     def simple_tree(self, graph_optimized: MappedGraph[str]) -> AVLTree[datetime, MappedGraph[str]]:
@@ -189,6 +197,15 @@ class TestCcxtPlugin:
 
         # The original unoptimized graph is placed at the earliest possible time
         simple_tree.insert_node(datetime.fromtimestamp(1504541580, timezone.utc), graph_optimized)
+
+        return simple_tree
+
+    @pytest.fixture
+    def simple_pionex_tree(self, pionex_graph_optimized: MappedGraph[str]) -> AVLTree[datetime, MappedGraph[str]]:
+        simple_tree: AVLTree[datetime, MappedGraph[str]] = AVLTree()
+
+        # The original unoptimized graph is placed at the earliest possible time
+        simple_tree.insert_node(datetime.fromtimestamp(1504541580, timezone.utc), pionex_graph_optimized)
 
         return simple_tree
 
@@ -802,3 +819,40 @@ class TestCcxtPlugin:
         assert new_snapshot.open == BTCUSDT_OPEN * USDTUSD_OPEN
         assert new_snapshot.close == BTCUSDT_CLOSE * USDTUSD_CLOSE
         assert new_snapshot.volume == BTCUSDT_VOLUME + USDTUSD_VOLUME
+
+    def test_base_universal_aliases(
+        self,
+        mocker: Any,
+        graph_optimized: MappedGraph[str],
+        simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]],
+        simple_pionex_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]],
+    ) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
+        self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
+        pionex_markets: Dict[str, List[str]] = TEST_MARKETS
+        pionex_markets.update(PIONEX_MARKETS)
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {PIONEX_EXCHANGE: pionex_markets, TEST_EXCHANGE: TEST_MARKETS})
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {PIONEX_EXCHANGE: simple_pionex_tree, TEST_EXCHANGE: simple_tree})
+
+        data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "XBT", "USD", TEST_EXCHANGE)
+
+        # XBT should have the exact same price as BTC
+        assert data
+        assert data.timestamp == BTCUSDT_TIMESTAMP
+        assert data.low == BTCUSDT_LOW * USDTUSD_LOW
+        assert data.high == BTCUSDT_HIGH * USDTUSD_HIGH
+        assert data.open == BTCUSDT_OPEN * USDTUSD_OPEN
+        assert data.close == BTCUSDT_CLOSE * USDTUSD_CLOSE
+        assert data.volume == BTCUSDT_VOLUME + USDTUSD_VOLUME + RP2Decimal("1")
+
+        # Test micro assets on a specific exchange
+        data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "MBTC", "USD", "Pionex")
+
+        # XBT should have the exact same price as BTC
+        assert data
+        assert data.timestamp == BTCUSDT_TIMESTAMP
+        assert data.low == BTCUSDT_LOW * USDTUSD_LOW * RP2Decimal("0.001")
+        assert data.high == BTCUSDT_HIGH * USDTUSD_HIGH * RP2Decimal("0.001")
+        assert data.open == BTCUSDT_OPEN * USDTUSD_OPEN * RP2Decimal("0.001")
+        assert data.close == BTCUSDT_CLOSE * USDTUSD_CLOSE * RP2Decimal("0.001")
+        assert data.volume == BTCUSDT_VOLUME + USDTUSD_VOLUME + RP2Decimal("1")
