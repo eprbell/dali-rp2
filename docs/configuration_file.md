@@ -474,6 +474,7 @@ default_exchange = <em>&lt;default_exchange&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 google_api_key = <em>&lt;google_api_key&gt;</em>
 untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
+aliases = <em>&lt;untradeable_assets&gt;</em>
 </pre>
 
 Where:
@@ -482,6 +483,11 @@ Where:
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
 * `untradeable_assets` is a comma separated list of assets that have no market, yet. These are typically assets that are farmed or given away as a part of promotion before a market is available to price them and CCXT can not automatically assign a price. If you get the error "The asset XXX or XXX is missing from graph" and the asset is untradeable, adding the untradeable asset to this list will resolve it.
+* `aliases` is a list of aliases separated by semicolons. Each alias has 4 properties: exchange, from asset, to asset, factor. `exchange` is the name of the exchange if the alias is specific or `UNIVERSAL` if you want it applied to all exchanges. The current exchanges recognized by the CCXT plugin are "Binance.com", "Binance US", "Bitfinex", "Coinbase Pro", "Gate", "Huobi", "Kraken", "Okex", "Pionex" and "Upbit". `from asset` and `to asset` are the ISO codes in all caps of the assets you want to make an alias for. Finally, `factor` is the price factor for the alias (e.g. "1" if it is one to one). Here are some examples:
+
+```ini
+aliases = UNIVERSAL, XETH, ETH, 1; Kraken, KILOBTC, BTC, 1000; Kraken, SATOSHI, BTC, 0.00000001
+```
 
 The CCXT pair converter plugin uses a routing system to find the shortest pricing path between a base asset and a quote asset (what the asset is priced in). It does this by assembling a graph of nodes made out of assets and edges made from markets with a preference for the exchange the asset was purchased on. Fiat exchange rates from the European Central Bank are also added to the graph to allow any fiat to be converted between each other.
 
