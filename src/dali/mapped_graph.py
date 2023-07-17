@@ -12,21 +12,69 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Set
+from datetime import datetime, timedelta
+from typing import Dict, Iterator, List, NamedTuple, Optional, Set
 
 from prezzemolo.graph import Graph
 from prezzemolo.utility import ValueType
 from prezzemolo.vertex import Vertex
+from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2TypeError
 
+from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 
 
+class Alias(NamedTuple):
+    from_asset: str
+    to_asset: str
+
+
+# Hard-coded base aliases
+_UNIVERSAL_ALIASES = {
+    Alias(from_asset="LUNA", to_asset="LUNC"): RP2Decimal("1"),
+    Alias(from_asset="XBT", to_asset="BTC"): RP2Decimal("1"),
+}
+
+_EXCHANGE_SPECIFIC_ALIASES = {
+    "Coinbase Pro": {
+        Alias(from_asset="ETH2", to_asset="ETH"): RP2Decimal("1"),
+    },
+    "Pionex": {
+        Alias(from_asset="MBTC", to_asset="BTC"): RP2Decimal("0.001"),
+        Alias(from_asset="METH", to_asset="ETH"): RP2Decimal("0.001"),
+    },
+}
+
+_UNIVERSAL: str = "UNIVERSAL"
+
+
 class MappedGraph(Graph[ValueType]):
-    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None, optimized_assets: Optional[Set[str]] = None) -> None:
+    def __init__(
+        self,
+        exchange: str,  # This is temporary until teleportation is implemented
+        vertexes: Optional[List["Vertex[ValueType]"]] = None,
+        optimized_assets: Optional[Set[str]] = None,
+        aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None,
+    ) -> None:
         super().__init__(vertexes)
+        self.__exchange: str = exchange  # Temporary until teleportation
         self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
         self.__optimized_assets: Set[str] = set() if optimized_assets is None else optimized_assets
+        self.__universal_aliases: Dict[Alias, RP2Decimal] = {}
+        self.__universal_aliases.update(_UNIVERSAL_ALIASES)
+        self.__universal_aliases.update(_EXCHANGE_SPECIFIC_ALIASES.get(exchange, {}))  # To be removed for teleportation
+        # TO BE IMPLEMENTED - exchange specific aliases when teleportation is implemented
+        # self.__exchange_aliases: Dict[str, Dict[Alias, RP2Decimal]]
+
+        if aliases:
+            self.__universal_aliases.update(aliases.get(_UNIVERSAL, {}))
+            self.__universal_aliases.update(aliases.get(exchange, {}))
+        self.__add_aliases(self.__universal_aliases)
+
+    @property
+    def aliases(self) -> Iterator[Alias]:
+        return iter(self.__universal_aliases.keys())
 
     def add_vertex_if_missing(self, name: str) -> None:
         if not self.__name_to_vertex.get(name):
@@ -46,6 +94,22 @@ class MappedGraph(Graph[ValueType]):
         super().add_vertex(vertex)
         self.__name_to_vertex[vertex.name] = vertex
 
+    def get_alias_bar(self, from_asset: str, to_asset: str, timestamp: datetime) -> Optional[HistoricalBar]:
+        alias_pair = Alias(from_asset, to_asset)
+        factor: Optional[RP2Decimal] = self.__universal_aliases.get(alias_pair)
+
+        if factor:
+            return HistoricalBar(
+                duration=timedelta(seconds=60),
+                timestamp=timestamp,
+                open=factor,
+                high=factor,
+                low=factor,
+                close=factor,
+                volume=RP2Decimal("1.0"),
+            )
+        return None
+
     def get_vertex(self, name: str) -> Optional[Vertex[ValueType]]:
         if not isinstance(name, str):
             raise RP2TypeError(f"Internal Error: parameter {name} is not a str.")
@@ -62,6 +126,10 @@ class MappedGraph(Graph[ValueType]):
         self.add_vertex(new_vertex)
         return new_vertex
 
+    def is_alias(self, from_asset: str, to_asset: str) -> bool:
+        current_alias: Alias = Alias(from_asset, to_asset)
+        return current_alias in self.__universal_aliases
+
     def is_optimized(self, asset: str) -> bool:
         LOGGER.debug("Checking if %s is in %s", asset, self.__optimized_assets)
         return bool(asset in self.__optimized_assets)
@@ -74,7 +142,10 @@ class MappedGraph(Graph[ValueType]):
     # Optimized assets are tracked to prevent requesting prices for unoptimized assets
     # Negative weights will get deleted.
     def clone_with_optimization(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
-        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(optimized_assets=self.__optimized_assets.copy())
+        # exchange is used here again temporarily
+        cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(
+            self.__exchange, optimized_assets=self.__optimized_assets.copy(), aliases={_UNIVERSAL: self.__universal_aliases}
+        )
 
         for original_vertex in self.vertexes:
             # Add existing neighbors
@@ -109,3 +180,10 @@ class MappedGraph(Graph[ValueType]):
             vertex.add_neighbor(neighbor, weight)
         if optimized:
             self.__optimized_assets.add(vertex_name)
+
+    # No adding aliases after cloning, because that would make MappedGraph mutable
+    def __add_aliases(self, aliases: Dict[Alias, RP2Decimal]) -> None:
+        for market in aliases.keys():
+            # Aliases have a zero weight since they are virtually the same asset
+            # They are automatically optimized
+            self.add_neighbor(market.from_asset, market.to_asset, 0.0, True)

@@ -48,7 +48,7 @@ from dali.abstract_pair_converter_plugin import (
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
-from dali.mapped_graph import MappedGraph
+from dali.mapped_graph import Alias, MappedGraph
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 from dali.transaction_manifest import TransactionManifest
 
@@ -81,6 +81,7 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
 }
 
 # Currently supported exchanges
+_ALIAS: str = "Alias"  # Virtual exchange
 _BINANCE: str = "Binance.com"
 _BINANCEUS: str = "Binance US"
 _BITFINEX: str = "Bitfinex"
@@ -89,6 +90,7 @@ _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
 _OKEX: str = "Okex"
+_PIONEX: str = "Pionex"  # Not currently supported by CCXT
 _UPBIT: str = "Upbit"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = _KRAKEN
@@ -101,6 +103,7 @@ _EXCHANGE_DICT: Dict[str, Any] = {
     _HUOBI: huobi,
     _KRAKEN: kraken,
     _OKEX: okex,
+    _PIONEX: None,  # Kraken is used instead
     _UPBIT: upbit,
 }
 _COINBASE_PRO_GRANULARITY_LIST: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _SIX_HOUR, _ONE_DAY, _ONE_WEEK]
@@ -190,6 +193,9 @@ _ALTERNATIVE_MARKET_WEIGHT: float = 51
 
 _KRAKEN_PRICE_EXPLAINATION_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md#a-special-note-for-prices-from-kraken-exchange"
 
+# Used to mark an alias used for all exchanges
+_UNIVERSAL: str = "UNIVERSAL"
+
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
@@ -207,6 +213,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
         untradeable_assets: Optional[str] = None,
+        aliases: Optional[str] = None,
     ) -> None:
         exchange_cache_modifier = default_exchange.replace(" ", "_") if default_exchange and exchange_locked else ""
         fiat_priority_cache_modifier = fiat_priority if fiat_priority else ""
@@ -234,6 +241,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
         self.__kraken_warning: bool = False
         self.__untradeable_assets: Set[str] = set(untradeable_assets.split(", ")) if untradeable_assets is not None else set()
+        self.__aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None if aliases is None else self._process_aliases(aliases)
 
     def name(self) -> str:
         return "CCXT-converter"
@@ -339,7 +347,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     AssetPairAndHistoricalPrice(
                         from_asset=last_node,
                         to_asset=node,
-                        exchange=current_markets[(last_node + node)][0],
+                        exchange=_ALIAS if current_graph.is_alias(last_node, node) else current_markets[(last_node + node)][0],
                         historical_data=None,
                     )
                 )
@@ -349,6 +357,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         for i, hop_data in enumerate(conversion_route):
             if self._is_fiat_pair(hop_data.from_asset, hop_data.to_asset):
                 hop_bar = self._get_fiat_exchange_rate(timestamp, hop_data.from_asset, hop_data.to_asset)
+            elif hop_data.exchange == _ALIAS:
+                hop_bar = current_graph.get_alias_bar(hop_data.from_asset, hop_data.to_asset, timestamp)
             else:
                 hop_bar = self.find_historical_bar(hop_data.from_asset, hop_data.to_asset, timestamp, hop_data.exchange)
 
@@ -681,16 +691,25 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         return following_monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
     def _generate_unoptimized_graph(self, exchange: str) -> MappedGraph[str]:
+        current_exchange: Exchange
         if exchange not in self.__exchanges:
             # initializes the cctx exchange instance which is used to get the historical data
             # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
-            current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+            # In order for aliases to be locked to Pionex, which is not supported by CCXT, we need to
+            # use Kraken, but call it Pionex
+            if exchange == _PIONEX:
+                current_exchange = _EXCHANGE_DICT[_KRAKEN]({"enableRateLimit": True})
+            else:
+                current_exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
         else:
             current_exchange = self.__exchanges[exchange]
 
         # key: market, value: exchanges where the market is available in order of priority
         current_markets: Dict[str, List[str]] = {}
-        current_graph: MappedGraph[str] = MappedGraph[str]()
+        current_graph: MappedGraph[str] = MappedGraph[str](exchange, aliases=self.__aliases)
+
+        for alias in current_graph.aliases:
+            current_markets[f"{alias.from_asset}{alias.to_asset}"] = [exchange]
 
         for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
             self.__logger.debug("Market: %s", market)
@@ -854,3 +873,18 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             del composite_optimizations[timestamp]
 
         return composite_optimizations
+
+    def _process_aliases(self, aliases: str) -> Dict[str, Dict[Alias, RP2Decimal]]:
+        alias_list: List[str] = aliases.split(";")
+        processed_aliases: Dict[str, Dict[Alias, RP2Decimal]] = {}
+
+        for alias in alias_list:
+            alias_properties: List[str] = alias.split(",")
+            if alias_properties[0] in _EXCHANGE_DICT or alias_properties[0] == _UNIVERSAL:
+                exchange: str = alias_properties[0]
+            else:
+                raise RP2ValueError(f"Exchange - {alias_properties[0]} is not supported at this time. Check the spelling of the exchange.")
+
+            processed_aliases.setdefault(exchange, {}).update({Alias(alias_properties[1], alias_properties[2]): RP2Decimal(alias_properties[3])})
+
+        return processed_aliases

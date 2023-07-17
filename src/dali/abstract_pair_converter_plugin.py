@@ -14,7 +14,7 @@
 
 from datetime import datetime, timedelta
 from json import JSONDecodeError
-from typing import Any, Dict, List, NamedTuple, Optional, Set, cast
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
 from requests.exceptions import ReadTimeout
