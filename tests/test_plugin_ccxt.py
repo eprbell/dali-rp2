@@ -848,7 +848,7 @@ class TestCcxtPlugin:
         # Test micro assets on a specific exchange
         data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "MBTC", "USD", "Pionex")
 
-        # XBT should have the exact same price as BTC
+        # MBTC should have 0.001 price as BTC
         assert data
         assert data.timestamp == BTCUSDT_TIMESTAMP
         assert data.low == BTCUSDT_LOW * USDTUSD_LOW * RP2Decimal("0.001")

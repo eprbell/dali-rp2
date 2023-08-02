@@ -13,9 +13,10 @@
 # limitations under the License.
 
 from datetime import datetime
-from typing import Optional
+from typing import Iterator, List, Optional
 
 import pytest
+from prezzemolo.vertex import Vertex
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.historical_bar import HistoricalBar
@@ -90,12 +91,14 @@ class TestMappedGraph:
 
     def test_basic_graph_with_aliases(self, basic_graph_with_aliases: MappedGraph[str]) -> None:
         first_parent_in_graph = basic_graph_with_aliases.get_vertex("first parent")
+        first_child_in_graph = basic_graph_with_aliases.get_vertex("first child")
         first_parent_alias_in_graph = basic_graph_with_aliases.get_vertex("first parent alias")
         override_in_graph = basic_graph_with_aliases.get_vertex("XBT")
         micro_first_parent_in_graph = basic_graph_with_aliases.get_vertex("micro first parent")
         macro_first_parent_in_graph = basic_graph_with_aliases.get_vertex("macro first parent")
 
         assert first_parent_in_graph
+        assert first_child_in_graph
         assert first_parent_alias_in_graph
         assert micro_first_parent_in_graph
         assert override_in_graph
@@ -127,7 +130,10 @@ class TestMappedGraph:
 
         assert basic_graph_with_aliases.get_alias_bar(first_parent_in_graph.name, first_parent_in_graph.name, datetime.now()) is None
 
-        del basic_graph_with_aliases
+        pricing_path: Optional[Iterator[Vertex[str]]] = basic_graph_with_aliases.dijkstra(micro_first_parent_in_graph, first_child_in_graph, False)
+        assert pricing_path
+        pricing_path_list: List[str] = [v.name for v in pricing_path]
+        assert pricing_path_list == [micro_first_parent_in_graph.name, first_parent_in_graph.name, first_child_in_graph.name]
 
     def test_cloned_graph(self, basic_graph: MappedGraph[str], cloned_graph: MappedGraph[str]) -> None:
         first_parent_in_graph = basic_graph.get_vertex("first parent")
