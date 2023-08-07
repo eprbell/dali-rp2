@@ -81,7 +81,7 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
 }
 
 # Currently supported exchanges
-_ALIAS: str = "Alias"  # Virtual exchange
+_ALIAS: str = "Alias"  # Virtual exchange - to be removed when teleportation is implemented
 _BINANCE: str = "Binance.com"
 _BINANCEUS: str = "Binance US"
 _BITFINEX: str = "Bitfinex"

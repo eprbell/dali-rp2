@@ -64,20 +64,20 @@ class MappedGraph(Graph[ValueType]):
         self.__exchange: str = exchange  # Temporary until teleportation
         self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
         self.__optimized_assets: Set[str] = set() if optimized_assets is None else optimized_assets
-        self.__universal_aliases: Dict[Alias, RP2Decimal] = {}
-        self.__universal_aliases.update(_UNIVERSAL_ALIASES)
-        self.__universal_aliases.update(_EXCHANGE_SPECIFIC_ALIASES.get(exchange, {}))  # To be removed for teleportation
+        self.__aliases: Dict[Alias, RP2Decimal] = {}
+        self.__aliases.update(_UNIVERSAL_ALIASES)
+        self.__aliases.update(_EXCHANGE_SPECIFIC_ALIASES.get(exchange, {}))  # To be removed for teleportation
         # TO BE IMPLEMENTED - exchange specific aliases when teleportation is implemented
         # self.__exchange_aliases: Dict[str, Dict[Alias, RP2Decimal]]
 
         if aliases:
-            self.__universal_aliases.update(aliases.get(_UNIVERSAL, {}))
-            self.__universal_aliases.update(aliases.get(exchange, {}))
-        self.__add_aliases(self.__universal_aliases)
+            self.__aliases.update(aliases.get(_UNIVERSAL, {}))
+            self.__aliases.update(aliases.get(exchange, {}))
+        self.__add_aliases(self.__aliases)
 
     @property
     def aliases(self) -> Iterator[Alias]:
-        return iter(self.__universal_aliases.keys())
+        return iter(self.__aliases.keys())
 
     def add_vertex_if_missing(self, name: str) -> None:
         if not self.__name_to_vertex.get(name):
@@ -99,7 +99,7 @@ class MappedGraph(Graph[ValueType]):
 
     def get_alias_bar(self, from_asset: str, to_asset: str, timestamp: datetime) -> Optional[HistoricalBar]:
         alias_pair = Alias(from_asset, to_asset)
-        factor: Optional[RP2Decimal] = self.__universal_aliases.get(alias_pair)
+        factor: Optional[RP2Decimal] = self.__aliases.get(alias_pair)
 
         if factor:
             return HistoricalBar(
@@ -131,7 +131,7 @@ class MappedGraph(Graph[ValueType]):
 
     def is_alias(self, from_asset: str, to_asset: str) -> bool:
         current_alias: Alias = Alias(from_asset, to_asset)
-        return current_alias in self.__universal_aliases
+        return current_alias in self.__aliases
 
     def is_optimized(self, asset: str) -> bool:
         LOGGER.debug("Checking if %s is in %s", asset, self.__optimized_assets)
@@ -147,7 +147,7 @@ class MappedGraph(Graph[ValueType]):
     def clone_with_optimization(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
         # exchange is used here again temporarily
         cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(
-            self.__exchange, optimized_assets=self.__optimized_assets.copy(), aliases={_UNIVERSAL: self.__universal_aliases}
+            self.__exchange, optimized_assets=self.__optimized_assets.copy(), aliases={_UNIVERSAL: self.__aliases}
         )
 
         for original_vertex in self.vertexes:
