@@ -37,6 +37,9 @@ _UNIVERSAL_ALIASES = {
 }
 
 _EXCHANGE_SPECIFIC_ALIASES = {
+    "Coinbase": {
+        Alias(from_asset="ETH2", to_asset="ETH"): RP2Decimal("1"),
+    },
     "Coinbase Pro": {
         Alias(from_asset="ETH2", to_asset="ETH"): RP2Decimal("1"),
     },

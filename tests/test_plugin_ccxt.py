@@ -405,8 +405,7 @@ class TestCcxtPlugin:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
 
-        data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "BTC", "USD", "Bogus Exchange")
-        assert data
+        assert plugin._get_pricing_exchange_for_exchange("Bogus Exchange") == TEST_EXCHANGE  # pylint: disable=protected-access
 
     def test_historical_prices(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
@@ -754,17 +753,17 @@ class TestCcxtPlugin:
 
         def add_exchange_side_effect(exchange: str) -> MappedGraph[str]:  # pylint: disable=unused-argument
             mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {LOCKED_EXCHANGE: exchange_instance})
-            mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {LOCKED_EXCHANGE: LOCKED_MARKETS})
+            mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {"not-kraken": LOCKED_MARKETS})
+            mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {"not-kraken": simple_tree})
 
             return graph_optimized
 
         mocker.patch.object(plugin, "_cache_graph_snapshots", autospec=True).side_effect = add_exchange_side_effect
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {LOCKED_EXCHANGE: simple_tree})
 
         data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "BTC", "USD", "not-kraken")
 
         assert data
-        assert mocker.patch.object(plugin, "_cache_graph_snapshots").called_once_with(LOCKED_EXCHANGE)
+        plugin._cache_graph_snapshots.assert_called_once_with("not-kraken")  # type: ignore # pylint: disable=protected-access, no-member
 
     def test_optimization_of_graph(self, mocker: Any, graph_fiat_optimized: MappedGraph[str]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
