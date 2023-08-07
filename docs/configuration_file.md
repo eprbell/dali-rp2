@@ -446,7 +446,10 @@ Here is an example of how to configure the plugin:
 configuration_path = input/bob_2021_input.ini
 input_file = input/bob_2021_input.ods
 native_fiat=USD ;optional
+force_repricing=False ; optional
 ```
+
+* `<force_repricing>` is either True or False. If you would like the pricing plugin to re-lookup fiat prices for your digital assets, set this to True. Otherwise, you can leave this field out and Dali will use the prices in the .ods.
 
 ## Pair Converter Plugin Sections
 A pair converter plugin has the purpose of converting a currency to another (both crypto and fiat) and it is used to fill missing spot price and convert foreign fiat to native fiat (e.g. USD for US, JPY for Japan, etc.). It is initialized with parameters from a plugin-specific section of the INI file. This section has the following format:
