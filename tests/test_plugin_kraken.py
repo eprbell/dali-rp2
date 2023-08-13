@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# pylint: disable=protected-access
-
 from typing import Any
 
+# pylint: disable=protected-access
+import pytest
 from ccxt import Exchange
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
@@ -25,9 +26,20 @@ from dali.out_transaction import OutTransaction
 from dali.plugin.input.rest.kraken import _BASE, _BASE_ID, _ID, _QUOTE, InputPlugin
 
 
-def test_kraken(mocker: Any) -> None:
+@pytest.fixture
+def plugin():
+    return InputPlugin(
+        account_holder="tester",
+        api_key="a",
+        api_secret="b",
+        native_fiat="USD",
+        use_cache=False,
+    )
+
+
+def test__initialize_markets_exception(plugin: InputPlugin, mocker: any) -> None:
     """
-    This tests withdraw, deposit, buy and a sell.
+    This tests failure when old data format is used
     """
     plugin = InputPlugin(
         account_holder="tester",
@@ -38,14 +50,36 @@ def test_kraken(mocker: Any) -> None:
     )
 
     client: Exchange = plugin._client
-
     mocker.patch.object(client, "load_markets").return_value = None
+    # Old format: Dict[str, Dict]
     mocker.patch.object(
         client,
         "markets_by_id",
         {
             "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
             "XLTCXXBT": {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
+        },
+    )
+    with pytest.raises(RP2RuntimeError) as excinfo:
+        plugin.load(country=None)
+
+    assert "List of markets can't be converted to dictionary, since list does not contain exaxtly one market entry." == str(excinfo.value)
+
+
+def test_kraken(plugin: InputPlugin, mocker: Any) -> None:
+    """
+    This tests withdraw, deposit, buy and a sell.
+    """
+
+    client: Exchange = plugin._client
+
+    mocker.patch.object(client, "load_markets").return_value = None
+    mocker.patch.object(
+        client,
+        "markets_by_id",
+        {
+            "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
+            "XLTCXXBT": [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
         },
     )
 
