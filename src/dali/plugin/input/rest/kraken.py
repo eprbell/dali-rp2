@@ -122,8 +122,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def _initialize_markets(self) -> None:
         self._client.load_markets()
-        self._client.markets_by_id.update({"BSVUSD": {_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}})
+        # Convert Dict[any, List[Dict]] to Dict[any, Dict]
+        for key, value in self._client.markets_by_id.items():
+            if len(value) != 1:
+                raise RP2RuntimeError("List of markets can't be converted to dictionary, since list does not contain exaxtly one market entry.")
+            self._client.markets_by_id[key] = value[0]
 
+        self._client.markets_by_id.update({"BSVUSD": {_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}})
         for market in self._client.markets_by_id.values():
             self.base_id_to_base.update({market[_BASE_ID]: market[_BASE]})
 
