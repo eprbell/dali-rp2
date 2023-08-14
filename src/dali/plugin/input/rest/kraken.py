@@ -125,7 +125,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Convert Dict[any, List[Dict]] to Dict[any, Dict]
         for key, value in self._client.markets_by_id.items():
             if len(value) != 1:
-                raise RP2RuntimeError("List of markets can't be converted to dictionary, since list does not contain exaxtly one market entry.")
+                raise RP2RuntimeError("List of markets can't be converted to dictionary, since list does not contain exactly one market entry.")
             self._client.markets_by_id[key] = value[0]
 
         self._client.markets_by_id.update({"BSVUSD": {_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}})
