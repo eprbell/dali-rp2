@@ -449,7 +449,7 @@ native_fiat=USD ;optional
 force_repricing=False ; optional
 ```
 
-* `<force_repricing>` is either True or False. If you would like the pricing plugin to re-lookup fiat prices for your digital assets, set this to True. Otherwise, you can leave this field out and Dali will use the prices in the .ods.
+* `<force_repricing>` is either True or False. If you would like the pricing plugin to re-lookup fiat prices for your digital assets, set this to True. Note that dali-rp2 will need to be run with the `-s` argument in order for prices to be pulled from the web. Without the `-s` argument `force_repricing` will just delete the current prices. Otherwise, you can leave this field out and Dali will use the prices in the .ods.
 
 ## Pair Converter Plugin Sections
 A pair converter plugin has the purpose of converting a currency to another (both crypto and fiat) and it is used to fill missing spot price and convert foreign fiat to native fiat (e.g. USD for US, JPY for Japan, etc.). It is initialized with parameters from a plugin-specific section of the INI file. This section has the following format:

@@ -140,6 +140,15 @@ def _dali_main_internal(country: AbstractCountry) -> None:
                 plugin_configuration[Keyword.NATIVE_FIAT.value] = dali_configuration[Keyword.NATIVE_FIAT.value]
                 input_plugin: AbstractInputPlugin = plugin_module.InputPlugin(**plugin_configuration)
                 LOGGER.debug("InputPlugin object: '%s'", input_plugin)
+                if (
+                    normalized_section_name == "dali.plugin.input.ods.rp2_input"
+                    and plugin_configuration["force_repricing"] is True
+                    and not args.read_spot_price_from_web
+                ):
+                    LOGGER.info(
+                        "RP2 Input Plugin (ODS) was configured to force_repricing, but the -s flag was not used when running dali-rp2. "
+                        "No repricing will occur."
+                    )
                 if not hasattr(input_plugin, "load"):
                     LOGGER.error("Plugin '%s' has no 'load' method. Exiting...", normalized_section_name)
                     sys.exit(1)
