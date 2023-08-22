@@ -45,10 +45,10 @@ from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 from dali.abstract_pair_converter_plugin import (
     AbstractPairConverterPlugin,
     AssetPairAndTimestamp,
-    MappedGraph,
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
+from dali.mapped_graph import Alias, MappedGraph
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 from dali.transaction_manifest import TransactionManifest
 
@@ -81,14 +81,17 @@ _TIME_GRANULARITY_STRING_TO_SECONDS: Dict[str, int] = {
 }
 
 # Currently supported exchanges
+_ALIAS: str = "Alias"  # Virtual exchange - to be removed when teleportation is implemented
 _BINANCE: str = "Binance.com"
 _BINANCEUS: str = "Binance US"
 _BITFINEX: str = "Bitfinex"
+_COINBASE: str = "Coinbase"  # Can't be used for pricing
 _COINBASE_PRO: str = "Coinbase Pro"
 _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
 _OKEX: str = "Okex"
+_PIONEX: str = "Pionex"  # Not currently supported by CCXT
 _UPBIT: str = "Upbit"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
 _DEFAULT_EXCHANGE: str = _KRAKEN
@@ -109,7 +112,6 @@ _TIME_GRANULARITY_DICT: Dict[str, List[str]] = {
 }
 _NONSTANDARD_GRANULARITY_EXCHANGE_SET: Set[str] = set(_TIME_GRANULARITY_DICT.keys())
 _TIME_GRANULARITY_SET: Set[str] = set(_TIME_GRANULARITY) | set(_COINBASE_PRO_GRANULARITY_LIST)
-
 
 # Delay in fractional seconds before making a request to avoid too many request errors
 # Kraken states it has a limit of 1 call per second, but this doesn't seem to be correct.
@@ -190,6 +192,9 @@ _ALTERNATIVE_MARKET_WEIGHT: float = 51
 
 _KRAKEN_PRICE_EXPLAINATION_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md#a-special-note-for-prices-from-kraken-exchange"
 
+# Used to mark an alias used for all exchanges
+_UNIVERSAL: str = "UNIVERSAL"
+
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
@@ -207,6 +212,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
         untradeable_assets: Optional[str] = None,
+        aliases: Optional[str] = None,
     ) -> None:
         exchange_cache_modifier = default_exchange.replace(" ", "_") if default_exchange and exchange_locked else ""
         fiat_priority_cache_modifier = fiat_priority if fiat_priority else ""
@@ -234,6 +240,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
         self.__kraken_warning: bool = False
         self.__untradeable_assets: Set[str] = set(untradeable_assets.split(", ")) if untradeable_assets is not None else set()
+        self.__aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None if aliases is None else self._process_aliases(aliases)
 
     def name(self) -> str:
         return "CCXT-converter"
@@ -263,22 +270,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         if self._is_fiat_pair(from_asset, to_asset):
             return self._get_fiat_exchange_rate(timestamp, from_asset, to_asset)
 
-        if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT or self.__exchange_locked:
-            if self.__exchange_locked:
-                self.__logger.debug("Price routing locked to %s type for %s.", self.__default_exchange, exchange)
-            else:
-                self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
-            exchange = self.__default_exchange
-
-        # The exchange could have been added as an alt; if so markets wouldn't have been built
-        if exchange not in self.__exchange_2_graph_tree or exchange not in self.__exchange_markets:
-            if self.__exchange_locked:
-                self._cache_graph_snapshots(self.__default_exchange)
-            elif exchange in _EXCHANGE_DICT:
-                self._cache_graph_snapshots(exchange)
-            else:
-                self.__logger.error("WARNING: Unrecognized Exchange: %s. Please open an issue at %s", exchange, self.issues_url)
-                return None
+        if exchange not in self.__exchange_2_graph_tree:
+            self._cache_graph_snapshots(exchange)
 
         current_markets = self.__exchange_markets[exchange]
         current_graph = self.__exchange_2_graph_tree[exchange].find_max_value_less_than(timestamp)
@@ -339,7 +332,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     AssetPairAndHistoricalPrice(
                         from_asset=last_node,
                         to_asset=node,
-                        exchange=current_markets[(last_node + node)][0],
+                        exchange=_ALIAS if current_graph.is_alias(last_node, node) else current_markets[(last_node + node)][0],
                         historical_data=None,
                     )
                 )
@@ -349,6 +342,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         for i, hop_data in enumerate(conversion_route):
             if self._is_fiat_pair(hop_data.from_asset, hop_data.to_asset):
                 hop_bar = self._get_fiat_exchange_rate(timestamp, hop_data.from_asset, hop_data.to_asset)
+            elif hop_data.exchange == _ALIAS:
+                hop_bar = current_graph.get_alias_bar(hop_data.from_asset, hop_data.to_asset, timestamp)
             else:
                 hop_bar = self.find_historical_bar(hop_data.from_asset, hop_data.to_asset, timestamp, hop_data.exchange)
 
@@ -680,17 +675,43 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         following_monday: datetime = timestamp + timedelta(days=-timestamp.weekday(), weeks=1)
         return following_monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
+    # Isolated for testing
+    def _get_pricing_exchange_for_exchange(self, exchange: str) -> str:
+        if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT or self.__exchange_locked:
+            if self.__exchange_locked:
+                self.__logger.debug("Price routing locked to %s type for %s.", self.__default_exchange, exchange)
+            else:
+                self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
+            exchange = self.__default_exchange
+
+        # The exchange could have been added as an alt; if so markets wouldn't have been built
+        if exchange not in self.__exchange_2_graph_tree or exchange not in self.__exchange_markets:
+            if self.__exchange_locked:
+                exchange = self.__default_exchange
+            elif exchange not in _EXCHANGE_DICT:
+                raise RP2ValueError(f"WARNING: Unrecognized Exchange: {exchange}. Please open an issue at {self.issues_url}")
+
+        return exchange
+
     def _generate_unoptimized_graph(self, exchange: str) -> MappedGraph[str]:
-        if exchange not in self.__exchanges:
+        pricing_exchange: str = self._get_pricing_exchange_for_exchange(exchange)
+        exchange_name: str = exchange
+
+        if exchange_name not in self.__exchanges:
             # initializes the cctx exchange instance which is used to get the historical data
             # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
-            current_exchange: Exchange = _EXCHANGE_DICT[exchange]({"enableRateLimit": True})
+            self.__logger.debug("Trying to instantiate exchange %s", exchange)
+            current_exchange = _EXCHANGE_DICT[pricing_exchange]({"enableRateLimit": True})
         else:
-            current_exchange = self.__exchanges[exchange]
+            current_exchange = self.__exchanges[exchange_name]
 
         # key: market, value: exchanges where the market is available in order of priority
         current_markets: Dict[str, List[str]] = {}
-        current_graph: MappedGraph[str] = MappedGraph[str]()
+        self.__logger.debug("Creating graph for %s", pricing_exchange)
+        current_graph: MappedGraph[str] = MappedGraph[str](exchange_name, aliases=self.__aliases)
+
+        for alias in current_graph.aliases:
+            current_markets[f"{alias.from_asset}{alias.to_asset}"] = [exchange]
 
         for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
             self.__logger.debug("Market: %s", market)
@@ -709,8 +730,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         self._add_fiat_edges_to_graph(current_graph, current_markets)
         self.__logger.debug("Created unoptimized graph for %s : %s", exchange, current_graph)
-        self.__exchanges[exchange] = current_exchange
-        self.__exchange_markets[exchange] = current_markets
+        self.__exchanges[exchange_name] = current_exchange
+        self.__exchange_markets[exchange_name] = current_markets
 
         return current_graph
 
@@ -854,3 +875,18 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             del composite_optimizations[timestamp]
 
         return composite_optimizations
+
+    def _process_aliases(self, aliases: str) -> Dict[str, Dict[Alias, RP2Decimal]]:
+        alias_list: List[str] = aliases.split(";")
+        processed_aliases: Dict[str, Dict[Alias, RP2Decimal]] = {}
+
+        for alias in alias_list:
+            alias_properties: List[str] = alias.split(",")
+            if alias_properties[0] in _EXCHANGE_DICT or alias_properties[0] == _UNIVERSAL:
+                exchange: str = alias_properties[0]
+            else:
+                raise RP2ValueError(f"Exchange - {alias_properties[0]} is not supported at this time. Check the spelling of the exchange.")
+
+            processed_aliases.setdefault(exchange, {}).update({Alias(alias_properties[1], alias_properties[2]): RP2Decimal(alias_properties[3])})
+
+        return processed_aliases
