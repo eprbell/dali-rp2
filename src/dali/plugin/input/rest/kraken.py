@@ -135,7 +135,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             for market in markets:  # type: ignore
                 base_id: str = market[_BASE_ID]
-                if base_id in self.base_id_to_base.keys() and \
+                if base_id in self.base_id_to_base and \
                     market[_BASE] != self.base_id_to_base[base_id]:
                     self.__logger.warning(
                         "A Kraken market's BASE differs with another BASE for the same BASE_ID. "
