@@ -22,15 +22,15 @@ from io import BytesIO
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
 from os import makedirs, path
-from typing import Any, Dict, Generator, List, NamedTuple, Optional, Tuple, cast
+from typing import Any, Dict, Generator, List, NamedTuple, Optional, Set, Tuple, cast
 from zipfile import ZipFile
 
 import requests
 from requests.models import Response
 from requests.sessions import Session
 from rp2.logger import create_logger
-from rp2.rp2_decimal import RP2Decimal
-from rp2.rp2_error import RP2RuntimeError
+from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.historical_bar import HistoricalBar
@@ -69,14 +69,45 @@ _SECONDS_IN_DAY: int = 86400
 _CHUNK_SIZE: int = _SECONDS_IN_DAY * 30
 _SECONDS_IN_MINUTE: int = 60
 
-# Time in minutes
-_MINUTE: str = "1"
-_FIVE_MINUTE: str = "5"
-_FIFTEEN_MINUTE: str = "15"
-_ONE_HOUR: str = "60"
-_TWELVE_HOUR: str = "720"
-_ONE_DAY: str = "1440"
-_TIME_GRANULARITY: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _TWELVE_HOUR, _ONE_DAY]
+# Time in minutes, used for file names
+_MINUTE_IN_MINUTES: str = "1"
+_FIVE_MINUTE_IN_MINUTES: str = "5"
+_FIFTEEN_MINUTE_IN_MINUTES: str = "15"
+_ONE_HOUR_IN_MINUTES: str = "60"
+_TWELVE_HOUR_IN_MINUTES: str = "720"
+_ONE_DAY_IN_MINUTES: str = "1440"
+_ONE_WEEK_IN_MINUTES: str = "10080"  # Emulated
+_KRAKEN_TIME_GRANULARITY: List[str] = [
+    _MINUTE_IN_MINUTES,
+    _FIVE_MINUTE_IN_MINUTES,
+    _FIFTEEN_MINUTE_IN_MINUTES,
+    _ONE_HOUR_IN_MINUTES,
+    _TWELVE_HOUR_IN_MINUTES,
+    _ONE_DAY_IN_MINUTES,
+    _ONE_WEEK_IN_MINUTES,
+]
+
+# Time in str, which is what CCXT uses normally
+# 4 hour doesn't exist in Kraken CSV. We might need to emulate it in the future
+_MINUTE_IN_STR: str = "1m"
+_FIVE_MINUTE_IN_STR: str = "5m"
+_FIFTEEN_MINUTE_IN_STR: str = "15m"
+_ONE_HOUR_IN_STR: str = "1h"
+_TWELVE_HOUR_IN_STR: str = "12h"
+_ONE_DAY_IN_STR: str = "1d"
+_ONE_WEEK_IN_STR: str = "1w"
+_CCXT_TIME_GRANULARITY: List[str] = [
+    _MINUTE_IN_STR,
+    _FIVE_MINUTE_IN_STR,
+    _FIFTEEN_MINUTE_IN_STR,
+    _ONE_HOUR_IN_STR,
+    _TWELVE_HOUR_IN_STR,
+    _ONE_DAY_IN_STR,
+    _ONE_WEEK_IN_STR,
+]
+
+
+_CCXT_TIME_GRANULARITY_SET: Set[str] = set(_CCXT_TIME_GRANULARITY)
 
 # Chunking variables
 _PAIR_START: str = "start"
@@ -169,95 +200,177 @@ class Kraken:
             elif position == _PAIR_START:
                 pair_start = int(chunk[0][self.__TIMESTAMP_INDEX])
 
-            chunk_filename: str = f'{pair}_{file_timestamp}_{duration_in_minutes}.{"csv.gz"}'
-            chunk_filepath: str = path.join(self.__CACHE_DIRECTORY, chunk_filename)
+            self._write_chunk_to_disk(pair, file_timestamp, duration_in_minutes, chunk)
 
-            with gopen(chunk_filepath, "wt", encoding="utf-8", newline="") as chunk_file:
-                csv_writer = writer(chunk_file)
-                for row in chunk:
-                    csv_writer.writerow(row)
+            # Emulate 1 week candle
+            if duration_in_minutes == _ONE_DAY_IN_MINUTES:
+                week_chunk = []
+
+                for i in range(0, len(chunk), 7):
+                    seven_chunks = chunk[i : i + 7]
+
+                    # We want to make sure we have a full week for the averages and accurate pricing
+                    if len(seven_chunks) < 7:
+                        break
+
+                    # The timestamp of the first row becomes the timestamp for the weekly row
+                    column_sums: List[str] = [seven_chunks[0][self.__TIMESTAMP_INDEX]]
+
+                    # We don't want/need to add up the timestamp column
+                    for column in range(self.__OPEN, self.__TRADES + 1):
+                        column_sum = str(sum((RP2Decimal(row[column]) for row in seven_chunks), ZERO))
+
+                        # Average all prices
+                        # BUG FIX: shouldn't be averages but reflect a true candle (e.g. high should be the highest)
+                        if column in range(self.__OPEN, (self.__CLOSE + 1)):
+                            column_average = str(RP2Decimal(column_sum) / RP2Decimal("7"))
+                            column_sums.append(column_average)
+                        else:
+                            column_sums.append(column_sum)
+                    week_chunk.append(column_sums)
+
+                # Same file_timestamp is okay since _ONE_DAY uses _MAX_MULTIPLIER
+                self._write_chunk_to_disk(pair, file_timestamp, _ONE_WEEK_IN_MINUTES, week_chunk)
+                if pair_start:
+                    self.__cached_pairs[pair + _ONE_WEEK_IN_MINUTES] = _PairStartEnd(start=pair_start, end=pair_end)
 
         if pair_start:
             self.__cached_pairs[pair_duration] = _PairStartEnd(start=pair_start, end=pair_end)
 
-    def _retrieve_cached_bar(self, base_asset: str, quote_asset: str, timestamp: int) -> Optional[HistoricalBar]:
+    def _write_chunk_to_disk(self, pair: str, file_timestamp: str, duration_in_minutes: str, chunk: List[List[str]]) -> None:
+        chunk_filename: str = f'{pair}_{file_timestamp}_{duration_in_minutes}.{"csv.gz"}'
+        chunk_filepath: str = path.join(self.__CACHE_DIRECTORY, chunk_filename)
+
+        with gopen(chunk_filepath, "wt", encoding="utf-8", newline="") as chunk_file:
+            csv_writer = writer(chunk_file)
+            for row in chunk:
+                csv_writer.writerow(row)
+
+    def _retrieve_cached_bars(
+        self, base_asset: str, quote_asset: str, timestamp: int, all_bars: bool = False, timespan: str = _MINUTE_IN_STR
+    ) -> Optional[List[HistoricalBar]]:
         pair_name: str = base_asset + quote_asset
 
-        retry_count: int = 0
+        if timespan in _CCXT_TIME_GRANULARITY_SET:
+            retry_count: int = _CCXT_TIME_GRANULARITY.index(timespan)
+        else:
+            raise RP2ValueError("Internal Error: Invalid timespan passed to _retrieve_cached_bars.")
 
-        while retry_count < len(_TIME_GRANULARITY):
-            if (
-                timestamp < self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start
-                or timestamp > self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].end
-            ):
-                self.__logger.debug(
-                    "Out of range - %s < %s or %s > %s",
-                    timestamp,
-                    self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].start,
-                    timestamp,
-                    self.__cached_pairs[pair_name + _TIME_GRANULARITY[retry_count]].end,
-                )
+        while retry_count < len(_KRAKEN_TIME_GRANULARITY):
+            window_start: int = self.__cached_pairs[pair_name + _KRAKEN_TIME_GRANULARITY[retry_count]].start
+            window_end: int = self.__cached_pairs[pair_name + _KRAKEN_TIME_GRANULARITY[retry_count]].end
+
+            if timestamp < window_start or timestamp > window_end:
+                self.__logger.debug("Out of range - %s < %s or %s > %s", timestamp, window_start, timestamp, window_end)
                 retry_count += 1
                 continue
 
-            duration_chunk_size = _CHUNK_SIZE * min(int(_TIME_GRANULARITY[retry_count]), _MAX_MULTIPLIER)
+            duration_chunk_size = _CHUNK_SIZE * min(int(_KRAKEN_TIME_GRANULARITY[retry_count]), _MAX_MULTIPLIER)
+            result: List[HistoricalBar] = []
             file_timestamp: int = (timestamp // duration_chunk_size) * duration_chunk_size
 
             # Floor the timestamp to find the price
-            duration_timestamp: int = (timestamp // (int(_TIME_GRANULARITY[retry_count]) * _SECONDS_IN_MINUTE)) * (
-                int(_TIME_GRANULARITY[retry_count]) * _SECONDS_IN_MINUTE
+            duration_timestamp: int = (timestamp // (int(_KRAKEN_TIME_GRANULARITY[retry_count]) * _SECONDS_IN_MINUTE)) * (
+                int(_KRAKEN_TIME_GRANULARITY[retry_count]) * _SECONDS_IN_MINUTE
             )
 
-            file_name: str = f"{base_asset + quote_asset}_{file_timestamp}_{_TIME_GRANULARITY[retry_count]}.csv.gz"
-            file_path: str = path.join(self.__CACHE_DIRECTORY, file_name)
-            self.__logger.debug("Retrieving %s -> %s at %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp)
-            try:
-                with gopen(file_path, "rt") as file:
-                    rows = reader(file)
-                    for row in rows:
-                        if int(row[self.__TIMESTAMP_INDEX]) != duration_timestamp:
-                            continue
-                        return HistoricalBar(
-                            duration=timedelta(minutes=int(_TIME_GRANULARITY[retry_count])),
-                            timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
-                            open=RP2Decimal(row[self.__OPEN]),
-                            high=RP2Decimal(row[self.__HIGH]),
-                            low=RP2Decimal(row[self.__LOW]),
-                            close=RP2Decimal(row[self.__CLOSE]),
-                            volume=RP2Decimal(row[self.__VOLUME]),
-                        )
-            except FileNotFoundError:
-                self.__logger.error(f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s",
-                                    self.ISSUES_URL, datetime.fromtimestamp(timestamp))
+            while file_timestamp < window_end:
+                file_name: str = f"{base_asset + quote_asset}_{file_timestamp}_{_KRAKEN_TIME_GRANULARITY[retry_count]}.csv.gz"
+                file_path: str = path.join(self.__CACHE_DIRECTORY, file_name)
+                if all_bars:
+                    self.__logger.debug(
+                        "Retrieving bars for %s -> %s starting from %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp
+                    )
+                else:
+                    self.__logger.debug("Retrieving %s -> %s at %s from %s stamped file.", base_asset, quote_asset, duration_timestamp, file_timestamp)
+                try:
+                    with gopen(file_path, "rt") as file:
+                        rows = reader(file)
+                        for row in rows:
+                            if all_bars and int(row[self.__TIMESTAMP_INDEX]) >= duration_timestamp:
+                                result.append(
+                                    HistoricalBar(
+                                        duration=timedelta(minutes=int(_KRAKEN_TIME_GRANULARITY[retry_count])),
+                                        timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
+                                        open=RP2Decimal(row[self.__OPEN]),
+                                        high=RP2Decimal(row[self.__HIGH]),
+                                        low=RP2Decimal(row[self.__LOW]),
+                                        close=RP2Decimal(row[self.__CLOSE]),
+                                        volume=RP2Decimal(row[self.__VOLUME]),
+                                    )
+                                )
+                            elif int(row[self.__TIMESTAMP_INDEX]) == duration_timestamp:
+                                return [
+                                    HistoricalBar(
+                                        duration=timedelta(minutes=int(_KRAKEN_TIME_GRANULARITY[retry_count])),
+                                        timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
+                                        open=RP2Decimal(row[self.__OPEN]),
+                                        high=RP2Decimal(row[self.__HIGH]),
+                                        low=RP2Decimal(row[self.__LOW]),
+                                        close=RP2Decimal(row[self.__CLOSE]),
+                                        volume=RP2Decimal(row[self.__VOLUME]),
+                                    )
+                                ]
+                except FileNotFoundError:
+                    self.__logger.error(
+                        f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s", self.ISSUES_URL, datetime.fromtimestamp(timestamp)
+                    )
+
+                file_timestamp += duration_chunk_size
+
+            if result:
+                return result
             retry_count += 1
 
         return None
 
     def find_historical_bar(self, base_asset: str, quote_asset: str, timestamp: datetime) -> Optional[HistoricalBar]:
+        historical_bars: Optional[List[HistoricalBar]] = self.find_historical_bars(base_asset, quote_asset, timestamp)
+        if historical_bars:
+            return historical_bars[0]
+        return None
+
+    def find_historical_bars(
+        self, base_asset: str, quote_asset: str, timestamp: datetime, all_bars: bool = False, timespan: str = _MINUTE_IN_STR
+    ) -> Optional[List[HistoricalBar]]:
+        # Kraken refers to BTC as XBT only on it's API
+        if base_asset == "BTC":
+            base_asset = "XBT"
         epoch_timestamp = int(timestamp.timestamp())
         self.__logger.debug("Retrieving bar for %s%s at %s", base_asset, quote_asset, epoch_timestamp)
 
         if not self.__cache_loaded:
             self.__logger.debug("Loading cache for Kraken CSV pair converter.")
             self.__load_cache()
+            self.__cache_loaded = True
 
         # Attempt to load smallest duration
-        if self.__cached_pairs.get(base_asset + quote_asset + "1"):
+        if self.__cached_pairs.get(base_asset + quote_asset + _MINUTE_IN_MINUTES):
             self.__logger.debug("Retrieving cached bar for %s, %s at %s", base_asset, quote_asset, epoch_timestamp)
-            return self._retrieve_cached_bar(base_asset, quote_asset, epoch_timestamp)
+            return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
 
+        if self._download_and_chunk(base_asset, quote_asset, all_bars):
+            return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
+
+        return None
+
+    def _download_and_chunk(self, base_asset: str, quote_asset: str, all_bars: bool = False) -> bool:
         base_file: str = f"{base_asset}_OHLCVT.zip"
 
-        self.__logger.info("Attempting to load %s from Kraken Google Drive for timestamp=%s.", base_file, timestamp)
+        self.__logger.info("Attempting to load %s from Kraken Google Drive.", base_file)
         file_bytes = self._google_file_to_bytes(base_file)
 
         if file_bytes:
             with ZipFile(BytesIO(file_bytes)) as zipped_ohlcvt:
                 self.__logger.debug("Files found in zipped file - %s", zipped_ohlcvt.namelist())
-                all_timespans_for_pair: List[str] = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
+                all_timespans_for_pair: List[str]
+                if all_bars:
+                    all_timespans_for_pair = zipped_ohlcvt.namelist()
+                else:
+                    all_timespans_for_pair = [x for x in zipped_ohlcvt.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
                 if len(all_timespans_for_pair) == 0:
                     self.__logger.debug("Market not found in Kraken files. Skipping file read.")
-                    return None
+                    return False
 
                 csv_files: Dict[str, str] = {}
                 for file_name in all_timespans_for_pair:
@@ -268,9 +381,9 @@ class Kraken:
                     pool.starmap(self._split_chunks_size_n, zip(list(csv_files.keys()), list(csv_files.values())))
 
             save_to_cache(self.cache_key(), self.__cached_pairs)
-            return self._retrieve_cached_bar(base_asset, quote_asset, epoch_timestamp)
+            return True
 
-        return None
+        return False
 
     # isolated in order to be mocked
     def _google_file_to_bytes(self, file_name: str) -> Optional[bytes]:
@@ -371,11 +484,19 @@ class Kraken:
                 return None
 
             self.__logger.debug("Retrieved %s from %s", data, response.url)
+            retry_count: int = 0
 
-            # Downloading the zipfile that contains the 6 files one for each of the standard durations of candles:
-            # 1m, 5m, 15m, 1h, 12h, 24h.
-            params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # _CONFIRM: 1 bypasses large file warning
-            file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
+            while True:
+                # Downloading the zipfile that contains the 6 files one for each of the standard durations of candles:
+                # 1m, 5m, 15m, 1h, 12h, 24h.
+                params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # _CONFIRM: 1 bypasses large file warning
+                file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
+                with ZipFile(BytesIO(file_response.content)) as file_check:
+                    if file_check.testzip() is None:
+                        break
+                    retry_count += 1
+                if retry_count > 2:
+                    raise RP2RuntimeError(f"Invalid zipfile - {file_name}. Giving up. Try again later.")
 
         except JSONDecodeError as exc:
             self.__logger.debug("Fetching of kraken csv files failed. Try again later.")

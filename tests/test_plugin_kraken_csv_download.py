@@ -58,6 +58,7 @@ class TestKrakenCsvDownload:
         assert test_bar
         assert test_bar.low == RP2Decimal("1.778")
         assert "USDTUSD_1594080000_5.csv.gz" in files
+        assert "USDTUSD_1296000000_10080.csv.gz" in files
 
         test_bar = kraken_csv.find_historical_bar("USDT", "USD", datetime.fromtimestamp(1601683300))
 
@@ -65,3 +66,13 @@ class TestKrakenCsvDownload:
         # Also that proper price was retrieved from chunked files in the cache folder
         assert test_bar
         assert test_bar.low == RP2Decimal("1.6668")
+
+        test_bars = kraken_csv.find_historical_bars("USDT", "USD", datetime.fromtimestamp(1601683200), True, "1w")
+
+        assert test_bars
+        test_bar = test_bars[0]
+
+        # Test to make sure it only emulates full weeks
+        assert len(test_bars) == 1
+        assert test_bar.low == RP2Decimal("1.952314285714285714285714286")
+        assert test_bar.volume == RP2Decimal("12016.1594")

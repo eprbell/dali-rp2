@@ -1,4 +1,4 @@
-# Copyright 2022 eprbell
+# Copyright 2023 Christopher Whelan
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+class Widgets:
+    pass
 
-import logging
+class Percentage(Widgets):
+    pass
 
-from progressbar import streams
-from rp2.logger import create_logger
+class Bar(Widgets):
+    pass
 
-# Must be called before any logging setup
-streams.wrap_stderr()
+class Timer(Widgets):
+    pass
 
-LOGGER: logging.Logger = create_logger("dali")
+class AdaptiveETA(Widgets):
+    def __init__(self, samples: int) -> None: ...

@@ -16,6 +16,8 @@
 from datetime import datetime
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
+from progressbar import ProgressBar
+from progressbar.widgets import AdaptiveETA, Bar, Percentage, Timer
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError, RP2TypeError, RP2ValueError
 
@@ -231,70 +233,91 @@ def resolve_transactions(
     unique_id_2_transactions: Dict[AssetAndUniqueId, List[AbstractTransaction]] = {}
     transaction: AbstractTransaction
 
+    progress_bar = ProgressBar(
+        # Approximate len(transactions) + len(unique_id_2_transactions) in a way that will never underestimate
+        max_value=(2 * len(transactions)),
+        widgets=[
+            Percentage(),
+            " ",
+            Bar(),
+            " ",
+            Timer(),
+            " ",
+            AdaptiveETA(samples=100),
+        ],
+    )
+
     try:
-        for transaction in transactions:
-            if not isinstance(transaction, AbstractTransaction):
-                raise RP2RuntimeError(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
+        with progress_bar:
+            for i, transaction in enumerate(transactions):
+                progress_bar.update(i)
+                if not isinstance(transaction, AbstractTransaction):
+                    raise RP2RuntimeError(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
 
-            if transaction.fiat_ticker not in {None, global_configuration[Keyword.NATIVE_FIAT.value]}:
-                # Foreign exchanges may have transactions denominated in non-native fiat
-                transaction = _convert_fiat_fields_to_native_fiat(transaction, global_configuration)
+                if transaction.fiat_ticker not in {None, global_configuration[Keyword.NATIVE_FIAT.value]}:
+                    # Foreign exchanges may have transactions denominated in non-native fiat
+                    transaction = _convert_fiat_fields_to_native_fiat(transaction, global_configuration)
 
-            if is_unknown(transaction.unique_id):
-                # Cannot resolve further if unique_id is not known
+                if is_unknown(transaction.unique_id):
+                    # Cannot resolve further if unique_id is not known
+                    if read_spot_price_from_web:
+                        transaction = _update_spot_price_from_web(transaction, global_configuration)
+                    LOGGER.debug("Unresolvable transaction (no %s): %s", Keyword.UNIQUE_ID.value, str(transaction))
+                    resolved_transactions.append(transaction)
+                else:
+                    transaction_list: List[AbstractTransaction]
+                    transaction_list = unique_id_2_transactions.setdefault(AssetAndUniqueId(transaction.asset, transaction.unique_id), [])
+                    transaction_list.append(transaction)
+                    unique_id_2_transactions[AssetAndUniqueId(transaction.asset, transaction.unique_id)] = transaction_list
+
+            # Update to true length now that unique_id_2_transactions is set, strict reduction in size
+            progress_bar.max_value = len(transactions) + len(unique_id_2_transactions)
+
+            for i, transaction_list in enumerate(unique_id_2_transactions.values()):
+                progress_bar.update(len(transactions) + i)
+
+                if len(transaction_list) > 2:
+                    raise RP2RuntimeError(
+                        f"Internal error: Attempting to resolve more than two transactions with same {Keyword.UNIQUE_ID.value}: {transaction_list}"
+                    )
+                if len(transaction_list) == 1:
+                    transaction = _apply_transaction_hint(transaction_list[0], global_configuration)
+                    if read_spot_price_from_web:
+                        transaction = _update_spot_price_from_web(transaction, global_configuration)
+                    LOGGER.debug("Self-contained transaction: %s", str(transaction))
+                    resolved_transactions.append(transaction)
+                    continue
+                if len(transaction_list) == 0:
+                    raise RP2RuntimeError(f"Internal error: Attempting to resolve zero transactions: {transaction_list}")
+
+                transaction1: AbstractTransaction = transaction_list[0]
+                transaction2: AbstractTransaction = transaction_list[1]
+
+                if transaction1.unique_id != transaction2.unique_id:
+                    raise RP2RuntimeError(
+                        f"Internal error: transaction1.{Keyword.UNIQUE_ID.value} != transaction2.{Keyword.UNIQUE_ID.value}: {transaction1}\n{transaction2}"
+                    )
+                if transaction1.asset != transaction2.asset:
+                    raise RP2RuntimeError(
+                        f"Internal error: transaction1.{Keyword.ASSET.value} != transaction2.{Keyword.ASSET.value}: {transaction1}\n{transaction2}"
+                    )
+
+                if isinstance(transaction1, InTransaction) and isinstance(transaction2, OutTransaction):
+                    transaction = _resolve_in_out_transaction(transaction1, transaction2, None)
+                elif isinstance(transaction1, OutTransaction) and isinstance(transaction2, InTransaction):
+                    transaction = _resolve_out_in_transaction(transaction1, transaction2, None)
+                elif isinstance(transaction1, IntraTransaction) and isinstance(transaction2, IntraTransaction):
+                    transaction = _resolve_intra_intra_transaction(transaction1, transaction2, None)
+                else:
+                    raise RP2RuntimeError(
+                        f"Internal error: attempting to resolve two transactions that aren't Intra/Intra, In/Out or Out/In:\n{transaction1}\n{transaction2}"
+                    )
+
                 if read_spot_price_from_web:
                     transaction = _update_spot_price_from_web(transaction, global_configuration)
-                LOGGER.debug("Unresolvable transaction (no %s): %s", Keyword.UNIQUE_ID.value, str(transaction))
+
+                LOGGER.debug("Resolved transaction: %s", str(transaction))
                 resolved_transactions.append(transaction)
-            else:
-                transaction_list: List[AbstractTransaction]
-                transaction_list = unique_id_2_transactions.setdefault(AssetAndUniqueId(transaction.asset, transaction.unique_id), [])
-                transaction_list.append(transaction)
-                unique_id_2_transactions[AssetAndUniqueId(transaction.asset, transaction.unique_id)] = transaction_list
-
-        for transaction_list in unique_id_2_transactions.values():
-            if len(transaction_list) > 2:
-                raise RP2RuntimeError(
-                    f"Internal error: Attempting to resolve more than two transactions with same {Keyword.UNIQUE_ID.value}: {transaction_list}"
-                )
-            if len(transaction_list) == 1:
-                transaction = _apply_transaction_hint(transaction_list[0], global_configuration)
-                if read_spot_price_from_web:
-                    transaction = _update_spot_price_from_web(transaction, global_configuration)
-                LOGGER.debug("Self-contained transaction: %s", str(transaction))
-                resolved_transactions.append(transaction)
-                continue
-            if len(transaction_list) == 0:
-                raise RP2RuntimeError(f"Internal error: Attempting to resolve zero transactions: {transaction_list}")
-
-            transaction1: AbstractTransaction = transaction_list[0]
-            transaction2: AbstractTransaction = transaction_list[1]
-
-            if transaction1.unique_id != transaction2.unique_id:
-                raise RP2RuntimeError(
-                    f"Internal error: transaction1.{Keyword.UNIQUE_ID.value} != transaction2.{Keyword.UNIQUE_ID.value}: {transaction1}\n{transaction2}"
-                )
-            if transaction1.asset != transaction2.asset:
-                raise RP2RuntimeError(
-                    f"Internal error: transaction1.{Keyword.ASSET.value} != transaction2.{Keyword.ASSET.value}: {transaction1}\n{transaction2}"
-                )
-
-            if isinstance(transaction1, InTransaction) and isinstance(transaction2, OutTransaction):
-                transaction = _resolve_in_out_transaction(transaction1, transaction2, None)
-            elif isinstance(transaction1, OutTransaction) and isinstance(transaction2, InTransaction):
-                transaction = _resolve_out_in_transaction(transaction1, transaction2, None)
-            elif isinstance(transaction1, IntraTransaction) and isinstance(transaction2, IntraTransaction):
-                transaction = _resolve_intra_intra_transaction(transaction1, transaction2, None)
-            else:
-                raise RP2RuntimeError(
-                    f"Internal error: attempting to resolve two transactions that aren't Intra/Intra, In/Out or Out/In:\n{transaction1}\n{transaction2}"
-                )
-
-            if read_spot_price_from_web:
-                transaction = _update_spot_price_from_web(transaction, global_configuration)
-
-            LOGGER.debug("Resolved transaction: %s", str(transaction))
-            resolved_transactions.append(transaction)
 
     except KeyboardInterrupt:
         LOGGER.info("Exiting and saving to cache.")
