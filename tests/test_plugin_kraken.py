@@ -15,7 +15,7 @@
 # pylint: disable=protected-access
 
 import pytest
-from typing import Any
+from typing import Any, Dict
 
 from ccxt import Exchange
 
@@ -34,93 +34,9 @@ from dali.plugin.input.rest.kraken import (
 from rp2.rp2_error import RP2RuntimeError
 
 
-@pytest.fixture(name="plugin")
-def plugin_fixture() -> InputPlugin:
-    return InputPlugin(
-        account_holder="tester",
-        api_key="a",
-        api_secret="b",
-        native_fiat="USD",
-        use_cache=False,
-    )
-
-
-def test__initialize_markets_exception(plugin: InputPlugin, mocker: Any) -> None:
-    """
-    This tests failure when old data format is used
-    """
-    client: Exchange = plugin._client
-
-    mocker.patch.object(client, "load_markets").return_value = None
-    mocker.patch.object(client, "markets_by_id",
-                            {
-                                "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
-                                'XLTCXXBT': {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
-                            }
-                        )
-
-    with pytest.raises(RP2RuntimeError) as excinfo:
-        plugin.load(country=None)  # type: ignore
-
-    assert "Incompatible CCXT library - make sure to follow Dali setup instructions" in str(excinfo.value)
-
-
-def test_initialize_markets_multiple_bases(plugin: InputPlugin, mocker: Any, caplog: pytest.LogCaptureFixture) -> None:
-    """
-    This tests failure when old data format is used
-    """
-    plugin = InputPlugin(
-        account_holder="tester",
-        api_key="a",
-        api_secret="b",
-        native_fiat="USD",
-        use_cache=False,
-    )
-
-    client: Exchange = plugin._client
-
-    mocker.patch.object(client, "load_markets").return_value = None
-    mocker.patch.object(client, "markets_by_id",
-                            {
-                                "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
-                                'XLTCXXBT': [
-                                                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
-                                                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "XLTC", _QUOTE: "BTC"},
-                                             ],
-                            }
-                        )
-
-    plugin._initialize_markets()
-
-    assert "A Kraken market's BASE differs with another BASE for the same BASE_ID" in caplog.text
-
-
-def test_kraken(mocker: Any) -> None:
-    """
-    This tests withdraw, deposit, buy and a sell.
-    """
-    plugin = InputPlugin(
-        account_holder="tester",
-        api_key="a",
-        api_secret="b",
-        native_fiat="USD",
-        use_cache=False,
-    )
-
-    client: Exchange = plugin._client
-
-    mocker.patch.object(client, "load_markets").return_value = None
-    mocker.patch.object(client, "markets_by_id",
-                            {
-                                "XLTCZUSD": [
-                                    {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
-                                    {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "ZUSD"}
-                                ],
-                                'XLTCXXBT': [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
-                            }
-                        )
-
-    mocker.patch.object(client, "private_post_ledgers").return_value = {
+@pytest.fixture(name="private_post_ledgers_return")
+def private_post_ledgers_return_fixture() -> Dict[str, Any]:  # type: ignore
+    return {
         "error": [],
         "result": {
             "count": "4",
@@ -173,7 +89,10 @@ def test_kraken(mocker: Any) -> None:
         },
     }
 
-    mocker.patch.object(client, "private_post_tradeshistory").return_value = {
+
+@pytest.fixture(name="private_post_tradeshistory_return")
+def private_post_tradeshistory_return_fixture() -> Dict[str, Any]:  # type: ignore
+    return {
         "error": [],
         "result": {
             "count": "2",
@@ -211,6 +130,113 @@ def test_kraken(mocker: Any) -> None:
             },
         },
     }
+
+
+@pytest.fixture(name="plugin")
+def plugin_fixture() -> InputPlugin:
+    return InputPlugin(
+        account_holder="tester",
+        api_key="a",
+        api_secret="b",
+        native_fiat="USD",
+        use_cache=False,
+    )
+
+
+def test_initialize_markets_exception(plugin: InputPlugin, mocker: Any) -> None:
+    """
+    This tests failure when old data format is used
+    """
+    client: Exchange = plugin._client
+
+    mocker.patch.object(client, "load_markets").return_value = None
+    mocker.patch.object(client, "markets_by_id",
+                            {
+                                "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
+                                'XLTCXXBT': {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
+                            }
+                        )
+
+    with pytest.raises(RP2RuntimeError) as excinfo:
+        plugin.load(country=None)  # type: ignore
+
+    assert "Incompatible CCXT library - make sure to follow Dali setup instructions" in str(excinfo.value)
+
+
+def test_initialize_markets_multiple_bases(plugin: InputPlugin, mocker: Any) -> None:
+    """
+    This tests failure when multiple bases exist for a base_id in set of markets
+    """
+    client: Exchange = plugin._client
+
+    mocker.patch.object(client, "load_markets").return_value = None
+    mocker.patch.object(client, "markets_by_id",
+                            {
+                                "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
+                                'XLTCXXBT': [
+                                                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
+                                                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "XLTC", _QUOTE: "BTC"},
+                                             ],
+                            }
+                        )
+
+    with pytest.raises(RP2RuntimeError) as excinfo:
+        plugin.load(country=None)  # type: ignore
+
+    assert "A Kraken market's BASE differs with another BASE for the same BASE_ID" in str(excinfo.value)
+
+
+def test_initialize_markets_multiple_quotes_to_base_pair(
+    mocker: Any,
+    plugin: InputPlugin,
+    private_post_ledgers_return: Dict[str, Any],
+    private_post_tradeshistory_return: Dict[str, Any],
+) -> None:
+    """
+    This tests failure when there are multiple quote symbols to a base symbol in a set of markets
+    """
+    client: Exchange = plugin._client
+
+    mocker.patch.object(client, "load_markets").return_value = None
+    mocker.patch.object(client, "markets_by_id",
+                            {
+                                "XLTCZUSD": [
+                                    {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
+                                    {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "ZUSD"}
+                                ],
+                                'XLTCXXBT': [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
+                            },
+                        )
+    mocker.patch.object(client, "private_post_ledgers").return_value = private_post_ledgers_return
+    mocker.patch.object(client, "private_post_tradeshistory").return_value = private_post_tradeshistory_return
+
+    with pytest.raises(RP2RuntimeError) as excinfo:
+        plugin.load(country=None)  # type: ignore
+
+    assert "Multiple quotes for pair. Please open an issue at" in str(excinfo.value)
+
+
+def test_kraken(
+    mocker: Any,
+    plugin: InputPlugin,
+    private_post_ledgers_return: Dict[str, Any],
+    private_post_tradeshistory_return: Dict[str, Any],
+) -> None:
+    """
+    This tests withdraw, deposit, buy and a sell.
+    """
+    client: Exchange = plugin._client
+
+    mocker.patch.object(client, "load_markets").return_value = None
+    mocker.patch.object(client, "markets_by_id",
+                            {
+                                "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
+                                'XLTCXXBT': [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
+                            }
+                        )
+
+    mocker.patch.object(client, "private_post_ledgers").return_value = private_post_ledgers_return
+    mocker.patch.object(client, "private_post_tradeshistory").return_value = private_post_tradeshistory_return
     actual_result = plugin.load(country=None)  # type: ignore
 
     assert len(actual_result) == 4
