@@ -23,7 +23,13 @@ from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-from dali.plugin.input.rest.kraken import _BASE, _BASE_ID, _ID, _QUOTE, InputPlugin
+from dali.plugin.input.rest.kraken import (
+    _BASE,
+    _BASE_ID,
+    _ID,
+    _QUOTE,
+    InputPlugin
+)
 
 from rp2.rp2_error import RP2RuntimeError
 
