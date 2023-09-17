@@ -18,7 +18,7 @@
 import logging
 from csv import reader
 from decimal import Decimal
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 from rp2.logger import create_logger
 
@@ -49,6 +49,7 @@ class InputPlugin(AbstractInputPlugin):
     __TIMESTAMP_INDEX = 1
     __TRANSACTION_CATEGORY_INDEX = 2
     __TRANSACTION_TYPE_INDEX = 3
+    __TRANSACTION_ID_INDEX = 5
 
     __PRIMARY_ASSET_INDEX = 6
     __PRIMARY_ASSET_AMOUNT_INDEX = 7
@@ -94,6 +95,7 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = self.__DELIMITER.join(line)
                 self.__logger.debug("Transaction: %s", raw_data)
 
+                transaction_id = line[self.__TRANSACTION_ID_INDEX].strip()
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
                 category = line[self.__TRANSACTION_CATEGORY_INDEX].strip()
 
@@ -102,7 +104,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 common_params = {
                     "plugin": self.__BINANCE,
-                    "unique_id": Keyword.UNKNOWN.value,
+                    "unique_id": transaction_id,
                     "raw_data": raw_data,
                     "timestamp": timestamp_with_timezone,
                     "notes": f"{category} - {transaction_type}",
@@ -117,7 +119,7 @@ class InputPlugin(AbstractInputPlugin):
                 # it is unclear what 'Distribution > Other' represents, but it looks like some type of income
                 if transaction_type in [_REFERRAL_COMMISSION, _STAKING_REWARDS] or (category == "Distribution" and transaction_type == _OTHERS):
                     granular_transaction_type = Keyword.INCOME if transaction_type == _REFERRAL_COMMISSION else Keyword.INTEREST
-                    currency = line[self.__PRIMARY_ASSET_INDEX].strip()
+                    currency: str = line[self.__PRIMARY_ASSET_INDEX].strip()
 
                     crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT_INDEX].strip()
                     calculated_spot_price = Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
@@ -125,7 +127,7 @@ class InputPlugin(AbstractInputPlugin):
                     result.append(
                         InTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "asset": currency,
                                     "exchange": self.__BINANCE,
@@ -139,14 +141,14 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
                 elif transaction_type == _CRYPTO_DEPOSIT:
-                    currency = line[self.__PRIMARY_ASSET_INDEX].strip()
+                    currency: str = line[self.__PRIMARY_ASSET_INDEX].strip()
                     crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT_INDEX].strip()
                     calculated_spot_price = Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         IntraTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "asset": currency,
                                     "crypto_sent": "0",
@@ -163,14 +165,14 @@ class InputPlugin(AbstractInputPlugin):
                         )
                     )
                 elif transaction_type == _CRYPTO_WITHDRAWAL:
-                    currency = line[self.__PRIMARY_ASSET_INDEX].strip()
+                    currency: str = line[self.__PRIMARY_ASSET_INDEX].strip()
                     crypto_amount = line[self.__PRIMARY_ASSET_AMOUNT_INDEX].strip()
                     calculated_spot_price = Decimal(line[self.__PRIMARY_ASSET_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         IntraTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "crypto_received": "0",
                                     # withdrawals happen in the primary asset field
@@ -191,7 +193,7 @@ class InputPlugin(AbstractInputPlugin):
                     result.append(
                         OutTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "notes": f"Fee for {category} - {transaction_type}",
                                 }
@@ -205,18 +207,18 @@ class InputPlugin(AbstractInputPlugin):
                     # 52358478,2021-08-04 16:15:55.614,Quick Buy,Buy,{32 char txn id},{9 char id},,,,USD,30.00000000,30.00000000,BUSD,29.84000000,29.84542100,USD,0.15000000,0.15000000,ACH,, # pylint: disable=line-too-long
 
                     if category == "Quick Buy":
-                        purchased_asset = line[self.__QUOTE_ASSET_INDEX].strip()
+                        purchased_asset: str = line[self.__QUOTE_ASSET_INDEX].strip()
                         crypto_amount = line[self.__QUOTE_ASSET_AMOUNT_INDEX].strip()
                         calculated_spot_price = Decimal(line[self.__QUOTE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
                     else:
-                        purchased_asset = line[self.__BASE_ASSET_INDEX].strip()
+                        purchased_asset: str = line[self.__BASE_ASSET_INDEX].strip()
                         crypto_amount = line[self.__BASE_ASSET_AMOUNT_INDEX].strip()
                         calculated_spot_price = Decimal(line[self.__BASE_ASSET_AMOUNT_SPOT_PRICE_INDEX].strip()) / Decimal(crypto_amount)
 
                     result.append(
                         InTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "exchange": self.__BINANCE,
                                     "holder": self.account_holder,
@@ -241,7 +243,7 @@ class InputPlugin(AbstractInputPlugin):
                     result.append(
                         OutTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "exchange": self.__BINANCE,
                                     "holder": self.account_holder,
@@ -260,7 +262,7 @@ class InputPlugin(AbstractInputPlugin):
                         result.append(
                             OutTransaction(
                                 **(
-                                    common_params  # type: ignore
+                                    common_params
                                     | {
                                         "notes": f"Fee for {category} - {transaction_type}",
                                     }
@@ -275,7 +277,7 @@ class InputPlugin(AbstractInputPlugin):
                     result.append(
                         OutTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "exchange": self.__BINANCE,
                                     "holder": self.account_holder,
@@ -295,7 +297,7 @@ class InputPlugin(AbstractInputPlugin):
                     result.append(
                         InTransaction(
                             **(
-                                common_params  # type: ignore
+                                common_params
                                 | {
                                     "exchange": self.__BINANCE,
                                     "holder": self.account_holder,
@@ -313,7 +315,7 @@ class InputPlugin(AbstractInputPlugin):
                         result.append(
                             OutTransaction(
                                 **(
-                                    common_params  # type: ignore
+                                    common_params
                                     | {
                                         "notes": f"Fee for {category} - {transaction_type}",
                                     }
@@ -330,7 +332,7 @@ class InputPlugin(AbstractInputPlugin):
 
         return result
 
-    def generate_fee_parameters(self, line: list[str]) -> Dict[str, str]:
+    def generate_fee_parameters(self, line):
         fee_amount = Decimal(line[self.__FEE_ASSET_AMOUNT_INDEX].strip())
 
         if fee_amount.is_zero():
@@ -340,6 +342,7 @@ class InputPlugin(AbstractInputPlugin):
         calculated_spot_price = fee_realized_usd / fee_amount
 
         return {
+            "unique_id": line[self.__TRANSACTION_ID_INDEX].strip() + "-fee",
             "asset": line[self.__FEE_ASSET_INDEX].strip(),
             # `fee` transaction_types must have a zero specified for crypto_out_no_fee
             "crypto_out_no_fee": "0",
