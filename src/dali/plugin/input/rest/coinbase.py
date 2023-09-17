@@ -553,7 +553,8 @@ class InputPlugin(AbstractInputPlugin):
             )
         elif transaction_type == _SEND:
             transaction_network = transaction[_NETWORK]
-            crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else Keyword.UNKNOWN.value
+            # although this transaction ID is not global, is improves adutibility in the reports
+            crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else transaction[_ID]
             if amount < ZERO:
                 if (  # pylint: disable=too-many-boolean-expressions
                     _TO in transaction
