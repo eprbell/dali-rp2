@@ -79,7 +79,10 @@ Read the [Internal Design](../README.dev.md#internal-design) section of the Deve
 Read about the [transaction_resolver](../src/dali/transaction_resolver.py) in the [Internal Design](../README.dev.md#the-transaction-resolver) section of the Developer Documentation.
 
 ## Why the Strange Directory Structure with Src?
-Because DaLI is a [src](https://bskinn.github.io/My-How-Why-Pyproject-Src/)-[based](https://hynek.me/articles/testing-packaging/) [project](https://blog.ionelmc.ro/2014/05/25/python-packaging/).
+Because DaLI is a [src](https://bskinn.github.io/My-How-Why-Pyproject-Src/)-[based](https://hynek.me/articles/testing-packaging/) 
+<!-- markdown-link-check-disable -->
+[project](https://blog.ionelmc.ro/2014/05/25/python-packaging/).
+<!-- markdown-link-check-enable -->
 
 ## How to Use the Cache to Speed Up Development?
 Use the `-c` command line option to enable the cache. This instructs DaLI to store transactions coming from cache-enabled plugins in the cache. The next time DaLI is run, transaction data is read directly from the cache instead of from the plugin native source. To make a plugin cache-enabled, just define its `cache_key()` method (for an example, look at the [Coinbase plugin](../src/dali/plugin/input/rest/coinbase.py)). Note that the code doesn't yet check for newer data: if it finds cached data, it reads it but doesn't check the native source for more recent entries, so currently the cache is only useful to speed up development, not for regular use. The cache is stored in the `.dali_cache/` directory: to reset the cache delete this directory.
