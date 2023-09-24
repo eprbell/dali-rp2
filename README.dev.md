@@ -53,7 +53,7 @@ DaLI is released under the terms of Apache License Version 2.0. For more informa
 The latest DaLI source can be downloaded at: <https://github.com/eprbell/dali-rp2>.
 
 ## Setup
-DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.7.0 or greater. Virtualenv is recommended for DaLI development.
+DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.8.0 or greater. Virtualenv is recommended for DaLI development.
 
 ### Setup on Ubuntu Linux
 First make sure Python, pip and virtualenv are installed. If not, open a terminal window and enter the following commands:
@@ -84,7 +84,7 @@ virtualenv -p python3 .venv
 .venv/bin/pip3 install -e '.[dev]'
 ```
 ### Setup on Windows 10
-First make sure [Python](https://python.org) 3.7 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH"), then open a PowerShell window and enter the following commands:
+First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH"), then open a PowerShell window and enter the following commands:
 ```
 python -m pip install virtualenv
 ```
@@ -97,7 +97,7 @@ virtualenv -p python .venv
 python -m pip install -e ".[dev]"
 ```
 ### Setup on Other Unix-like Systems
-* install python 3.7 or greater
+* install python 3.8 or greater
 * install pip3
 * install virtualenv
 * cd _<dali_directory>_

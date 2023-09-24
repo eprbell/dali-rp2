@@ -51,6 +51,7 @@ from dali.plugin.pair_converter.ccxt import (
 from dali.plugin.pair_converter.historic_crypto import (
     PairConverterPlugin as HistoricCryptoPairConverterPlugin,
 )
+from dali.transaction_manifest import TransactionManifest
 from dali.transaction_resolver import resolve_transactions
 
 _VERSION: str = "0.6.9"
@@ -139,6 +140,15 @@ def _dali_main_internal(country: AbstractCountry) -> None:
                 plugin_configuration[Keyword.NATIVE_FIAT.value] = dali_configuration[Keyword.NATIVE_FIAT.value]
                 input_plugin: AbstractInputPlugin = plugin_module.InputPlugin(**plugin_configuration)
                 LOGGER.debug("InputPlugin object: '%s'", input_plugin)
+                if (
+                    normalized_section_name == "dali.plugin.input.ods.rp2_input"
+                    and plugin_configuration["force_repricing"] is True
+                    and not args.read_spot_price_from_web
+                ):
+                    LOGGER.info(
+                        "RP2 Input Plugin (ODS) was configured to force_repricing, but the -s flag was not used when running dali-rp2. "
+                        "No repricing will occur."
+                    )
                 if not hasattr(input_plugin, "load"):
                     LOGGER.error("Plugin '%s' has no 'load' method. Exiting...", normalized_section_name)
                     sys.exit(1)
@@ -154,8 +164,18 @@ def _dali_main_internal(country: AbstractCountry) -> None:
             pair_converter_list.append(CcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
             LOGGER.info("No pair converter plugins found in configuration file: using default pair converters.")
 
+        with ThreadPool(args.thread_count) as pool:
+            result_list = pool.map(_input_plugin_helper, input_plugin_args_list)
+
+        transactions: List[AbstractTransaction] = [transaction for result in result_list for transaction in result]
+
+        LOGGER.info("Building manifest to optimize price calculation with the pair converters.")
+        manifest = TransactionManifest(transactions, args.thread_count, country.currency_iso_code.upper())
+
+        # Check if pair converter has unique cache key and optimize plugin
         pair_converters_by_cache_key: Dict[str, AbstractPairConverterPlugin] = {}
         for pair_converter in pair_converter_list:
+            pair_converter.optimize(manifest)
             cache_key = pair_converter.cache_key()
             if cache_key in pair_converters_by_cache_key:
                 LOGGER.error(
@@ -168,11 +188,6 @@ def _dali_main_internal(country: AbstractCountry) -> None:
             pair_converters_by_cache_key[cache_key] = pair_converter
 
         dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
-
-        with ThreadPool(args.thread_count) as pool:
-            result_list = pool.map(_input_plugin_helper, input_plugin_args_list)
-
-        transactions: List[AbstractTransaction] = [transaction for result in result_list for transaction in result]
 
         LOGGER.info("Resolving transactions")
         resolved_transactions: List[AbstractTransaction] = resolve_transactions(transactions, dali_configuration, args.read_spot_price_from_web)

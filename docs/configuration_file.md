@@ -17,11 +17,11 @@
 ## Table of Contents
 * **[Introduction](#introduction)**
 * **[Data Loader Plugin Sections](#data-loader-plugin-sections)**
-  * [Binance.com Section (REST)](#binance-com-section-rest)
+  * [Binance.com Section (REST)](#binancecom-section-rest)
   * [Bitbank Section (REST)](#bitbank-section-rest)
   * [Coinbase Section (REST)](#coinbase-section-rest)
   * [Coinbase Pro Section (REST)](#coinbase-pro-section-rest)
-  * [Binance.com Supplemental Section (CSV)](#binance.com-supplemental-section-csv)
+  * [Binance.com Supplemental Section (CSV)](#binancecom-supplemental-section-csv)
   * [Bitbank Supplemental Section (CSV)](#bitbank-supplemental-section-csv)
   * [Coincheck Supplemental Section (CSV)](#coincheck-supplemental-section-csv)
   * [Ledger Section (CSV)](#ledger-section-csv)
@@ -446,7 +446,10 @@ Here is an example of how to configure the plugin:
 configuration_path = input/bob_2021_input.ini
 input_file = input/bob_2021_input.ods
 native_fiat=USD ;optional
+force_repricing=False ; optional
 ```
+
+* `<force_repricing>` is either True or False. If you would like the pricing plugin to re-lookup fiat prices for your digital assets, set this to True. Note that dali-rp2 will need to be run with the `-s` argument in order for prices to be pulled from the web. Without the `-s` argument `force_repricing` will just delete the current prices. Otherwise, you can leave this field out and Dali will use the prices in the .ods.
 
 ## Pair Converter Plugin Sections
 A pair converter plugin has the purpose of converting a currency to another (both crypto and fiat) and it is used to fill missing spot price and convert foreign fiat to native fiat (e.g. USD for US, JPY for Japan, etc.). It is initialized with parameters from a plugin-specific section of the INI file. This section has the following format:
@@ -473,6 +476,8 @@ historical_price_type = <em>&lt;historical_price_type&gt;</em>
 default_exchange = <em>&lt;default_exchange&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 google_api_key = <em>&lt;google_api_key&gt;</em>
+untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
+aliases = <em>&lt;untradeable_assets&gt;</em>
 </pre>
 
 Where:
@@ -480,6 +485,12 @@ Where:
 * `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Kraken(US) is used. If you would like an exchange added please open an issue. The current available exchanges are "Binance.com", "Gate", "Huobi" and "Kraken".
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
+* `untradeable_assets` is a comma separated list of assets that have no market, yet. These are typically assets that are farmed or given away as a part of promotion before a market is available to price them and CCXT can not automatically assign a price. If you get the error "The asset XXX or XXX is missing from graph" and the asset is untradeable, adding the untradeable asset to this list will resolve it.
+* `aliases` is a list of aliases separated by semicolons. Each alias has 4 properties: exchange, from asset, to asset, factor. `exchange` is the name of the exchange if the alias is specific or `UNIVERSAL` if you want it applied to all exchanges. The current exchanges recognized by the CCXT plugin are "Binance.com", "Binance US", "Bitfinex", "Coinbase Pro", "Gate", "Huobi", "Kraken", "Okex", "Pionex" and "Upbit". `from asset` and `to asset` are the ISO codes in all caps of the assets you want to make an alias for. Finally, `factor` is the price factor for the alias (e.g. "1" if it is one to one). Here are some examples:
+
+```ini
+aliases = UNIVERSAL, XETH, ETH, 1; Kraken, KILOBTC, BTC, 1000; Kraken, SATOSHI, BTC, 0.00000001
+```
 
 The CCXT pair converter plugin uses a routing system to find the shortest pricing path between a base asset and a quote asset (what the asset is priced in). It does this by assembling a graph of nodes made out of assets and edges made from markets with a preference for the exchange the asset was purchased on. Fiat exchange rates from the European Central Bank are also added to the graph to allow any fiat to be converted between each other.
 
@@ -498,6 +509,19 @@ Be aware that:
 * The router uses the exchange listed in the transaction data to build the graph to calculate the route. If no exchange is listed, the current default is Kraken(US).
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 * Some exchanges, in particular Binance.com, might not be available in certain territories.
+
+#### A Special Note for Prices from Kraken Exchange
+Prices for the latest quarter from the Kraken exchange may be inaccurate due to the restrictions of the Kraken REST API. Only the latest 720 bars can be retrieved, so different candles must be used depending on how old the transaction is from the time you are pulling the pricing data. The following chart provides a rough estimate of what candles are used for which timeframe.
+
+transaction age    | candle used
+-------------------|-------------
+0 - 12 hours old   |          1m
+.5 - 2.5 days old  |          5m
+2.5 - 7.5 days old |         15m
+7.5 - 30 days old  |          1h
+1 - 4 months old   |          4h
+
+Accuracy will improve once new CSV data is released, which is typically 2 weeks after the end of a quarter. Also, the Kraken REST API is very slow. It may take 20-30 seconds per transaction to retrieve prices for the latest quarter.
 
 
 ### Binance Locked CCXT

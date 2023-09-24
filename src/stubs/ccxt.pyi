@@ -44,7 +44,22 @@ class binance(Exchange):
     def sapiGetMiningPubAlgoList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
     def sapi_get_staking_stakingrecord(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
 
+class binanceus(Exchange):
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
+    options: Dict[str, str]
+    def sapiGetAssetAssetDividend(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapiGetFiatOrders(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapiGetFiatPayments(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapi_get_lending_union_interesthistory(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapiGetMiningPaymentList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapiGetMiningPubAlgoList(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+    def sapi_get_staking_stakingrecord(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
+
 class bitbank(Exchange):
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
+    options: Dict[str, str]
+
+class bitfinex(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
@@ -53,10 +68,6 @@ class coinbase(Exchange):
     options: Dict[str, str]
 
 class coinbasepro(Exchange):
-    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
-    options: Dict[str, str]
-
-class ftx(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
@@ -78,6 +89,10 @@ class kraken(Exchange):
     def getMarkets(self, params: Dict[str, Union[int, str, None]] = ...) -> Any: ...  # type: ignore
 
 class liquid(Exchange):
+    def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
+    options: Dict[str, str]
+
+class okex(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 

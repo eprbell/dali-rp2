@@ -142,10 +142,15 @@ _LOCKED_SAVINGS = "Locked Savings"
 _LOCKED_STAKING = "Locked Staking"
 _SOLO_AIRDROP = "SOLO airdrop"
 _GENERAL_STAKING = "STAKING"
+# More types added
+_CASH_VOUCHER = "Cash Voucher"
+_LAUNCHPAD = "launchpad"
+_SAVINGS_TRAIL_FUND = "Savings Trail Fund"
 
 _AIRDROP_LIST = [_SOLO_AIRDROP]
-_INTEREST_LIST = [_FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS]
-_STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING]
+_INTEREST_LIST = [_FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS, _SAVINGS_TRAIL_FUND]
+_STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING, _LAUNCHPAD]
+_INCOME_LIST = [_CASH_VOUCHER]
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
@@ -636,7 +641,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
         # Crypto Bought with fiat. Technically this is a deposit of fiat that is used for a market order that fills immediately.
         # No limit on the date range
-        # fiat payments takes the 'beginTime' param in contrast to other functions that take 'startTime'
+        # fiat (payments and deposits) takes the 'beginTime' param in contrast to other functions that take 'startTime'
         fiat_payments = self._client.sapiGetFiatPayments(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))
         # {
         #   "code": "000000",
@@ -674,7 +679,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_deposits by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as withdrawls, but with _TRANSACTION_TYPE set to 0 (for deposits)
-        fiat_deposits = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _START_TIME: self._start_time_ms, _END_TIME: now_time}))
+        fiat_deposits = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 0, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -685,8 +690,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #          "indicatedAmount": "15.00",
         #          "amount": "15.00",
         #          "totalFee": "0.00",
-        #          "method": "card",
-        #          "status": "Failed",
+        #          "method": "Card",
+        #          "status": "Failed",  // Processing, Failed, Successful, Finished, Refunding, Refunded, Refund Failed, Order Partial credit Stopped
         #          "createTime": 1627501026000,
         #          "updateTime": 1627501027000
         #        }
@@ -708,7 +713,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Fiat deposits can also be pulled via CCXT fetch_withdrawls by cycling through legal_money
         # Using the underlying api endpoint is faster for Binance.
         # Note that this is the same endpoint as deposits, but with _TRANSACTION_TYPE set to 1 (for withdrawls)
-        fiat_withdrawals = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _START_TIME: self._start_time_ms, _END_TIME: now_time}))
+        fiat_withdrawals = self._client.sapiGetFiatOrders(params=({_TRANSACTION_TYPE: 1, _BEGIN_TIME: self._start_time_ms, _END_TIME: now_time}))
         #    {
         #      "code": "000000",
         #      "message": "success",
@@ -719,8 +724,8 @@ class InputPlugin(AbstractCcxtInputPlugin):
         #          "indicatedAmount": "15.00",
         #          "amount": "15.00",
         #          "totalFee": "0.00",
-        #          "method": "card",
-        #          "status": "Failed",
+        #          "method": "Card",
+        #          "status": "Failed",  // Processing, Failed, Successful, Finished, Refunding, Refunded, Refund Failed, Order Partial credit Stopped
         #          "createTime": 1627501026000,
         #          "updateTime": 1627501027000
         #        }
@@ -793,12 +798,14 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def _process_dividend(self, dividend: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         self._logger.debug("Dividend: %s", json.dumps(dividend))
-        if dividend[_EN_INFO] in _STAKING_LIST or re.search("[dD]istribution", dividend[_EN_INFO]) or re.search("staking", dividend[_EN_INFO]):
+        if dividend[_EN_INFO] in _STAKING_LIST or re.search("[dD]istribution", dividend[_EN_INFO]) or re.search("[sS]taking", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.STAKING, notes)
         if dividend[_EN_INFO] in _INTEREST_LIST:
             return self._process_gain(dividend, Keyword.INTEREST, notes)
-        if dividend[_EN_INFO] in _AIRDROP_LIST or re.search("[aA]irdrop", dividend[_EN_INFO]):
+        if dividend[_EN_INFO] in _AIRDROP_LIST or re.search("[aA]ir[df]rop", dividend[_EN_INFO]):
             return self._process_gain(dividend, Keyword.AIRDROP, notes)
+        if dividend[_EN_INFO] in _INCOME_LIST:
+            return self._process_gain(dividend, Keyword.INCOME, notes)
         self._logger.error("WARNING: Unrecognized Dividend: %s. Please open an issue at %s", dividend[_EN_INFO], self.ISSUES_URL)
         return ProcessOperationResult(in_transactions=[], out_transactions=[], intra_transactions=[])
 
@@ -875,7 +882,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self._logger.debug("Fiat Order (%s): %s", transaction_type.value, json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
         out_transaction_list: List[OutTransaction] = []
-        if transaction[_STATUS] == "Completed":
+        if transaction[_STATUS] == "Successful":
             amount: RP2Decimal = RP2Decimal(transaction[_INDICATED_AMOUNT])
             fee: RP2Decimal = RP2Decimal(transaction[_TOTAL_FEE])
             notes = f"{notes + '; ' if notes else ''}Fiat {transaction_type.value} of {transaction[_FIAT_CURRENCY]}"

@@ -17,9 +17,6 @@ from json import JSONDecodeError
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
-from prezzemolo.graph import Graph
-from prezzemolo.utility import ValueType
-from prezzemolo.vertex import Vertex
 from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
@@ -30,6 +27,8 @@ from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
+from dali.mapped_graph import MappedGraph
+from dali.transaction_manifest import TransactionManifest
 
 # exchangerates.host keywords
 _SUCCESS: str = "success"
@@ -67,34 +66,6 @@ class AssetPairAndTimestamp(NamedTuple):
     exchange: str
 
 
-class MappedGraph(Graph[ValueType]):
-    def __init__(self, vertexes: Optional[List["Vertex[ValueType]"]] = None) -> None:
-        super().__init__(vertexes)
-        self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
-
-    def add_vertex(self, vertex: Vertex[ValueType]) -> None:
-        super().add_vertex(vertex)
-        self.__name_to_vertex[vertex.name] = vertex
-
-    def get_vertex(self, name: str) -> Optional[Vertex[ValueType]]:
-        return self.__name_to_vertex.get(name)
-
-    def get_or_set_vertex(self, name: str) -> Vertex[ValueType]:
-        existing_vertex: Optional[Vertex[ValueType]] = self.get_vertex(name)
-        if existing_vertex:
-            return existing_vertex
-
-        new_vertex: Vertex[ValueType] = Vertex[ValueType](name=name)
-        self.add_vertex(new_vertex)
-        return new_vertex
-
-    def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0) -> None:
-        vertex: Vertex[ValueType] = self.get_or_set_vertex(vertex_name)
-        neighbor: Vertex[ValueType] = self.get_or_set_vertex(neighbor_name)
-        if not vertex.has_neighbor(neighbor):
-            vertex.add_neighbor(neighbor, weight)
-
-
 class AbstractPairConverterPlugin:
     __ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __TIMEOUT: int = 30
@@ -111,7 +82,7 @@ class AbstractPairConverterPlugin:
         except EOFError:
             LOGGER.error("EOFError: Cached file corrupted, no cache found.")
             result = None
-        self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
+        self.__cache: Dict[AssetPairAndTimestamp, Any] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
         self.__session: Session = requests.Session()
         self.__fiat_list: List[str] = []
@@ -130,11 +101,21 @@ class AbstractPairConverterPlugin:
     def cache_key(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
+    def optimize(self, transaction_manifest: TransactionManifest) -> None:
+        raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
+
     def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
         self.__cache[self._floor_key(key)] = historical_bar
 
     def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
         return self.__cache.get(self._floor_key(key))
+
+    # All bundle timestamps have 1 millisecond added to them, so will not conflict with the floored timestamps of single bars
+    def _add_bundle_to_cache(self, key: AssetPairAndTimestamp, historical_bars: List[HistoricalBar]) -> None:
+        self.__cache[key] = historical_bars
+
+    def _get_bundle_from_cache(self, key: AssetPairAndTimestamp) -> Optional[List[HistoricalBar]]:
+        return cast(List[HistoricalBar], self.__cache.get(key))
 
     # The most granular pricing available is 1 minute, to reduce the size of cache and increase the reuse of pricing data
     def _floor_key(self, key: AssetPairAndTimestamp) -> AssetPairAndTimestamp:
@@ -245,6 +226,7 @@ class AbstractPairConverterPlugin:
                         fiat,
                         to_be_added_fiat,
                         self.__fiat_priority.get(fiat, _STANDARD_WEIGHT),
+                        True,  # use set optimization
                     )
 
                 LOGGER.debug("Added to assets for %s: %s", fiat, to_fiat_list)

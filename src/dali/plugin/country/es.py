@@ -1,4 +1,4 @@
-# Copyright 2022 eprbell
+# Copyright 2023 Larision
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,11 @@
 # limitations under the License.
 
 
-import logging
+from rp2.plugin.country.es import ES
 
-from progressbar import streams
-from rp2.logger import create_logger
+from dali.dali_main import dali_main
 
-# Must be called before any logging setup
-streams.wrap_stderr()
 
-LOGGER: logging.Logger = create_logger("dali")
+# ES-specific entry point
+def dali_entry() -> None:
+    dali_main(ES())

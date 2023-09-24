@@ -122,10 +122,32 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def _initialize_markets(self) -> None:
         self._client.load_markets()
-        self._client.markets_by_id.update({"BSVUSD": {_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}})
+        markets_by_ids: Dict[str, List[Dict[str, str]]] = self._client.markets_by_id  # type: ignore
 
-        for market in self._client.markets_by_id.values():
-            self.base_id_to_base.update({market[_BASE_ID]: market[_BASE]})
+        markets_by_ids.update({"BSVUSD": [{_ID: "BSVUSD", _BASE_ID: "BSV", _BASE: "BSV", _QUOTE: "USD"}]})
+
+        for markets in self._client.markets_by_id.values():
+            if not isinstance(markets, list):  # type: ignore
+                exc_str = f"Expected List from Kraken CCXT Exchange, got {type(markets)} instead. " \
+                          f"Incompatible CCXT library - make sure to follow Dali setup instructions " \
+                          f"to install appropriate versions of dependencies."
+                raise RP2RuntimeError(exc_str)
+
+            for market in markets:  # type: ignore
+                base_id: str = market[_BASE_ID]
+
+                # The following is a defensive check against changes to the underlying exchange. CCXT can return
+                # multiple markets for a market ID. This plugin is designed for one BASE symbol to a BASE_ID.
+                # If this condition occurs, it indicates the Exchange has changed its response to the
+                # API call. Please report the issue to the DALI-RP2 developers.
+                if base_id in self.base_id_to_base and \
+                    market[_BASE] != self.base_id_to_base[base_id]:
+                    exc_str = f"Unsupported BASE for BASE_ID. Please open an issue at {self.ISSUES_URL}. " \
+                              f"A Kraken market's BASE differs with another BASE for the same BASE_ID. " \
+                              f"BASE_ID={base_id}, discovered BASE={market[_BASE]}, " \
+                              f"previous cached base={self.base_id_to_base[base_id]}"
+                    raise RP2RuntimeError(exc_str)
+                self.base_id_to_base.update({market[_BASE_ID]: market[_BASE]})
 
     @property
     def _client(self) -> kraken:
@@ -230,8 +252,19 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             if record[_TYPE] == _TRADE and not is_fiat_asset:
                 self.__logger.debug("Trade history record: %s", trade_history[record[_REFID]])
-                market: Dict[str, str] = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]]
-                asset_quote: str = market[_QUOTE]
+                markets: List[Dict[str, str]] = self._client.markets_by_id[trade_history[record[_REFID]][_PAIR]]  # type: ignore
+
+                # The following is a defensive check against changes to the underlying exchange. CCXT can return
+                # multiple markets for a market ID. This plugin is designed for one QUOTE symbol to a BASE symbol
+                # in a market ID. If this condition occurs, it indicates the Exchange has changed its response to
+                # the API call. Please report the issue to the DALI-RP2 developers.
+                if len(markets) > 1:
+                    possible_quotes = [market[_QUOTE] for market in markets]
+                    exc_str = f"Multiple quotes for pair. Please open an issue at {self.ISSUES_URL}. " \
+                              f"Which quote to use for {trade_history[record[_REFID]][_PAIR]} market? " \
+                              f"Possible quotes={possible_quotes}"
+                    raise RP2RuntimeError(exc_str)
+                asset_quote: str = markets[0][_QUOTE]
                 is_quote_asset_fiat: bool = asset_quote in _KRAKEN_FIAT_LIST
 
                 spot_price = trade_history[record[_REFID]][_PRICE] if is_quote_asset_fiat else Keyword.UNKNOWN.value
