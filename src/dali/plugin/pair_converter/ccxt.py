@@ -203,6 +203,11 @@ class AssetPairAndHistoricalPrice(NamedTuple):
     historical_data: Optional[HistoricalBar] = None
 
 
+class ExchangeNameAndClass(NamedTuple):
+    name: str
+    klass: Any
+
+
 class PairConverterPlugin(AbstractPairConverterPlugin):
     def __init__(
         self,
@@ -226,7 +231,12 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__google_api_key: Optional[str] = google_api_key
         self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
         self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
+
+        # CSV Reader variables
+        self.__csv_pricing_dict: Dict[str, Any] = _CSV_PRICING_DICT
+        self.__default_csv_reader: ExchangeNameAndClass = ExchangeNameAndClass(_KRAKEN, _CSV_PRICING_DICT[_KRAKEN])
         self.__exchange_csv_reader: Dict[str, Any] = {}
+
         # key: name of exchange, value: AVLTree of all snapshots of the graph
         # TO BE IMPLEMENTED - Combine all graphs into one graph where assets can 'teleport' between exchanges
         #   This will eliminate the need for markets and this dict, replacing it with just one AVLTree
@@ -411,7 +421,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             raise RP2ValueError("Internal error: Invalid timespan passed to find_historical_bars.")
         current_exchange: Any = self.__exchanges[exchange]
         ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
-        csv_pricing: Any = _CSV_PRICING_DICT.get(exchange)
+        csv_pricing: Any = self.__csv_pricing_dict.get(exchange)
         csv_reader: Any = None
 
         if self.__exchange_csv_reader.get(exchange):
@@ -682,6 +692,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 self.__logger.debug("Price routing locked to %s type for %s.", self.__default_exchange, exchange)
             else:
                 self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
+
+            csv_pricing_class: Any = self.__csv_pricing_dict.get(self.__default_exchange)
+            if csv_pricing_class:
+                self.__default_csv_reader = ExchangeNameAndClass(self.__default_exchange, csv_pricing_class)
+                self.__csv_pricing_dict[exchange] = self.__default_csv_reader.klass
             exchange = self.__default_exchange
 
         # The exchange could have been added as an alt; if so markets wouldn't have been built
