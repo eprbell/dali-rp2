@@ -426,6 +426,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         if self.__exchange_csv_reader.get(exchange):
             csv_reader = self.__exchange_csv_reader[exchange]
+        elif csv_pricing == self.__default_csv_reader.klass and self.__exchange_csv_reader.get(self.__default_csv_reader.name) is not None:
+            csv_reader = self.__exchange_csv_reader.get(self.__default_csv_reader.name)
         elif csv_pricing is not None:
             csv_signature: Signature = signature(csv_pricing)
 
@@ -439,6 +441,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     )
             else:
                 csv_reader = csv_pricing()
+
+            if csv_pricing == self.__default_csv_reader.klass:
+                self.__exchange_csv_reader[self.__default_csv_reader.name] = csv_reader
 
         if csv_reader:
             csv_bar: Optional[List[HistoricalBar]]
