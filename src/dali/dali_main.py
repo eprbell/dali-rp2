@@ -19,8 +19,9 @@ from argparse import ArgumentParser, Namespace, RawTextHelpFormatter
 from configparser import ConfigParser
 from importlib import import_module
 from inspect import Signature, signature
+from multiprocessing.pool import ThreadPool
 from pathlib import Path
-from typing import Any, Dict, List, Set, Type, Union
+from typing import Any, Dict, List, NamedTuple, Set, Type, Union
 
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import LOG_FILE
@@ -28,7 +29,6 @@ from rp2.logger import LOG_FILE
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_pair_converter_plugin import AbstractPairConverterPlugin
 from dali.abstract_transaction import AbstractTransaction, DirectionTypeAndNotes
-from dali.config_generator import generate_config_file
 from dali.configuration import (
     DEFAULT_CONFIGURATION,
     DIRECTION_2_TRANSACTION_TYPE_SET,
@@ -39,17 +39,29 @@ from dali.configuration import (
     is_transaction_type_valid,
     is_unknown,
 )
+from dali.configuration_generator import generate_configuration_file
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.logger import LOGGER
 from dali.ods_generator import generate_input_file
 from dali.out_transaction import OutTransaction
+from dali.plugin.pair_converter.ccxt import (
+    PairConverterPlugin as CcxtPairConverterPlugin,
+)
 from dali.plugin.pair_converter.historic_crypto import (
     PairConverterPlugin as HistoricCryptoPairConverterPlugin,
 )
+from dali.transaction_manifest import TransactionManifest
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.4.12"
+_VERSION: str = "0.6.9"
+
+
+class _InputPluginHelperArgs(NamedTuple):
+    input_plugin: AbstractInputPlugin
+    package_name: str
+    country: AbstractCountry
+    use_cache: bool
 
 
 def dali_main(country: AbstractCountry) -> None:
@@ -60,7 +72,6 @@ def dali_main(country: AbstractCountry) -> None:
 
 
 def _dali_main_internal(country: AbstractCountry) -> None:
-
     args: Namespace
     parser: ArgumentParser
 
@@ -76,8 +87,6 @@ def _dali_main_internal(country: AbstractCountry) -> None:
         parser.print_help()
         sys.exit(1)
 
-    transactions: List[AbstractTransaction] = []
-
     try:
         LOGGER.info("Country: %s", country.country_iso_code)
 
@@ -85,8 +94,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
         ini_config.read(args.ini_file)
 
         pair_converter_list: List[AbstractPairConverterPlugin] = []
-
-        input_plugin_found: bool = False
+        input_plugin_args_list: List[_InputPluginHelperArgs] = []
         section_name: str
         for section_name in ini_config.sections():
             # Plugin sections can have extra trailing words to make them unique: this way there can be multiple sections
@@ -129,43 +137,55 @@ def _dali_main_internal(country: AbstractCountry) -> None:
 
             elif hasattr(plugin_module, "InputPlugin"):
                 plugin_configuration = _validate_plugin_configuration(ini_config, section_name, signature(plugin_module.InputPlugin))
-                if Keyword.NATIVE_FIAT.value not in plugin_configuration:
-                    LOGGER.error("No '%s' parameter in plugin '%s' constructor", Keyword.NATIVE_FIAT.value, normalized_section_name)
-                    sys.exit(1)
                 plugin_configuration[Keyword.NATIVE_FIAT.value] = dali_configuration[Keyword.NATIVE_FIAT.value]
                 input_plugin: AbstractInputPlugin = plugin_module.InputPlugin(**plugin_configuration)
-                LOGGER.info("Reading crypto data using plugin '%s'", section_name)
                 LOGGER.debug("InputPlugin object: '%s'", input_plugin)
+                if (
+                    normalized_section_name == "dali.plugin.input.ods.rp2_input"
+                    and plugin_configuration["force_repricing"] is True
+                    and not args.read_spot_price_from_web
+                ):
+                    LOGGER.info(
+                        "RP2 Input Plugin (ODS) was configured to force_repricing, but the -s flag was not used when running dali-rp2. "
+                        "No repricing will occur."
+                    )
                 if not hasattr(input_plugin, "load"):
                     LOGGER.error("Plugin '%s' has no 'load' method. Exiting...", normalized_section_name)
                     sys.exit(1)
+                LOGGER.info("Initialized input plugin '%s'", section_name)
+                input_plugin_args_list.append(_InputPluginHelperArgs(input_plugin, section_name, country, args.use_cache))
 
-                plugin_transactions: List[AbstractTransaction]
-                if args.use_cache and input_plugin.cache_key() is not None:
-                    cache = input_plugin.load_from_cache()
-                    if cache:
-                        LOGGER.info("Reading plugin load result from cache")
-                        plugin_transactions = cache
-                    else:
-                        plugin_transactions = input_plugin.load()
-                        input_plugin.save_to_cache(plugin_transactions)
-                else:
-                    plugin_transactions = input_plugin.load()
-
-                for transaction in plugin_transactions:
-                    if not isinstance(transaction, AbstractTransaction):
-                        LOGGER.error("Plugin '%s' returned a non-transaction object: %s. Exiting...", normalized_section_name, str(transaction))  # type: ignore
-                        sys.exit(1)
-                transactions.extend(plugin_transactions)
-                input_plugin_found = True
-
-        if not input_plugin_found:
+        if not input_plugin_args_list:
             LOGGER.error("No input plugin configuration found in config file. Exiting...")
             sys.exit(1)
 
         if not pair_converter_list:
             pair_converter_list.append(HistoricCryptoPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
-            LOGGER.info("No pair converter plugins found in configuration file: using Historic_Crypto/high as default")
+            pair_converter_list.append(CcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
+            LOGGER.info("No pair converter plugins found in configuration file: using default pair converters.")
+
+        with ThreadPool(args.thread_count) as pool:
+            result_list = pool.map(_input_plugin_helper, input_plugin_args_list)
+
+        transactions: List[AbstractTransaction] = [transaction for result in result_list for transaction in result]
+
+        LOGGER.info("Building manifest to optimize price calculation with the pair converters.")
+        manifest = TransactionManifest(transactions, args.thread_count, country.currency_iso_code.upper())
+
+        # Check if pair converter has unique cache key and optimize plugin
+        pair_converters_by_cache_key: Dict[str, AbstractPairConverterPlugin] = {}
+        for pair_converter in pair_converter_list:
+            pair_converter.optimize(manifest)
+            cache_key = pair_converter.cache_key()
+            if cache_key in pair_converters_by_cache_key:
+                LOGGER.error(
+                    "Internal error: the following pair converter plugins both attempt to store at %s: %s, %s",
+                    cache_key,
+                    pair_converter.name(),
+                    pair_converters_by_cache_key[cache_key].name(),
+                )
+                sys.exit(1)
+            pair_converters_by_cache_key[cache_key] = pair_converter
 
         dali_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value] = pair_converter_list
 
@@ -173,7 +193,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
         resolved_transactions: List[AbstractTransaction] = resolve_transactions(transactions, dali_configuration, args.read_spot_price_from_web)
 
         LOGGER.info("Generating config file in %s", args.output_dir)
-        generate_config_file(args.output_dir, args.prefix, "crypto_data.config", resolved_transactions, dali_configuration)
+        generate_configuration_file(args.output_dir, args.prefix, "crypto_data.ini", resolved_transactions, dali_configuration)
 
         LOGGER.info("Generating input file in %s", args.output_dir)
         generate_input_file(args.output_dir, args.prefix, "crypto_data.ods", resolved_transactions, dali_configuration)
@@ -186,13 +206,39 @@ def _dali_main_internal(country: AbstractCountry) -> None:
     LOGGER.info("Done")
 
 
+def _input_plugin_helper(args: _InputPluginHelperArgs) -> List[AbstractTransaction]:
+    input_plugin: AbstractInputPlugin = args.input_plugin
+    package_name: str = args.package_name
+    country: AbstractCountry = args.country
+    use_cache: bool = args.use_cache
+    plugin_transactions: List[AbstractTransaction]
+    if use_cache and input_plugin.cache_key() is not None:
+        cache = input_plugin.load_from_cache()
+        if cache:
+            LOGGER.info("Reading crypto data for plugin '%s' from cache", package_name)
+            plugin_transactions = cache
+        else:
+            LOGGER.info("Reading crypto data using plugin '%s'", package_name)
+            plugin_transactions = input_plugin.load(country)
+            input_plugin.save_to_cache(plugin_transactions)
+    else:
+        LOGGER.info("Reading crypto data using plugin '%s'", package_name)
+        plugin_transactions = input_plugin.load(country)
+
+    for transaction in plugin_transactions:
+        if not isinstance(transaction, AbstractTransaction):
+            LOGGER.error("Plugin '%s' returned a non-transaction object: %s. Exiting...", package_name, str(transaction))  # type: ignore
+            sys.exit(1)
+    return plugin_transactions
+
+
 def _setup_argument_parser() -> ArgumentParser:
     parser: ArgumentParser = ArgumentParser(
         description=(
             "Generate RP2 input and configuration files. Links:\n"
             "- documentation: https://github.com/eprbell/dali-rp2/blob/main/README.md\n"
             "- FAQ: https://github.com/eprbell/dali-rp2/blob/main/docs/user_faq.md\n"
-            "- leave a star on Github: https://github.com/eprbell/dali-rp2"
+            "- support DaLI by leaving a star on Github: https://github.com/eprbell/dali-rp2"
         ),
         formatter_class=RawTextHelpFormatter,
     )
@@ -226,6 +272,15 @@ def _setup_argument_parser() -> ArgumentParser:
         "--read-spot-price-from-web",
         action="store_true",
         help="Read spot price from the Internet, for transactions where it's missing",
+    )
+    parser.add_argument(
+        "-t",
+        "--thread-count",
+        action="store",
+        default=1,
+        help="Number of concurrent threads for data loaders",
+        metavar="THREAD_COUNT",
+        type=int,
     )
     parser.add_argument(
         "-v",

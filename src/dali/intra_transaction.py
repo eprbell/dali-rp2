@@ -14,6 +14,8 @@
 
 from typing import Callable, Dict, List, Optional, Union
 
+from rp2.rp2_error import RP2RuntimeError
+
 from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import Keyword, is_transaction_type_valid
 
@@ -24,8 +26,8 @@ class IntraTransaction(AbstractTransaction):
         value = cls._validate_string_field(name, value, raw_data, disallow_empty=True, disallow_unknown=True)
         Keyword.type_check_from_string(value)
         if not is_transaction_type_valid(Keyword.INTRA.value, value):
-            raise Exception(f"Invalid transaction type {value} for {cls.__name__}")
-        return value
+            raise RP2RuntimeError(f"Invalid transaction type {value} for {cls.__name__}")
+        return value.capitalize()
 
     def __init__(
         self,
@@ -73,7 +75,6 @@ class IntraTransaction(AbstractTransaction):
         self.__is_unresolved: bool = self._setup_constructor_parameter_dictionary(self.__constructor_parameter_dictionary)
 
     def to_string(self, indent: int = 0, repr_format: bool = True, extra_data: Optional[List[str]] = None) -> str:
-
         class_specific_data: List[str] = []
         stringify: Callable[[object], str] = repr
         if not repr_format:

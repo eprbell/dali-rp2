@@ -56,8 +56,10 @@ Some examples of this:
 * BlockFI CSVs don't contain the hash or any other transaction id;
 * Coinbase CSVs contain an internal transaction id, but it's not the hash.
 
+There is one more nuanced detail to this topic. If the transaction is complete and DOESN'T need resolution (e.g. a BUY or a SELL transaction), then it's ok to use an internal exchange id as the `unique_id`: it will help document the transaction and can be helpful when looking it up in the logs.
+
 Check the following for more details:
-*  [transaction resolver dev docs](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#the-transaction-resolver)
+* [transaction resolver dev docs](https://github.com/eprbell/dali-rp2/blob/main/README.dev.md#the-transaction-resolver)
 * [manual plugin docs](https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md#partial-transactions-and-transaction-resolution), which contain an example of how users would use the `unique_id` field in manual plugin CSV files to finish incomplete transactions for unsupported exchanges.
 
 ## Should I Implement a CSV or a REST Data Loader Plugin?
@@ -77,7 +79,10 @@ Read the [Internal Design](../README.dev.md#internal-design) section of the Deve
 Read about the [transaction_resolver](../src/dali/transaction_resolver.py) in the [Internal Design](../README.dev.md#the-transaction-resolver) section of the Developer Documentation.
 
 ## Why the Strange Directory Structure with Src?
-Because DaLI is a [src](https://bskinn.github.io/My-How-Why-Pyproject-Src/)-[based](https://hynek.me/articles/testing-packaging/) [project](https://blog.ionelmc.ro/2014/05/25/python-packaging/).
+Because DaLI is a [src](https://bskinn.github.io/My-How-Why-Pyproject-Src/)-[based](https://hynek.me/articles/testing-packaging/) 
+<!-- markdown-link-check-disable -->
+[project](https://blog.ionelmc.ro/2014/05/25/python-packaging/).
+<!-- markdown-link-check-enable -->
 
 ## How to Use the Cache to Speed Up Development?
 Use the `-c` command line option to enable the cache. This instructs DaLI to store transactions coming from cache-enabled plugins in the cache. The next time DaLI is run, transaction data is read directly from the cache instead of from the plugin native source. To make a plugin cache-enabled, just define its `cache_key()` method (for an example, look at the [Coinbase plugin](../src/dali/plugin/input/rest/coinbase.py)). Note that the code doesn't yet check for newer data: if it finds cached data, it reads it but doesn't check the native source for more recent entries, so currently the cache is only useful to speed up development, not for regular use. The cache is stored in the `.dali_cache/` directory: to reset the cache delete this directory.

@@ -30,8 +30,10 @@ from requests import PreparedRequest
 from requests.auth import AuthBase
 from requests.models import Response
 from requests.sessions import Session
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -41,12 +43,17 @@ from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
 
 # Native format keywords
+_ADVANCED_TRADE_FILL: str = "advanced_trade_fill"
 _AMOUNT: str = "amount"
 _BALANCE: str = "balance"
 _BUY: str = "buy"
+_CARDBUYBACK: str = "cardbuyback"
+_CARDSPEND: str = "cardspend"
 _CODE: str = "code"
+_COMMISSION: str = "commission"
 _CREATED_AT: str = "created_at"
 _CURRENCY: str = "currency"
+_DESCRIPTION: str = "description"
 _DETAILS: str = "details"
 _EMAIL: str = "email"
 _EXCHANGE_DEPOSIT: str = "exchange_deposit"
@@ -54,6 +61,7 @@ _EXCHANGE_WITHDRAWAL: str = "exchange_withdrawal"
 _FEE: str = "fee"
 _FIAT_DEPOSIT: str = "fiat_deposit"
 _FIAT_WITHDRAWAL: str = "fiat_withdrawal"
+_FILL_PRICE: str = "fill_price"
 _FROM: str = "from"
 _HASH: str = "hash"
 _ID: str = "id"
@@ -106,7 +114,6 @@ class _SwapPair(NamedTuple):
 
 
 class _CoinbaseAuth(AuthBase):
-
     __API_VERSION: str = "2017-11-27"
 
     def __init__(self, api_key: str, api_secret: str) -> None:
@@ -130,7 +137,6 @@ class _CoinbaseAuth(AuthBase):
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __API_URL: str = "https://api.coinbase.com"
     __DEFAULT_THREAD_COUNT: int = 3
     __MAX_THREAD_COUNT: int = 4
@@ -152,7 +158,6 @@ class InputPlugin(AbstractInputPlugin):
         native_fiat: Optional[str] = None,
         thread_count: Optional[int] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__api_url: str = InputPlugin.__API_URL
         self.__auth: _CoinbaseAuth = _CoinbaseAuth(api_key, api_secret)
@@ -161,12 +166,12 @@ class InputPlugin(AbstractInputPlugin):
         self.__cache_key: str = f"{self.__COINBASE.lower()}-{account_holder}"
         self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         if self.__thread_count > self.__MAX_THREAD_COUNT:
-            raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
+            raise RP2RuntimeError(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
         in_transaction_2_trade_id: Dict[InTransaction, str] = {}
         trade_id_2_out_transaction: Dict[str, OutTransaction] = {}
@@ -251,7 +256,9 @@ class InputPlugin(AbstractInputPlugin):
                 trade_id = in_transaction_2_trade_id[in_transaction]
                 out_transaction = trade_id_2_out_transaction[trade_id]
                 if in_transaction.asset == out_transaction.asset:
-                    raise Exception(f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}")
+                    raise RP2RuntimeError(
+                        f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}"
+                    )
                 in_transaction_and_index: _InTransactionAndIndex = _InTransactionAndIndex(
                     in_transaction=in_transaction,
                     in_transaction_index=index,
@@ -272,7 +279,9 @@ class InputPlugin(AbstractInputPlugin):
                 trade_id = out_transaction_2_trade_id[out_transaction]
                 in_transaction = trade_id_2_in_transaction[trade_id]
                 if in_transaction.asset == out_transaction.asset:
-                    raise Exception(f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}")
+                    raise RP2RuntimeError(
+                        f"Internal error: detected a crypto swap with same asset ({in_transaction.asset}): {in_transaction} // {out_transaction}"
+                    )
                 out_transaction_and_index: _OutTransactionAndIndex = _OutTransactionAndIndex(
                     out_transaction=out_transaction,
                     out_transaction_index=index,
@@ -297,27 +306,27 @@ class InputPlugin(AbstractInputPlugin):
         # Process swaps
         for trade_id, swap_pair in trade_id_2_swap_pair.items():
             if swap_pair.in_transaction is None or swap_pair.out_transaction is None:
-                raise Exception(f"Internal error: unmatched swap pair: {swap_pair}")
+                raise RP2RuntimeError(f"Internal error: unmatched swap pair: {swap_pair}")
             in_transaction = swap_pair.in_transaction.in_transaction
             out_transaction = swap_pair.out_transaction.out_transaction
 
             # Ensure fees are not yet computed
             if in_transaction.crypto_fee is not None or in_transaction.fiat_fee is None or RP2Decimal(in_transaction.fiat_fee) != ZERO:
-                raise Exception(f"Internal error: in-transaction crypto_fee is not None or fiat_fee != 0: {in_transaction}")
+                raise RP2RuntimeError(f"Internal error: in-transaction crypto_fee is not None or fiat_fee != 0: {in_transaction}")
             if (
                 out_transaction.crypto_fee is None
                 or RP2Decimal(out_transaction.crypto_fee) != ZERO
                 or out_transaction.fiat_fee is None
                 or RP2Decimal(out_transaction.fiat_fee) != ZERO
             ):
-                raise Exception(f"Internal error: out-transaction crypto_fee != 0 or fiat_fee != 0: {out_transaction}")
+                raise RP2RuntimeError(f"Internal error: out-transaction crypto_fee != 0 or fiat_fee != 0: {out_transaction}")
 
             fiat_out_no_fee: RP2Decimal
             # The fiat_fee is paid in the InTransaction, unless the InTransaction is fiat (which is ignored in RP2):
             # in this case the fiat_fee is paid in the OutTransaction
             if not self.is_native_fiat(in_transaction.asset):
                 if not in_transaction.fiat_in_no_fee or not in_transaction.fiat_in_with_fee or not out_transaction.fiat_out_no_fee:
-                    raise Exception(f"Internal error: swap transactions have incomplete fiat data: {in_transaction}//{out_transaction}")
+                    raise RP2RuntimeError(f"Internal error: swap transactions have incomplete fiat data: {in_transaction}//{out_transaction}")
                 fiat_in_no_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_in_no_fee)
                 fiat_in_with_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_in_with_fee)
                 fiat_out_no_fee = RP2Decimal(out_transaction.fiat_out_no_fee)
@@ -383,7 +392,7 @@ class InputPlugin(AbstractInputPlugin):
             else:
                 # InTransaction is fiat, so it is ignored in RP2: however any fiat_fee must be applied to the OutTransaction to avoid losing it
                 if not in_transaction.fiat_fee or not out_transaction.fiat_out_no_fee:
-                    raise Exception(f"Internal error: swap transactions have incomplete fiat data: {in_transaction} // {out_transaction}")
+                    raise RP2RuntimeError(f"Internal error: swap transactions have incomplete fiat data: {in_transaction} // {out_transaction}")
                 fiat_out_no_fee = RP2Decimal(out_transaction.fiat_out_no_fee)
                 fiat_fee: RP2Decimal = RP2Decimal(in_transaction.fiat_fee) if in_transaction.fiat_fee else ZERO
                 transaction_list[swap_pair.out_transaction.out_transaction_index] = OutTransaction(
@@ -410,12 +419,12 @@ class InputPlugin(AbstractInputPlugin):
                 )
 
     def _is_credit_card_spend(self, transaction: Any) -> bool:
-        return (
+        return (  # type: ignore
             transaction[_TYPE] is None
             and _TO in transaction
             and _EMAIL in transaction[_TO]
             and transaction[_TO][_EMAIL] == "treasury+coinbase-card@coinbase.com"
-        )
+        ) or (transaction[_TYPE] == _CARDSPEND)
 
     def _process_account(self, account: Dict[str, Any]) -> Optional[_ProcessAccountResult]:
         currency: str = account[_CURRENCY][_CODE]
@@ -461,13 +470,21 @@ class InputPlugin(AbstractInputPlugin):
                     id_2_buy=id_2_buy,
                     id_2_sell=id_2_sell,
                 )
+            elif transaction_type in {_ADVANCED_TRADE_FILL}:
+                self._process_advanced_trade_fill(
+                    transaction=transaction,
+                    currency=currency,
+                    in_transaction_list=in_transaction_list,
+                    out_transaction_list=out_transaction_list,
+                )
             elif transaction_type in {_INTEREST}:
                 self._process_gain(transaction, currency, Keyword.INTEREST, in_transaction_list)
             elif transaction_type in {_STAKING_REWARD}:
                 self._process_gain(transaction, currency, Keyword.STAKING, in_transaction_list)
             elif transaction_type in {_INFLATION_REWARD}:
                 self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list)
-            elif transaction_type in {_FIAT_DEPOSIT}:
+            elif transaction_type in {_FIAT_DEPOSIT, _CARDBUYBACK}:
+                # _CARDBUYBACK is a credit card refund
                 self._process_fiat_deposit(transaction, currency, in_transaction_list)
             elif transaction_type in {_FIAT_WITHDRAWAL}:
                 self._process_fiat_withdrawal(transaction, currency, out_transaction_list)
@@ -538,8 +555,10 @@ class InputPlugin(AbstractInputPlugin):
             transaction_network = transaction[_NETWORK]
             crypto_hash: str = transaction_network[_HASH] if _HASH in transaction_network else Keyword.UNKNOWN.value
             if amount < ZERO:
-                if (
+                if (  # pylint: disable=too-many-boolean-expressions
                     _TO in transaction
+                    and transaction[_TO] is not None
+                    and _RESOURCE in transaction[_TO]
                     and transaction[_TO][_RESOURCE] == _USER
                     and transaction_network[_STATUS] == _OFF_BLOCKCHAIN
                     and _SUBTITLE in transaction[_DETAILS]
@@ -576,7 +595,7 @@ class InputPlugin(AbstractInputPlugin):
                             asset=currency,
                             exchange=self.__COINBASE,
                             holder=self.account_holder,
-                            transaction_type="Sell",
+                            transaction_type=Keyword.SELL.name,
                             spot_price=str(native_amount / amount),
                             crypto_out_no_fee=str(-amount),
                             crypto_fee="0",
@@ -614,8 +633,11 @@ class InputPlugin(AbstractInputPlugin):
                         # Incoming money from another Coinbase user. Marking it as income conservatively, but it could be
                         # a gift or other type: if so the user needs to explicitly recast it with a transaction hint
                         self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, f"From: {transaction[_FROM][_EMAIL]}")
-                    elif transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
-                        # Coinbase Earn transactions
+                    elif (
+                        transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase")
+                        or transaction[_DETAILS][_SUBTITLE].endswith("Coinbase Earn")
+                        or transaction[_DESCRIPTION] == "Earn Task"
+                    ):
                         self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, "Coinbase EARN")
                 else:
                     intra_transaction_list.append(
@@ -656,7 +678,7 @@ class InputPlugin(AbstractInputPlugin):
         spot_price_string: str
 
         if not self.is_native_fiat(transaction[_NATIVE_AMOUNT][_CURRENCY]):
-            raise Exception(f"Internal error: native amount is not denominated in {self.native_fiat} {json.dumps(transaction)}")
+            raise RP2RuntimeError(f"Internal error: native amount is not denominated in {self.native_fiat} {json.dumps(transaction)}")
 
         raw_data: str = json.dumps(transaction)
         if not transaction_type in {_BUY, _SELL, _TRADE}:
@@ -691,7 +713,7 @@ class InputPlugin(AbstractInputPlugin):
                 asset=currency,
                 exchange=self.__COINBASE,
                 holder=self.account_holder,
-                transaction_type="Buy",
+                transaction_type=Keyword.BUY.name,
                 spot_price=spot_price_string,
                 crypto_in=str(crypto_amount),
                 crypto_fee=None,
@@ -724,7 +746,7 @@ class InputPlugin(AbstractInputPlugin):
                 asset=currency,
                 exchange=self.__COINBASE,
                 holder=self.account_holder,
-                transaction_type="Sell",
+                transaction_type=Keyword.SELL.name,
                 spot_price=str(spot_price),
                 crypto_out_no_fee=str(-crypto_amount - fiat_fee / spot_price),
                 crypto_fee=str(fiat_fee / spot_price),
@@ -737,6 +759,81 @@ class InputPlugin(AbstractInputPlugin):
             if transaction_type == _TRADE:
                 out_transaction_2_trade_id[out_transaction] = transaction[_TRADE][_ID]
                 trade_id_2_out_transaction[transaction[_TRADE][_ID]] = out_transaction
+
+    def _process_advanced_trade_fill(
+        self,
+        transaction: Any,
+        currency: str,
+        in_transaction_list: List[InTransaction],
+        out_transaction_list: List[OutTransaction],
+    ) -> None:
+        transaction_type: str = transaction[_TYPE]
+        native_amount: RP2Decimal = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
+        crypto_amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
+        fiat_fee: RP2Decimal = ZERO
+        spot_price: RP2Decimal
+
+        if not self.is_native_fiat(transaction[_NATIVE_AMOUNT][_CURRENCY]):
+            raise RP2RuntimeError(f"Internal error: native amount is not denominated in {self.native_fiat} {json.dumps(transaction)}")
+
+        raw_data: str = json.dumps(transaction)
+        if not transaction_type in {_ADVANCED_TRADE_FILL}:
+            self.__logger.error("Unsupported transaction type for fill (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
+            return
+
+        if native_amount >= ZERO:
+            raw_data = f"{raw_data}"
+            fiat_fee = RP2Decimal(transaction[transaction_type][_COMMISSION])
+            spot_price = RP2Decimal(transaction[transaction_type][_FILL_PRICE])
+
+            fiat_in_no_fee: Optional[str] = None
+            fiat_in_with_fee: Optional[str] = None
+            if native_amount >= self.__MINIMUM_FIAT_PRECISION:
+                fiat_in_no_fee = str(native_amount)
+                fiat_in_with_fee = str(native_amount + fiat_fee)
+
+            in_transaction: InTransaction = InTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=raw_data,
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type=Keyword.BUY.name,
+                spot_price=str(spot_price),
+                crypto_in=str(crypto_amount),
+                crypto_fee=None,
+                fiat_in_no_fee=fiat_in_no_fee,
+                fiat_in_with_fee=fiat_in_with_fee,
+                fiat_fee=str(fiat_fee),
+                notes=None,
+            )
+            in_transaction_list.append(in_transaction)
+
+        elif native_amount < ZERO:
+            raw_data = f"{raw_data}"
+            fiat_fee = RP2Decimal(transaction[transaction_type][_COMMISSION])
+            spot_price = RP2Decimal(transaction[transaction_type][_FILL_PRICE])
+
+            out_transaction: OutTransaction = OutTransaction(
+                plugin=self.__COINBASE,
+                unique_id=transaction[_ID],
+                raw_data=raw_data,
+                timestamp=transaction[_CREATED_AT],
+                asset=currency,
+                exchange=self.__COINBASE,
+                holder=self.account_holder,
+                transaction_type=Keyword.SELL.name,
+                spot_price=str(spot_price),
+                crypto_out_no_fee=str(-crypto_amount - fiat_fee / spot_price),
+                crypto_fee=str(fiat_fee / spot_price),
+                crypto_out_with_fee=str(-crypto_amount),
+                fiat_out_no_fee=str(-native_amount),
+                fiat_fee=str(fiat_fee),
+                notes=None,
+            )
+            out_transaction_list.append(out_transaction)
 
     def _process_gain(
         self, transaction: Any, currency: str, transaction_type: Keyword, in_transaction_list: List[InTransaction], notes: Optional[str] = None
@@ -867,4 +964,4 @@ class InputPlugin(AbstractInputPlugin):
 
         # Defensive programming: we shouldn't reach here.
         self.__logger.debug("Reached past raise_for_status() call: %s", json_response["message"])
-        raise Exception(message)
+        raise RP2RuntimeError(message)

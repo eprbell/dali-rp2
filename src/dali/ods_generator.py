@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import ezodf
-from rp2.rp2_error import RP2TypeError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError
 
 from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import (
@@ -76,7 +76,6 @@ def generate_input_file(
     transactions: List[AbstractTransaction],
     global_configuration: Dict[str, Any],
 ) -> Any:
-
     native_fiat: str = global_configuration[Keyword.NATIVE_FIAT.value]
 
     _table_to_header: Dict[str, Dict[str, str]] = {
@@ -160,9 +159,15 @@ def generate_input_file(
     current_sheet: Optional[Any] = None
     current_table: Optional[str] = None
     row_index: int = 0
+
+    transaction_count_by_asset: Dict[str, int] = {}
+    for transaction in transactions:
+        working_asset = transaction.asset
+        transaction_count_by_asset[working_asset] = transaction_count_by_asset.setdefault(working_asset, 0) + 1
+
     for transaction in transactions:
         if not isinstance(transaction, AbstractTransaction):
-            raise Exception(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
+            raise RP2RuntimeError(f"Internal error: Parameter 'transaction' is not a subclass of AbstractTransaction. {transaction}")
         if transaction.asset == global_configuration[Keyword.NATIVE_FIAT.value]:
             continue
         table_type: str = _TRANSACTION_CLASS_TO_TABLE[transaction.__class__]
@@ -171,7 +176,7 @@ def generate_input_file(
                 _fill_cell(current_sheet, row_index, 0, _TABLE_END, visual_style="bold")
             current_asset = transaction.asset
             current_sheet = ezodf.Table(current_asset)
-            current_sheet.reset(size=(len(transactions) + _MIN_ROWS, _MAX_COLUMNS))
+            current_sheet.reset(size=(transaction_count_by_asset[current_asset] + _MIN_ROWS, _MAX_COLUMNS))
             output_file.sheets += current_sheet
             row_index = 0
             current_table = None
@@ -254,7 +259,6 @@ def _fill_cell(
     visual_style: str = "transparent",
     data_style: str = "default",
 ) -> None:
-
     if value is None:
         return
 

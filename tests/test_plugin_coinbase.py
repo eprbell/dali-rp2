@@ -14,7 +14,9 @@
 
 from typing import Any, Dict, List
 
+from rp2.plugin.country.us import US
 from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.in_transaction import InTransaction
 from dali.out_transaction import OutTransaction
@@ -136,14 +138,14 @@ class TestTrade:
                     },
                 ]
 
-            raise Exception("Invalid account id: " + account_id)
+            raise RP2RuntimeError("Invalid account id: " + account_id)
 
         mocker.patch.object(plugin, "_InputPlugin__get_transactions").side_effect = mock_get_transaction
 
         mocker.patch.object(plugin, "_InputPlugin__get_buys").return_value = []
         mocker.patch.object(plugin, "_InputPlugin__get_sells").return_value = []
 
-        result = plugin.load()
+        result = plugin.load(US())
         assert len(result) == 2
 
         out_transaction: OutTransaction = result[0]  # type: ignore

@@ -31,8 +31,10 @@ from requests import PreparedRequest
 from requests.auth import AuthBase
 from requests.models import Response
 from requests.sessions import Session
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction, AssetAndUniqueId
@@ -67,6 +69,7 @@ _TRADE_ID: str = "trade_id"
 _TRANSFER: str = "transfer"
 _TRANSFER_ID: str = "transfer_id"
 _TRANSFER_TYPE: str = "transfer_type"
+_TX_SERVICE_TRANSACTION_ID: str = "tx_service_transaction_id"
 _TYPE: str = "type"
 _USD_VOLUME: str = "usd_volume"
 _WITHDRAW: str = "withdraw"
@@ -109,7 +112,6 @@ class _CoinbaseProAuth(AuthBase):
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __API_URL: str = "https://api.pro.coinbase.com/"
     __DEFAULT_THREAD_COUNT: int = 2
     __MAX_THREAD_COUNT: int = 4
@@ -130,7 +132,6 @@ class InputPlugin(AbstractInputPlugin):
         native_fiat: Optional[str] = None,
         thread_count: Optional[int] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__api_url: str = InputPlugin.__API_URL
         self.__auth = _CoinbaseProAuth(api_key, api_secret, api_passphrase)
@@ -139,13 +140,13 @@ class InputPlugin(AbstractInputPlugin):
         self.__cache_key: str = f"coinbase_pro-{account_holder}"
         self.__thread_count = thread_count if thread_count else self.__DEFAULT_THREAD_COUNT
         if self.__thread_count > self.__MAX_THREAD_COUNT:
-            raise Exception(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
+            raise RP2RuntimeError(f"Thread count is {self.__thread_count}: it exceeds the maximum value of {self.__MAX_THREAD_COUNT}")
         self.__account_id_2_account: Dict[str, Any] = {}
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
         process_account_result_list: List[Optional[_ProcessAccountResult]]
         accounts = self.__get_accounts()
@@ -228,11 +229,11 @@ class InputPlugin(AbstractInputPlugin):
         raw_data: str = f"{json.dumps(transaction)}//{json.dumps(transfer)}"
 
         self.__logger.debug("Transfer: %s", json.dumps(transfer))
-        if _CRYPTO_TRANSACTION_HASH not in transfer_details:
-            self.__logger.debug("Transfer to/from Coinbase already captured by Coinbase plugin: ignoring.")
-            return
-
-        if _COINBASE_TRANSACTION_ID in transfer_details:
+        if (
+            _CRYPTO_TRANSACTION_HASH not in transfer_details
+            or _TX_SERVICE_TRANSACTION_ID not in transfer_details
+            or _COINBASE_TRANSACTION_ID in transfer_details
+        ):
             self.__logger.debug("Transfer is a Coinbase transaction already captured by Coinbase plugin: ignoring.")
             return
 
@@ -315,7 +316,7 @@ class InputPlugin(AbstractInputPlugin):
                         asset=to_currency if is_from_currency_fiat else from_currency,
                         exchange=self.__COINBASE_PRO,
                         holder=self.account_holder,
-                        transaction_type="Buy",
+                        transaction_type=Keyword.BUY.name,
                         spot_price=str(spot_price),
                         crypto_in=str(crypto_amount),
                         crypto_fee=None,
@@ -341,7 +342,7 @@ class InputPlugin(AbstractInputPlugin):
                         asset=from_currency if is_to_currency_fiat else from_currency,
                         exchange=self.__COINBASE_PRO,
                         holder=self.account_holder,
-                        transaction_type="Sell",
+                        transaction_type=Keyword.SELL.name,
                         spot_price=str(spot_price),
                         crypto_out_no_fee=str(crypto_amount - fiat_fee / spot_price),
                         crypto_fee=str(fiat_fee / spot_price),
@@ -372,7 +373,7 @@ class InputPlugin(AbstractInputPlugin):
                 from_currency_size = to_currency_size * RP2Decimal(fill[_PRICE])
                 from_currency_price = usd_volume / from_currency_size
             else:
-                raise Exception(f"Internal error: unsupported fill side {transaction}\n{fill}")
+                raise RP2RuntimeError(f"Internal error: unsupported fill side {transaction}\n{fill}")
             self.__append_transaction(
                 cast(List[AbstractTransaction], out_transaction_list),
                 OutTransaction(
@@ -383,7 +384,7 @@ class InputPlugin(AbstractInputPlugin):
                     asset=from_currency,
                     exchange=self.__COINBASE_PRO,
                     holder=self.account_holder,
-                    transaction_type="Sell",
+                    transaction_type=Keyword.SELL.name,
                     spot_price=str(from_currency_price),
                     crypto_out_no_fee=str(from_currency_size),
                     crypto_fee=str(from_crypto_fee),
@@ -404,7 +405,7 @@ class InputPlugin(AbstractInputPlugin):
                     asset=to_currency,
                     exchange=self.__COINBASE_PRO,
                     holder=self.account_holder,
-                    transaction_type="Buy",
+                    transaction_type=Keyword.BUY.name,
                     spot_price=str(to_currency_price),
                     crypto_in=str(to_currency_size),
                     crypto_fee=str(to_crypto_fee),
@@ -431,7 +432,7 @@ class InputPlugin(AbstractInputPlugin):
         amount: str = conversion[_AMOUNT]
 
         if not self.is_native_fiat(from_currency) and not self.is_native_fiat(to_currency):
-            raise Exception(f"Internal error: conversion without fiat currency ({from_currency} -> {to_currency}):{transaction}//{conversion}")
+            raise RP2RuntimeError(f"Internal error: conversion without fiat currency ({from_currency} -> {to_currency}):{transaction}//{conversion}")
 
         self.__append_transaction(
             cast(List[AbstractTransaction], out_transaction_list),
@@ -443,7 +444,7 @@ class InputPlugin(AbstractInputPlugin):
                 asset=from_currency,
                 exchange=self.__COINBASE_PRO,
                 holder=self.account_holder,
-                transaction_type="Sell",
+                transaction_type=Keyword.SELL.name,
                 spot_price="1",
                 crypto_out_no_fee=amount,
                 crypto_fee="0",
@@ -464,7 +465,7 @@ class InputPlugin(AbstractInputPlugin):
                 asset=to_currency,
                 exchange=self.__COINBASE_PRO,
                 holder=self.account_holder,
-                transaction_type="Buy",
+                transaction_type=Keyword.BUY.name,
                 spot_price="1",
                 crypto_in=amount,
                 crypto_fee="0",
@@ -529,4 +530,4 @@ class InputPlugin(AbstractInputPlugin):
 
         # Defensive programming: we shouldn't reach here.
         self.__logger.debug("Reached past raise_for_status() call: %s", json_response["message"])
-        raise Exception(message)
+        raise RP2RuntimeError(message)

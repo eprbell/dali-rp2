@@ -19,6 +19,7 @@ from pathlib import Path
 from subprocess import run
 from typing import List
 
+import ezodf
 from ods_diff import ods_diff
 
 from dali.cache import CACHE_DIR
@@ -33,7 +34,6 @@ OUTPUT_PATH: Path = ROOT_PATH / Path("output")
 
 
 class TestODSOutputDiff(unittest.TestCase):
-
     output_dir: Path
 
     @classmethod
@@ -54,7 +54,6 @@ class TestODSOutputDiff(unittest.TestCase):
         test_name: str,
         config: str,
     ) -> None:
-
         arguments: List[str] = [
             "dali_us",
             "-s",
@@ -66,7 +65,9 @@ class TestODSOutputDiff(unittest.TestCase):
         ]
         run(arguments, check=True)
 
-        for method in ["fifo", "lifo"]:
+        # Temporarily removed due to https://github.com/eprbell/rp2/issues/79
+        # for method in ["fifo", "lifo"]:
+        for method in ["fifo"]:
             arguments = [
                 "rp2_us",
                 "-m",
@@ -75,7 +76,7 @@ class TestODSOutputDiff(unittest.TestCase):
                 str(output_dir),
                 "-p",
                 f"{test_name}_",
-                str(output_dir / Path(f"{test_name}_crypto_data.config")),
+                str(output_dir / Path(f"{test_name}_crypto_data.ini")),
                 str(output_dir / Path(f"{test_name}_crypto_data.ods")),
             ]
             run(arguments, check=True)
@@ -101,19 +102,30 @@ class TestODSOutputDiff(unittest.TestCase):
         diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
         self.assertFalse(diff, msg=diff)
 
-    def test_lifo_tax_report_us_ods(self) -> None:
-        file_name: str = "test_lifo_tax_report_us.ods"
-        full_output_file_name: Path = self.output_dir / file_name
-        full_golden_file_name: Path = GOLDEN_PATH / file_name
-        diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
-        self.assertFalse(diff, msg=diff)
+    # Temporarily removed due to https://github.com/eprbell/rp2/issues/79
+    # def test_lifo_tax_report_us_ods(self) -> None:
+    #     file_name: str = "test_lifo_tax_report_us.ods"
+    #     full_output_file_name: Path = self.output_dir / file_name
+    #     full_golden_file_name: Path = GOLDEN_PATH / file_name
+    #     diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
+    #     self.assertFalse(diff, msg=diff)
 
-    def test_lifo_rp2_full_report_ods(self) -> None:
-        file_name: str = "test_lifo_rp2_full_report.ods"
-        full_output_file_name: Path = self.output_dir / file_name
-        full_golden_file_name: Path = GOLDEN_PATH / file_name
-        diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
-        self.assertFalse(diff, msg=diff)
+    # def test_lifo_rp2_full_report_ods(self) -> None:
+    #     file_name: str = "test_lifo_rp2_full_report.ods"
+    #     full_output_file_name: Path = self.output_dir / file_name
+    #     full_golden_file_name: Path = GOLDEN_PATH / file_name
+    #     diff = ods_diff(full_golden_file_name, full_output_file_name, generate_ascii_representation=True)
+    #     self.assertFalse(diff, msg=diff)
+
+    def test_ods_sheet_size(self) -> None:
+        sizes = {"test_crypto_data.ods": {"BTC": 46}}
+        for basename, sheet_sizes in sizes.items():
+            filename = self.output_dir / basename
+            file: ezodf.document.PackagedDocument = ezodf.opendoc(str(filename))
+
+            for sheet in file.sheets:
+                assert sheet.name in sheet_sizes
+                assert file.sheets[sheet.name].nrows() == sheet_sizes[sheet.name]
 
 
 if __name__ == "__main__":

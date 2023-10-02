@@ -15,6 +15,10 @@
 
 import logging
 
+from progressbar import streams
 from rp2.logger import create_logger
+
+# Must be called before any logging setup
+streams.wrap_stderr()
 
 LOGGER: logging.Logger = create_logger("dali")

@@ -12,35 +12,88 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime
-from typing import Dict, NamedTuple, Optional, cast
+from datetime import datetime, timedelta
+from json import JSONDecodeError
+from typing import Any, Dict, List, NamedTuple, Optional, cast
 
-from rp2.rp2_decimal import RP2Decimal
-from rp2.rp2_error import RP2TypeError
+import requests
+from requests.exceptions import ReadTimeout
+from requests.models import Response
+from requests.sessions import Session
+from rp2.rp2_decimal import ZERO, RP2Decimal
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
 from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
+from dali.mapped_graph import MappedGraph
+from dali.transaction_manifest import TransactionManifest
+
+# exchangerates.host keywords
+_SUCCESS: str = "success"
+_SYMBOLS: str = "symbols"
+_RATES: str = "rates"
+
+# exchangerates.host urls
+_EXCHANGE_BASE_URL: str = "https://api.exchangerate.host/"
+_EXCHANGE_SYMBOLS_URL: str = "https://api.exchangerate.host/symbols"
+
+_DAYS_IN_SECONDS: int = 86400
+_FIAT_EXCHANGE: str = "exchangerate.host"
+
+# First on the list has the most priority
+# This is hard-coded for now based on volume of each of these markets for BTC on Coinmarketcap.com
+# Any change to this priority should be documented in "docs/configuration_file.md"
+_FIAT_PRIORITY: Dict[str, float] = {
+    "USD": 1,
+    "JPY": 2,
+    "KRW": 3,
+    "EUR": 4,
+    "GBP": 5,
+    "AUD": 6,
+}
+
+# Other Weights
+_STANDARD_WEIGHT: float = 1
+_STANDARD_INCREMENT: float = 1
 
 
 class AssetPairAndTimestamp(NamedTuple):
     timestamp: datetime
     from_asset: str
     to_asset: str
+    exchange: str
 
 
 class AbstractPairConverterPlugin:
-    def __init__(self, historical_price_type: str) -> None:
+    __ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
+    __TIMEOUT: int = 30
+
+    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None) -> None:
         if not isinstance(historical_price_type, str):
             raise RP2TypeError(f"historical_price_type is not a string: {historical_price_type}")
         if historical_price_type not in HISTORICAL_PRICE_KEYWORD_SET:
             raise RP2TypeError(
                 f"historical_price_type must be one of {', '.join(sorted(HISTORICAL_PRICE_KEYWORD_SET))}, instead it was: {historical_price_type}"
             )
-        result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
-        self.__cache: Dict[AssetPairAndTimestamp, HistoricalBar] = result if result is not None else {}
+        try:
+            result = cast(Dict[AssetPairAndTimestamp, HistoricalBar], load_from_cache(self.cache_key()))
+        except EOFError:
+            LOGGER.error("EOFError: Cached file corrupted, no cache found.")
+            result = None
+        self.__cache: Dict[AssetPairAndTimestamp, Any] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
+        self.__session: Session = requests.Session()
+        self.__fiat_list: List[str] = []
+        self.__fiat_priority: Dict[str, float]
+        if fiat_priority:
+            weight: float = _STANDARD_WEIGHT
+            for fiat in fiat_priority:
+                self.__fiat_priority[fiat] = weight
+                weight += _STANDARD_INCREMENT
+        else:
+            self.__fiat_priority = _FIAT_PRIORITY
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -48,9 +101,48 @@ class AbstractPairConverterPlugin:
     def cache_key(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
+    def optimize(self, transaction_manifest: TransactionManifest) -> None:
+        raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
+
+    def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
+        self.__cache[self._floor_key(key)] = historical_bar
+
+    def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
+        return self.__cache.get(self._floor_key(key))
+
+    # All bundle timestamps have 1 millisecond added to them, so will not conflict with the floored timestamps of single bars
+    def _add_bundle_to_cache(self, key: AssetPairAndTimestamp, historical_bars: List[HistoricalBar]) -> None:
+        self.__cache[key] = historical_bars
+
+    def _get_bundle_from_cache(self, key: AssetPairAndTimestamp) -> Optional[List[HistoricalBar]]:
+        return cast(List[HistoricalBar], self.__cache.get(key))
+
+    # The most granular pricing available is 1 minute, to reduce the size of cache and increase the reuse of pricing data
+    def _floor_key(self, key: AssetPairAndTimestamp) -> AssetPairAndTimestamp:
+        raw_timestamp: datetime = key.timestamp
+        floored_timestamp: datetime = raw_timestamp - timedelta(
+            minutes=raw_timestamp.minute % 1, seconds=raw_timestamp.second, microseconds=raw_timestamp.microsecond
+        )
+        floored_key: AssetPairAndTimestamp = AssetPairAndTimestamp(
+            timestamp=floored_timestamp,
+            from_asset=key.from_asset,
+            to_asset=key.to_asset,
+            exchange=key.exchange,
+        )
+
+        return floored_key
+
     @property
     def historical_price_type(self) -> str:
         return self.__historical_price_type
+
+    @property
+    def fiat_list(self) -> List[str]:
+        return self.__fiat_list
+
+    @property
+    def issues_url(self) -> str:
+        return self.__ISSUES_URL
 
     # The exchange parameter is a hint on which exchange to use for price lookups. The plugin is free to use it or ignore it.
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
@@ -62,7 +154,7 @@ class AbstractPairConverterPlugin:
     def get_conversion_rate(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[RP2Decimal]:
         result: Optional[RP2Decimal] = None
         historical_bar: Optional[HistoricalBar] = None
-        key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset)
+        key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange)
         log_message_qualifier: str = ""
         if key in self.__cache:
             historical_bar = self.__cache[key]
@@ -85,5 +177,115 @@ class AbstractPairConverterPlugin:
                 self.name(),
                 historical_bar,
             )
+
+        return result
+
+    def _build_fiat_list(self) -> None:
+        try:
+            response: Response = self.__session.get(_EXCHANGE_SYMBOLS_URL, timeout=self.__TIMEOUT)
+            # {
+            #     'motd':
+            #         {
+            #             'msg': 'If you or your company ...',
+            #             'url': 'https://exchangerate.host/#/donate'
+            #         },
+            #     'success': True,
+            #     'symbols':
+            #         {
+            #             'AED':
+            #                 {
+            #                     'description': 'United Arab Emirates Dirham',
+            #                     'code': 'AED'
+            #                 },
+            #             ...
+            #         }
+            # }
+            data: Any = response.json()
+            if data[_SUCCESS]:
+                self.__fiat_list = [fiat_iso for fiat_iso in data[_SYMBOLS] if fiat_iso != "BTC"]
+            else:
+                if "message" in data:
+                    LOGGER.error("Error %d: %s: %s", response.status_code, _EXCHANGE_SYMBOLS_URL, data["message"])
+                response.raise_for_status()
+
+        except JSONDecodeError as exc:
+            LOGGER.info("Fetching of fiat symbols failed. The server might be down. Please try again later.")
+            raise RP2RuntimeError("JSON decode error") from exc
+
+    def _add_fiat_edges_to_graph(self, graph: MappedGraph[str], markets: Dict[str, List[str]]) -> None:
+        if not self.__fiat_list:
+            self._build_fiat_list()
+
+        for fiat in self.__fiat_list:
+            to_fiat_list: Dict[str, None] = dict.fromkeys(self.__fiat_list.copy())
+            del to_fiat_list[fiat]
+            # We don't want to add a fiat vertex here because that would allow a double hop on fiat (eg. USD -> KRW -> JPY)
+            if graph.get_vertex(fiat):
+                for to_be_added_fiat in to_fiat_list:
+                    graph.add_neighbor(
+                        fiat,
+                        to_be_added_fiat,
+                        self.__fiat_priority.get(fiat, _STANDARD_WEIGHT),
+                        True,  # use set optimization
+                    )
+
+                LOGGER.debug("Added to assets for %s: %s", fiat, to_fiat_list)
+
+            for to_fiat in to_fiat_list:
+                fiat_market = f"{fiat}{to_fiat}"
+                markets[fiat_market] = [_FIAT_EXCHANGE]
+
+    def _is_fiat_pair(self, from_asset: str, to_asset: str) -> bool:
+        return self._is_fiat(from_asset) and self._is_fiat(to_asset)
+
+    def _is_fiat(self, asset: str) -> bool:
+        if not self.__fiat_list:
+            self._build_fiat_list()
+
+        return asset in self.__fiat_list
+
+    def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+        result: Optional[HistoricalBar] = None
+        params: Dict[str, Any] = {"base": from_asset, "symbols": to_asset}
+        request_count: int = 0
+        # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
+        while request_count < 5:
+            try:
+                response: Response = self.__session.get(f"{_EXCHANGE_BASE_URL}{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+                # {
+                #     'motd':
+                #         {
+                #             'msg': 'If you or your company ...',
+                #             'url': 'https://exchangerate.host/#/donate'
+                #         },
+                #     'success': True,
+                #     'historical': True,
+                #     'base': 'EUR',
+                #     'date': '2020-04-04',
+                #     'rates':
+                #         {
+                #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
+                #         }
+                # }
+                data: Any = response.json()
+                if data[_SUCCESS]:
+                    result = HistoricalBar(
+                        duration=timedelta(seconds=_DAYS_IN_SECONDS),
+                        timestamp=timestamp,
+                        open=RP2Decimal(str(data[_RATES][to_asset])),
+                        high=RP2Decimal(str(data[_RATES][to_asset])),
+                        low=RP2Decimal(str(data[_RATES][to_asset])),
+                        close=RP2Decimal(str(data[_RATES][to_asset])),
+                        volume=ZERO,
+                    )
+                break
+
+            except (JSONDecodeError, ReadTimeout) as exc:
+                LOGGER.debug("Fetching of fiat exchange rates failed. The server might be down. Retrying the connection.")
+                request_count += 1
+                if request_count > 4:
+                    LOGGER.info("Giving up after 4 tries. Saving to Cache.")
+                    self.save_historical_price_cache()
+                    raise RP2RuntimeError("JSON decode error") from exc
 
         return result

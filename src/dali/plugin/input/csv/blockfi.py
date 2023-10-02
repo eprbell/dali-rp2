@@ -19,8 +19,10 @@ import logging
 from csv import reader
 from typing import Dict, List, Optional
 
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
@@ -49,7 +51,6 @@ _WITHDRAWAL_FEE: str = "Withdrawal Fee"
 
 
 class InputPlugin(AbstractInputPlugin):
-
     __BLOCKFI: str = "BlockFi"
 
     __CURRENCY_INDEX: int = 0
@@ -67,13 +68,12 @@ class InputPlugin(AbstractInputPlugin):
         trade_csv_file: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__transaction_csv_file: str = transaction_csv_file
         self.__trade_csv_file: Optional[str] = trade_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__BLOCKFI}/{self.account_holder}")
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         last_withdrawal_fee: Optional[RP2Decimal] = None
@@ -87,7 +87,7 @@ class InputPlugin(AbstractInputPlugin):
                 self.__logger.debug("Transaction: %s", raw_data)
 
                 if last_withdrawal_fee is not None and line[self.__TYPE_INDEX] != _WITHDRAWAL:
-                    raise Exception(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
+                    raise RP2RuntimeError(f"Internal error: withdrawal fee {last_withdrawal_fee} is not followed by withdrawal")
 
                 transaction_type: str = line[self.__TYPE_INDEX]
                 if transaction_type == _INTEREST_PAYMENT:
@@ -230,7 +230,7 @@ class InputPlugin(AbstractInputPlugin):
             self.__logger.debug("Header: %s", header)
 
             column_index: Dict[str, int] = {}
-            for (index, name) in enumerate(header):
+            for index, name in enumerate(header):
                 column_index[name] = index
 
             for line in lines:
@@ -239,7 +239,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 transaction_type: str = line[column_index[_TYPE]]
                 if transaction_type != "Trade":
-                    raise Exception(f"Internal error: unsupported transaction type: {transaction_type}")
+                    raise RP2RuntimeError(f"Internal error: unsupported transaction type: {transaction_type}")
 
                 trade_id: str = line[column_index[_TRADE_ID]]
                 date: str = line[column_index[_DATE]]

@@ -20,6 +20,7 @@ from csv import reader
 from decimal import Decimal
 from typing import List, Optional
 
+from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 
 from dali.abstract_input_plugin import AbstractInputPlugin
@@ -56,12 +57,11 @@ class InputPlugin(AbstractInputPlugin):
         transaction_csv_file: str,
         native_fiat: Optional[str] = None,
     ) -> None:
-
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__transaction_csv_file: str = transaction_csv_file
         self.__logger: logging.Logger = create_logger(f"{self.__NEXO}/{self.account_holder}")
 
-    def load(self) -> List[AbstractTransaction]:
+    def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
         with open(self.__transaction_csv_file, encoding="utf-8") as transaction_csv_file:

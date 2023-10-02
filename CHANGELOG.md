@@ -14,6 +14,72 @@
 
 # RP2 Change Log
 
+## 0.6.9
+* new Dijkstra-based pair converter implementation (#142)
+* added Coinbase Pro-based CCXT pair converter (#150)
+* fixed a bug in cache setup of CCXT pair converters (#149)
+* fixed a bug in Bitbank fee-only transactions (#155)
+* fixed spreadsheet size, which was set to a large value regardless of how many rows it contained (#147)
+* added XYMUSDT alternative market to CCXT pair converter (#158)
+* various optimizations (#151, #152))
+* various documentation fixes (#144, #148)
+
+## 0.6.8
+* Coinbase data loader: added a new flavor of transfer transaction that was slightly different from the other ones (#137)
+
+## 0.6.7
+* Coinbase data loader: fixed bug in advanced trade buy logic was not accounting for fee correctly
+* Coinbase data loader: added support for moving coins into staking pool (#132)
+
+## 0.6.5
+* new Trezor CSV plugin supporting the latest format from Trezor Suite
+
+## 0.6.4
+* added new RP2 Input data loader plugin, which can read RP2 input format data back into DaLI
+* improvements to Kraken CSV pair converter plugin: price data files are now downloaded locally and chunked to avoid excessive memory use
+* improvements to Coinbase plugin: added support for advanced_trade_fill, cardspend and cardbuyback
+* various smaller fixes and improvements
+
+## 0.6.3
+* added CCXT pair converter subclasses that are fixed to one exchange (Kraken, Binance)
+* added fiat deposit support to Bitbank plugin
+* small fixes and improvements
+
+## 0.6.2
+* added Kraken CSV price importer
+* various fixes to CCXT-based plugins
+* small improvements to some CSV data loaders
+* updated documentation
+
+## 0.6.1
+* added CCXT-based abstract superclass for REST data loader plugins (#80): this makes it much easier to add a new REST-based data loader
+* added Bitbank REST input plugin and CSV supplemental input plugin
+* added Coincheck CSV supplemental input plugin
+* updated RP2 to 1.3.1
+* updated documentation
+
+## 0.6.0
+* As of RP2 1.3.0, RP2 configuration files are no longer expressed in JSON format: they now use the INI format. So DaLI has been updated to generates INI-format configuration files instead of JSON. Any old JSON-format configuration file can be converted to the new INI format with the following command: rp2_config <json_config>
+* added Pionex CSV data loader plugin
+
+## 0.5.2
+* added Binance.com REST data loader plugin
+* added Binance.com supplemental (CSV) data loader plugin (for autoinvest purchases and ETH to BETH conversions)
+* added CCXT-based pair converter
+* updated documentation
+
+## 0.5.1
+* updated RP2 dependency to latest version, which fixes 2 bugs in HIFO. If you're using HIFO be sure to use RP2 1.10 or better.
+* tweaked documentation
+
+## 0.5.0
+* add top-level multi-thread support: it's now possible to run data loader plugins in parallel, using the -t option (which selects the number of parallel threads)
+* added Nexo CSV input plugin
+* Coinbase REST input plugin: added support for Coinbase Earn Reversals (due to CC refunds, etc.)
+* BlockFI CSV input plugin: added new transaction types
+* revised and improved all documentation
+* added FAQs
+
 ## 0.4.12
 * added country plugin infrastructure (US is the default country plugin). Default fiat is no longer hardcoded to USD (it now comes from the country plugin)
 * updated generators and rest of the code to use the native fiat from the country plugin (previously it was hard coded as USD)
