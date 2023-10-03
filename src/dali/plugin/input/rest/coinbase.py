@@ -559,10 +559,9 @@ class InputPlugin(AbstractInputPlugin):
                     _TO in transaction
                     and transaction[_TO] is not None
                     and _RESOURCE in transaction[_TO]
-                    and transaction[_TO][_RESOURCE] == _USER
+                    and transaction[_TO][_RESOURCE] in {_USER, _EMAIL}
                     and transaction_network[_STATUS] == _OFF_BLOCKCHAIN
                     and _SUBTITLE in transaction[_DETAILS]
-                    and _EMAIL in transaction[_TO]
                 ):
                     # Outgoing gift to another Coinbase user
                     out_transaction_list.append(
@@ -581,7 +580,7 @@ class InputPlugin(AbstractInputPlugin):
                             crypto_out_with_fee=str(-amount),
                             fiat_out_no_fee=str(-native_amount),
                             fiat_fee="0",
-                            notes=f"To: {transaction[_TO][_EMAIL]}",
+                            notes=f"{transaction[_DETAILS][_SUBTITLE]}",
                         )
                     )
                 elif _FROM in transaction and transaction[_DETAILS][_SUBTITLE].startswith("From Coinbase"):
