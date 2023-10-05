@@ -21,7 +21,7 @@ from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
 from rp2.rp2_decimal import ZERO, RP2Decimal
-from rp2.rp2_error import RP2RuntimeError, RP2TypeError
+from rp2.rp2_error import RP2RuntimeError, RP2TypeError, RP2ValueError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.configuration import HISTORICAL_PRICE_KEYWORD_SET
@@ -31,13 +31,15 @@ from dali.mapped_graph import MappedGraph
 from dali.transaction_manifest import TransactionManifest
 
 # exchangerates.host keywords
+_ACCESS_KEY: str = "access_key"
+_CURRENCIES: str = "currencies"
+_DATE: str = "date"
+_QUOTES: str = "quotes"
 _SUCCESS: str = "success"
-_SYMBOLS: str = "symbols"
-_RATES: str = "rates"
 
 # exchangerates.host urls
-_EXCHANGE_BASE_URL: str = "https://api.exchangerate.host/"
-_EXCHANGE_SYMBOLS_URL: str = "https://api.exchangerate.host/symbols"
+_EXCHANGE_BASE_URL: str = "http://api.exchangerate.host/"
+_EXCHANGE_SYMBOLS_URL: str = "http://api.exchangerate.host/list"
 
 _DAYS_IN_SECONDS: int = 86400
 _FIAT_EXCHANGE: str = "exchangerate.host"
@@ -58,6 +60,8 @@ _FIAT_PRIORITY: Dict[str, float] = {
 _STANDARD_WEIGHT: float = 1
 _STANDARD_INCREMENT: float = 1
 
+_CONFIG_FILE_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md"
+
 
 class AssetPairAndTimestamp(NamedTuple):
     timestamp: datetime
@@ -70,7 +74,7 @@ class AbstractPairConverterPlugin:
     __ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __TIMEOUT: int = 30
 
-    def __init__(self, historical_price_type: str, fiat_priority: Optional[str] = None) -> None:
+    def __init__(self, historical_price_type: str, fiat_access_key: Optional[str] = None, fiat_priority: Optional[str] = None) -> None:
         if not isinstance(historical_price_type, str):
             raise RP2TypeError(f"historical_price_type is not a string: {historical_price_type}")
         if historical_price_type not in HISTORICAL_PRICE_KEYWORD_SET:
@@ -94,6 +98,13 @@ class AbstractPairConverterPlugin:
                 weight += _STANDARD_INCREMENT
         else:
             self.__fiat_priority = _FIAT_PRIORITY
+        self.__fiat_access_key: Optional[str] = None
+        if fiat_access_key:
+            self.__fiat_access_key = fiat_access_key
+        else:
+            LOGGER.warning(
+                "No Fiat Access Key. Fiat pricing will NOT be available. To enable fiat pricing, an access key from exchangerate.host is required."
+            )
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
@@ -181,28 +192,25 @@ class AbstractPairConverterPlugin:
         return result
 
     def _build_fiat_list(self) -> None:
+        self._check_fiat_access_key()
         try:
-            response: Response = self.__session.get(_EXCHANGE_SYMBOLS_URL, timeout=self.__TIMEOUT)
-            # {
-            #     'motd':
-            #         {
-            #             'msg': 'If you or your company ...',
-            #             'url': 'https://exchangerate.host/#/donate'
-            #         },
-            #     'success': True,
-            #     'symbols':
-            #         {
-            #             'AED':
-            #                 {
-            #                     'description': 'United Arab Emirates Dirham',
-            #                     'code': 'AED'
-            #                 },
-            #             ...
-            #         }
+            response: Response = self.__session.get(_EXCHANGE_SYMBOLS_URL, params={_ACCESS_KEY: self.__fiat_access_key}, timeout=self.__TIMEOUT)
+            #  {
+            #     "success": true,
+            #     "terms": "https://exchangerate.host/terms",
+            #     "privacy": "https://exchangerate.host/privacy",
+            #     "currencies": {
+            #         "AED": "United Arab Emirates Dirham",
+            #         "AFN": "Afghan Afghani",
+            #         "ALL": "Albanian Lek",
+            #         "AMD": "Armenian Dram",
+            #         "ANG": "Netherlands Antillean Guilder",
+            #         [...]
+            #     }
             # }
             data: Any = response.json()
             if data[_SUCCESS]:
-                self.__fiat_list = [fiat_iso for fiat_iso in data[_SYMBOLS] if fiat_iso != "BTC"]
+                self.__fiat_list = [fiat_iso for fiat_iso in data[_CURRENCIES] if fiat_iso != "BTC"]
             else:
                 if "message" in data:
                     LOGGER.error("Error %d: %s: %s", response.status_code, _EXCHANGE_SYMBOLS_URL, data["message"])
@@ -245,37 +253,44 @@ class AbstractPairConverterPlugin:
         return asset in self.__fiat_list
 
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+        self._check_fiat_access_key()
+        if from_asset != "USD":
+            raise RP2ValueError("Fiat conversion is only available from USD at this time.")
         result: Optional[HistoricalBar] = None
-        params: Dict[str, Any] = {"base": from_asset, "symbols": to_asset}
+        params: Dict[str, Any] = {_ACCESS_KEY: self.__fiat_access_key, _DATE: timestamp.strftime("%Y-%m-%d"), _CURRENCIES: to_asset}
         request_count: int = 0
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
         while request_count < 5:
             try:
-                response: Response = self.__session.get(f"{_EXCHANGE_BASE_URL}{timestamp.strftime('%Y-%m-%d')}", params=params, timeout=self.__TIMEOUT)
+                response: Response = self.__session.get(f"{_EXCHANGE_BASE_URL}", params=params, timeout=self.__TIMEOUT)
                 # {
-                #     'motd':
-                #         {
-                #             'msg': 'If you or your company ...',
-                #             'url': 'https://exchangerate.host/#/donate'
-                #         },
-                #     'success': True,
-                #     'historical': True,
-                #     'base': 'EUR',
-                #     'date': '2020-04-04',
-                #     'rates':
-                #         {
-                #             'USD': 1.0847, ... // float, Lists all supported currencies unless you specify
-                #         }
+                #     "success": true,
+                #     "terms": "https://exchangerate.host/terms",
+                #     "privacy": "https://exchangerate.host/privacy",
+                #     "historical": true,
+                #     "date": "2005-02-01",
+                #     "timestamp": 1107302399,
+                #     "source": "USD",
+                #     "quotes": {
+                #         "USDAED": 3.67266,
+                #         "USDALL": 96.848753,
+                #         "USDAMD": 475.798297,
+                #         "USDANG": 1.790403,
+                #         "USDARS": 2.918969,
+                #         "USDAUD": 1.293878,
+                #         [...]
+                #     }
                 # }
                 data: Any = response.json()
                 if data[_SUCCESS]:
+                    market: str = f"USD{to_asset}"
                     result = HistoricalBar(
                         duration=timedelta(seconds=_DAYS_IN_SECONDS),
                         timestamp=timestamp,
-                        open=RP2Decimal(str(data[_RATES][to_asset])),
-                        high=RP2Decimal(str(data[_RATES][to_asset])),
-                        low=RP2Decimal(str(data[_RATES][to_asset])),
-                        close=RP2Decimal(str(data[_RATES][to_asset])),
+                        open=RP2Decimal(str(data[_QUOTES][market])),
+                        high=RP2Decimal(str(data[_QUOTES][market])),
+                        low=RP2Decimal(str(data[_QUOTES][market])),
+                        close=RP2Decimal(str(data[_QUOTES][market])),
                         volume=ZERO,
                     )
                 break
@@ -289,3 +304,11 @@ class AbstractPairConverterPlugin:
                     raise RP2RuntimeError("JSON decode error") from exc
 
         return result
+
+    def _check_fiat_access_key(self) -> None:
+        if self.__fiat_access_key is None:
+            raise RP2ValueError(
+                f"No fiat access key. To convert fiat assets, please acquire an access key from exchangerate.host."
+                f"The access key will then need to be added to the configuration file. For more details visit "
+                f"{_CONFIG_FILE_URL}"
+            )

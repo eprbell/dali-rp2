@@ -208,6 +208,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self,
         historical_price_type: str,
         default_exchange: Optional[str] = None,
+        fiat_access_key: Optional[str] = None,
         fiat_priority: Optional[str] = None,
         google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
@@ -218,7 +219,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         fiat_priority_cache_modifier = fiat_priority if fiat_priority else ""
         self.__cache_modifier = "_".join(x for x in [exchange_cache_modifier, fiat_priority_cache_modifier] if x)
 
-        super().__init__(historical_price_type=historical_price_type, fiat_priority=fiat_priority)
+        super().__init__(historical_price_type=historical_price_type, fiat_access_key=fiat_access_key, fiat_priority=fiat_priority)
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
         self.__exchanges: Dict[str, Exchange] = {}
