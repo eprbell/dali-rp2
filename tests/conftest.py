@@ -16,6 +16,9 @@ from typing import Dict, List, Union
 
 import pytest
 
+# This section configures pytest-recording, which uses vcrpy under the hood.
+# Documentation: https://github.com/kiwicom/pytest-recording
+
 
 @pytest.fixture(scope="session")
 def vcr_config() -> Dict[str, Union[bool, List[str], str]]:
