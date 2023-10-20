@@ -102,9 +102,7 @@ class AbstractPairConverterPlugin:
         if fiat_access_key:
             self.__fiat_access_key = fiat_access_key
         else:
-            LOGGER.warning(
-                "No Fiat Access Key. Fiat pricing will NOT be available. To enable fiat pricing, an access key from exchangerate.host is required."
-            )
+            LOGGER.warning("No Fiat Access Key. Fiat pricing will NOT be available. To enable fiat pricing, an access key from exchangerate.host is required.")
 
     def name(self) -> str:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
