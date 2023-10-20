@@ -60,7 +60,7 @@ _FIAT_PRIORITY: Dict[str, float] = {
 _STANDARD_WEIGHT: float = 1
 _STANDARD_INCREMENT: float = 1
 
-_CONFIG_FILE_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md"
+_CONFIG_DOC_FILE_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md"
 
 
 class AssetPairAndTimestamp(NamedTuple):
@@ -310,5 +310,5 @@ class AbstractPairConverterPlugin:
             raise RP2ValueError(
                 f"No fiat access key. To convert fiat assets, please acquire an access key from exchangerate.host."
                 f"The access key will then need to be added to the configuration file. For more details visit "
-                f"{_CONFIG_FILE_URL}"
+                f"{_CONFIG_DOC_FILE_URL}"
             )
