@@ -474,6 +474,7 @@ Initialize this plugin section as follows:
 [dali.plugin.pair_converter.ccxt</em>]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
 default_exchange = <em>&lt;default_exchange&gt;</em>
+fiat_access_key = <em>&lt;fiat_access_key&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 google_api_key = <em>&lt;google_api_key&gt;</em>
 untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
@@ -483,6 +484,7 @@ aliases = <em>&lt;untradeable_assets&gt;</em>
 Where:
 * `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
 * `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Kraken(US) is used. If you would like an exchange added please open an issue. The current available exchanges are "Binance.com", "Gate", "Huobi" and "Kraken".
+* `fiat_access_key` is an optional access key that can be obtained from [Exchangerate.host](https://exchangerate.host/). It is required for any fiat conversions, which are typically required if the base fiat is other than USD.
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
 * `untradeable_assets` is a comma separated list of assets that have no market, yet. These are typically assets that are farmed or given away as a part of promotion before a market is available to price them and CCXT can not automatically assign a price. If you get the error "The asset XXX or XXX is missing from graph" and the asset is untradeable, adding the untradeable asset to this list will resolve it.

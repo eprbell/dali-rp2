@@ -14,24 +14,17 @@
 
 # pylint: disable=protected-access
 
-import pytest
 from typing import Any, Dict
 
+import pytest
 from ccxt import Exchange
+from rp2.rp2_error import RP2RuntimeError
 
 from dali.configuration import Keyword
 from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 from dali.out_transaction import OutTransaction
-from dali.plugin.input.rest.kraken import (
-    _BASE,
-    _BASE_ID,
-    _ID,
-    _QUOTE,
-    InputPlugin
-)
-
-from rp2.rp2_error import RP2RuntimeError
+from dali.plugin.input.rest.kraken import _BASE, _BASE_ID, _ID, _QUOTE, InputPlugin
 
 
 @pytest.fixture(name="private_post_ledgers_return")
@@ -150,12 +143,14 @@ def test_initialize_markets_exception(plugin: InputPlugin, mocker: Any) -> None:
     client: Exchange = plugin._client
 
     mocker.patch.object(client, "load_markets").return_value = None
-    mocker.patch.object(client, "markets_by_id",
-                            {
-                                "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
-                                'XLTCXXBT': {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
-                            }
-                        )
+    mocker.patch.object(
+        client,
+        "markets_by_id",
+        {
+            "XLTCZUSD": {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
+            "XLTCXXBT": {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
+        },
+    )
 
     with pytest.raises(RP2RuntimeError) as excinfo:
         plugin.load(country=None)  # type: ignore
@@ -170,15 +165,17 @@ def test_initialize_markets_multiple_bases(plugin: InputPlugin, mocker: Any) -> 
     client: Exchange = plugin._client
 
     mocker.patch.object(client, "load_markets").return_value = None
-    mocker.patch.object(client, "markets_by_id",
-                            {
-                                "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
-                                'XLTCXXBT': [
-                                                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
-                                                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "XLTC", _QUOTE: "BTC"},
-                                             ],
-                            }
-                        )
+    mocker.patch.object(
+        client,
+        "markets_by_id",
+        {
+            "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
+            "XLTCXXBT": [
+                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"},
+                {_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "XLTC", _QUOTE: "BTC"},
+            ],
+        },
+    )
 
     with pytest.raises(RP2RuntimeError) as excinfo:
         plugin.load(country=None)  # type: ignore
@@ -198,15 +195,14 @@ def test_initialize_markets_multiple_quotes_to_base_pair(
     client: Exchange = plugin._client
 
     mocker.patch.object(client, "load_markets").return_value = None
-    mocker.patch.object(client, "markets_by_id",
-                            {
-                                "XLTCZUSD": [
-                                    {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"},
-                                    {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "ZUSD"}
-                                ],
-                                'XLTCXXBT': [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
-                            },
-                        )
+    mocker.patch.object(
+        client,
+        "markets_by_id",
+        {
+            "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}, {_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "ZUSD"}],
+            "XLTCXXBT": [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
+        },
+    )
     mocker.patch.object(client, "private_post_ledgers").return_value = private_post_ledgers_return
     mocker.patch.object(client, "private_post_tradeshistory").return_value = private_post_tradeshistory_return
 
@@ -228,12 +224,14 @@ def test_kraken(
     client: Exchange = plugin._client
 
     mocker.patch.object(client, "load_markets").return_value = None
-    mocker.patch.object(client, "markets_by_id",
-                            {
-                                "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
-                                'XLTCXXBT': [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
-                            }
-                        )
+    mocker.patch.object(
+        client,
+        "markets_by_id",
+        {
+            "XLTCZUSD": [{_ID: "XLTCZUSD", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "USD"}],
+            "XLTCXXBT": [{_ID: "XLTCXXBT", _BASE_ID: "XLTC", _BASE: "LTC", _QUOTE: "BTC"}],
+        },
+    )
 
     mocker.patch.object(client, "private_post_ledgers").return_value = private_post_ledgers_return
     mocker.patch.object(client, "private_post_tradeshistory").return_value = private_post_tradeshistory_return
