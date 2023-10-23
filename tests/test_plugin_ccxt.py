@@ -401,20 +401,24 @@ class TestCcxtPlugin:
 
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_unknown_exchange(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
         self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
 
         assert plugin._get_pricing_exchange_for_exchange("Bogus Exchange") == TEST_EXCHANGE  # pylint: disable=protected-access
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_historical_prices(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
         cache_path = os.path.join(CACHE_DIR, plugin.cache_key())
         if os.path.exists(cache_path):
             os.remove(cache_path)
 
         # Reinstantiate plugin now that cache is gone
-        plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
         self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
 
         data = plugin.get_historic_bar_from_native_source(BTCUSDT_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
@@ -453,8 +457,10 @@ class TestCcxtPlugin:
         assert data.close == BTCUSDT_CLOSE * USDTUSD_CLOSE
         assert data.volume == BTCUSDT_VOLUME + USDTUSD_VOLUME
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_missing_historical_prices(self, mocker: Any) -> None:
-        plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
         timestamp = datetime(2020, 6, 1, 0, 0)
 
         mocker.patch.object(plugin, "get_historic_bar_from_native_source").return_value = None
@@ -462,8 +468,10 @@ class TestCcxtPlugin:
         data = plugin.get_historic_bar_from_native_source(timestamp, "BOGUSCOIN", "JPY", TEST_EXCHANGE)
         assert data is None
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr(record_mode="none")
     def test_missing_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
         self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
 
         mocker.patch.object(plugin, "_get_fiat_exchange_rate").return_value = HistoricalBar(
@@ -488,8 +496,10 @@ class TestCcxtPlugin:
 
     # Some crypto assets have no fiat or stable coin pair; they are only paired with BTC or ETH (e.g. EZ or BETH)
     # To get an accurate fiat price, we must get the price in the base asset (e.g. BETH -> ETH) then convert that to fiat (e.g. ETH -> USD)
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_no_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
 
         exchange = kraken(
             {
@@ -559,8 +569,10 @@ class TestCcxtPlugin:
         assert data.volume == BETHETH_VOLUME + ETHUSDT_VOLUME + USDTUSD_VOLUME
 
     # Test to make sure the default stable coin is not used with a fiat market that does exist on the exchange
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_nonusd_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange="Binance.com")
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange="Binance.com", fiat_access_key="BOGUS_KEY")
         alt_exchange = binance(
             {
                 "apiKey": "key",
@@ -609,8 +621,10 @@ class TestCcxtPlugin:
         assert data.volume == BTCGBP_VOLUME
 
     # Plugin should hand off the handling of a fiat to fiat pair to the fiat converter
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_fiat_pair(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
         exchange = binance(
             {
                 "apiKey": "key",
@@ -644,8 +658,10 @@ class TestCcxtPlugin:
         assert data.close == EUR_USD_RATE
         assert data.volume == ZERO
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_kraken_csv(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever", fiat_access_key="BOGUS_KEY")
 
         cache_path = os.path.join(CACHE_DIR, "Test-" + plugin.cache_key())
         if os.path.exists(cache_path):
@@ -710,8 +726,12 @@ class TestCcxtPlugin:
         assert data.close == BTCUSDT_CLOSE * KRAKEN_CLOSE
         assert data.volume == BTCUSDT_VOLUME + KRAKEN_VOLUME
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_locked_exchange(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange=LOCKED_EXCHANGE, exchange_locked=True)
+        plugin: PairConverterPlugin = PairConverterPlugin(
+            Keyword.HISTORICAL_PRICE_HIGH.value, default_exchange=LOCKED_EXCHANGE, exchange_locked=True, fiat_access_key="BOGUS_KEY"
+        )
         # Name is changed to exchange_instance to avoid conflicts with the side effect function `add_exchange_side_effect`
         exchange_instance = kraken(
             {
@@ -729,6 +749,7 @@ class TestCcxtPlugin:
 
         mocker.patch.object(kraken_csv, "find_historical_bar").return_value = None
         mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {LOCKED_EXCHANGE: kraken_csv})
+        mocker.patch.object(plugin, "_get_request_delay").return_value = 0.0
         mocker.patch.object(exchange_instance, "fetchOHLCV").return_value = [
             [
                 BTCUSDT_TIMESTAMP.timestamp() * _MS_IN_SECOND,  # UTC timestamp in milliseconds, integer
@@ -765,8 +786,10 @@ class TestCcxtPlugin:
         assert data
         plugin._cache_graph_snapshots.assert_called_once_with("not-kraken")  # type: ignore # pylint: disable=protected-access, no-member
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_optimization_of_graph(self, mocker: Any, graph_fiat_optimized: MappedGraph[str]) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever", fiat_access_key="BOGUS_KEY")
 
         self.__btcusdt_mock(plugin, mocker, graph_fiat_optimized)
 
@@ -819,6 +842,8 @@ class TestCcxtPlugin:
         assert new_snapshot.close == BTCUSDT_CLOSE * USDTUSD_CLOSE
         assert new_snapshot.volume == BTCUSDT_VOLUME + USDTUSD_VOLUME
 
+    @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
+    @pytest.mark.vcr
     def test_base_universal_aliases(
         self,
         mocker: Any,
@@ -826,7 +851,7 @@ class TestCcxtPlugin:
         simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]],
         simple_pionex_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]],
     ) -> None:
-        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever")
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, google_api_key="whatever", fiat_access_key="BOGUS_KEY")
         self.__btcusdt_mock_unoptimized(plugin, mocker, graph_optimized, simple_tree)
         pionex_markets: Dict[str, List[str]] = TEST_MARKETS
         pionex_markets.update(PIONEX_MARKETS)
