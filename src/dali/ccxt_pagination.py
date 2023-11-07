@@ -163,7 +163,7 @@ class AbstractPaginationDetailsIterator:
         self.__params: Optional[Dict[str, Union[int, str, None]]] = params
 
     def _get_market(self) -> Optional[str]:
-        if self.__market_count >= len(self.__markets):
+        if self.__markets and self.__market_count >= len(self.__markets):
             raise StopIteration(self)
         return self.__markets[self.__market_count] if self.__markets else None
 
