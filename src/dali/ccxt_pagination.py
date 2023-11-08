@@ -32,6 +32,8 @@ _MS_IN_SECOND: int = 1000
 
 _DEFAULT_WINDOW: int = _THIRTY_DAYS_IN_MS
 
+_ID: str = "id"
+
 
 class PaginationDetails(NamedTuple):
     symbol: Optional[str]
@@ -119,6 +121,39 @@ class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
         )
 
 
+class IdBasedPaginationDetailSet(AbstractPaginationDetailSet):
+    def __init__(
+        self,
+        id_param: str,
+        limit: Optional[int] = None,
+        markets: Optional[List[str]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = None,
+    ) -> None:
+        params = {} if params is None else params
+        super().__init__()
+        self.__id_param: str = id_param
+        self.__limit: Optional[int] = limit
+        self.__markets: Optional[List[str]] = markets
+        self.__params: Optional[Dict[str, Union[int, str, None]]] = params
+
+    def __iter__(self) -> "IdBasedPaginationDetailsIterator":
+        return IdBasedPaginationDetailsIterator(
+            self.__id_param,
+            self.__limit,
+            self.__markets,
+            self.__params,
+        )
+
+    def _get_limit(self) -> Optional[int]:
+        return self.__limit
+
+    def _get_markets(self) -> Optional[List[str]]:
+        return self.__markets
+
+    def _get_params(self) -> Optional[Dict[str, Union[int, str, None]]]:
+        return self.__params
+
+
 class AbstractPaginationDetailsIterator:
     def __init__(self, limit: Optional[int], markets: Optional[List[str]] = None, params: Optional[Dict[str, Union[int, str, None]]] = None) -> None:
         params = {} if params is None else params
@@ -128,6 +163,8 @@ class AbstractPaginationDetailsIterator:
         self.__params: Optional[Dict[str, Union[int, str, None]]] = params
 
     def _get_market(self) -> Optional[str]:
+        if self.__market_count >= len(self.__markets):
+            raise StopIteration(self)
         return self.__markets[self.__market_count] if self.__markets else None
 
     def _has_more_markets(self) -> bool:
@@ -239,4 +276,55 @@ class CustomDateBasedPaginationDetailsIterator(DateBasedPaginationDetailsIterato
         raise StopIteration(self)
 
 
-# TODO: Add IdBasedPaginationDetails and PageNumberBasedPaginationDetails classes
+class IdBasedPaginationDetailsIterator(AbstractPaginationDetailsIterator):
+    def __init__(
+        self,
+        id_param: str,
+        limit: Optional[int] = None,
+        markets: Optional[List[str]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = None,
+    ) -> None:
+        super().__init__(limit, markets, params)
+        self.__end_of_data = False
+        self.__last_id = None
+        self.__id_param = id_param
+
+    def update_fetched_elements(self, current_results: Any) -> None:
+        end_of_market: bool = False
+
+        # Update last_id if needed otherwise end_of_market
+        if len(current_results) == self._get_limit():
+            # All times are inclusive
+            self.__last_id = current_results[len(current_results) - 1][_ID]
+        else:
+            end_of_market = True
+
+        if end_of_market:
+            if self._has_more_markets():
+                # we have reached the end of one market, now let's move on to the next
+                self.__last_id = None
+                self._next_market()
+            else:
+                self.__end_of_data = True
+
+    def _is_end_of_data(self) -> bool:
+        return self.__end_of_data
+
+    def _get_params(self) -> Optional[Dict[str, Union[int, str, None]]]:
+        params = super()._get_params()
+        if params is not None:
+            params.update({self.__id_param: self.__last_id})
+        return params
+
+    def __next__(self) -> PaginationDetails:
+        while not self._is_end_of_data():
+            return PaginationDetails(
+                symbol=self._get_market(),
+                since=None,
+                limit=self._get_limit(),
+                params=self._get_params(),
+            )
+        raise StopIteration(self)
+
+
+# TODO: PageNumberBasedPaginationDetails classes
