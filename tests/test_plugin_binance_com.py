@@ -48,7 +48,7 @@ class TestBinance:
 
         client: Exchange = plugin._client
 
-        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC"}]
+        mocker.patch.object(client, "fetch_markets").return_value = [{"id": "ETHBTC", "type": "spot"}]
         mocker.patch.object(plugin, "_AbstractCcxtInputPlugin__start_time_ms", int(datetime.datetime.now().timestamp()) * 1000 - 1)
         mocker.patch.object(client, "fetch_deposits").return_value = [
             {
@@ -87,6 +87,7 @@ class TestBinance:
             }
         ]
 
+        mocker.patch.object(client, "fetch_my_dust_trades").return_value = []
         mocker.patch.object(plugin, "_process_trades").return_value = None
         mocker.patch.object(plugin, "_process_gains").return_value = None
         mocker.patch.object(plugin, "_process_withdrawals").return_value = None
