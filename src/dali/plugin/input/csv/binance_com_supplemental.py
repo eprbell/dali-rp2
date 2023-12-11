@@ -103,6 +103,8 @@ class InputPlugin(AbstractInputPlugin):
                 quote_asset_symbol: str = line[self.__AUTO_QUOTE_AMOUNT_SYMBOL].split()[1]
                 quote_asset_amount: str = line[self.__AUTO_QUOTE_AMOUNT_SYMBOL].split()[0]
                 crypto_fee: str = line[self.__AUTO_TRADING_FEE_SYMBOL].split()[0]
+                if crypto_fee == "--": # Zero fees are reported as -- for some reason
+                    crypto_fee = "0"
                 crypto_out_with_fee: RP2Decimal = RP2Decimal(quote_asset_amount) + RP2Decimal(crypto_fee)
                 result.append(
                     OutTransaction(

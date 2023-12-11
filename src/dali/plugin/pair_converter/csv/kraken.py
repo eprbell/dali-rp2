@@ -22,8 +22,9 @@ from io import BytesIO
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
 from os import makedirs, path
+from time import sleep
 from typing import Any, Dict, Generator, List, NamedTuple, Optional, Set, Tuple, cast
-from zipfile import ZipFile
+from zipfile import BadZipFile, ZipFile
 
 import requests
 from requests.models import Response
@@ -487,16 +488,27 @@ class Kraken:
             retry_count: int = 0
 
             while True:
-                # Downloading the zipfile that contains the 6 files one for each of the standard durations of candles:
-                # 1m, 5m, 15m, 1h, 12h, 24h.
-                params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # _CONFIRM: 1 bypasses large file warning
-                file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
-                with ZipFile(BytesIO(file_response.content)) as file_check:
-                    if file_check.testzip() is None:
-                        break
+                try:
+                    # Downloading the zipfile that contains the 6 files one for each of the standard durations of candles:
+                    # 1m, 5m, 15m, 1h, 12h, 24h.
+                    params = {_ALT: _MEDIA, _API_KEY: self.__google_api_key, _CONFIRM: 1}  # _CONFIRM: 1 bypasses large file warning
+                    file_response: Response = self.__session.get(f"{_GOOGLE_APIS_URL}/{data[_FILES][0][_ID]}", params=params, timeout=self.__TIMEOUT)
+                    with ZipFile(BytesIO(file_response.content)) as file_check:
+                        if file_check.testzip() is None:
+                            break
+                        retry_count += 1
+                    if retry_count > 2:
+                        raise RP2RuntimeError(f"Invalid zipfile - {file_name}. Giving up. Try again later.")
+
+                # This is probably caused by too many requests to Google Drive in a short period of time.
+                except BadZipFile:
+                    self.__logger.info("Bad zip file - %s, trying again after a minute.", file_name)
+                    sleep(60)
                     retry_count += 1
-                if retry_count > 2:
-                    raise RP2RuntimeError(f"Invalid zipfile - {file_name}. Giving up. Try again later.")
+                    if retry_count > 5:
+                        raise RP2RuntimeError(f"Too many retries for {file_name}. Giving up. Try again later.")
+
+
 
         except JSONDecodeError as exc:
             self.__logger.debug("Fetching of kraken csv files failed. Try again later.")
