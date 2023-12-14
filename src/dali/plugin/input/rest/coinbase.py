@@ -951,10 +951,11 @@ class InputPlugin(AbstractInputPlugin):
 
     # Documented at: https://docs.cloud.coinbase.com/exchange/docs/requests
     def _validate_response(self, response: Response, method: str, endpoint: str) -> None:
-        json_response: Any = response.json()
         message: str = ""
         if 200 <= response.status_code < 300:
             return
+        self.__logger.info("Error %s: %s", response, response.content)
+        json_response: Any = response.json()
         if "message" in json_response:
             message = json_response["message"]
             self.__logger.error("Error %d: %s%s (%s): %s", response.status_code, self.__api_url, endpoint, method.upper(), json_response["message"])
