@@ -100,7 +100,11 @@ The author of DaLI is a Silicon Valley veteran, a software engineer and bitcoine
 ## Tax Questions
 
 ### What Events Are Taxable?
-Selling, swapping, donating, mining, staking, earning cryptocurrency are some common taxable events. For an up-to-date list in any given year, ask your tax professional. For additional information on taxable events read the [Cryptocurrency Tax FAQ](https://www.reddit.com/r/CryptoTax/comments/re6jal/cryptocurrency_tax_faq/) on Reddit and
+Selling, swapping, donating, mining, staking, earning cryptocurrency are some common taxable events. For an up-to-date list in any given year, ask your tax professional. For additional information on taxable events read the
+<!-- markdown-link-check-disable -->
+[Cryptocurrency Tax FAQ](https://www.reddit.com/r/CryptoTax/comments/re6jal/cryptocurrency_tax_faq/)
+<!-- markdown-link-check-enable-->
+on Reddit and
 <!-- markdown-link-check-disable -->
 [CoinTracker's summary on crypto taxes](https://www.cointracker.io/blog/what-tax-forms-should-crypto-holders-file).
 <!-- markdown-link-check-enable-->
