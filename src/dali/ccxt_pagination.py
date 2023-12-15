@@ -43,8 +43,27 @@ class PaginationDetails(NamedTuple):
 
 
 class AbstractPaginationDetailSet:
+    def __init__(
+        self,
+        limit: Optional[int] = None,
+        markets: Optional[List[str]] = None,
+        params: Optional[Dict[str, Union[int, str, None]]] = None,
+    ) -> None:
+        self.__limit: Optional[int] = limit
+        self.__markets: Optional[List[str]] = markets
+        self.__params: Optional[Dict[str, Union[int, str, None]]] = {} if params is None else params
+
     def __iter__(self) -> "AbstractPaginationDetailsIterator":
         raise NotImplementedError("Abstract method")
+
+    def _get_limit(self) -> Optional[int]:
+        return self.__limit
+
+    def _get_markets(self) -> Optional[List[str]]:
+        return self.__markets
+
+    def _get_params(self) -> Optional[Dict[str, Union[int, str, None]]]:
+        return self.__params
 
 
 class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
@@ -56,20 +75,16 @@ class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
         params: Optional[Dict[str, Union[int, str, None]]] = None,
         window: Optional[int] = None,
     ) -> None:
-        params = {} if params is None else params
-        super().__init__()
+        super().__init__(limit, markets, params)
         self.__exchange_start_time: int = exchange_start_time
-        self.__limit: Optional[int] = limit
-        self.__markets: Optional[List[str]] = markets
-        self.__params: Optional[Dict[str, Union[int, str, None]]] = params
         self.__window: Optional[int] = window
 
     def __iter__(self) -> "DateBasedPaginationDetailsIterator":
         return DateBasedPaginationDetailsIterator(
             self.__exchange_start_time,
-            self.__limit,
-            self.__markets,
-            self.__params,
+            self._get_limit(),
+            self._get_markets(),
+            self._get_params(),
             self.__window,
         )
 
@@ -78,15 +93,6 @@ class DateBasedPaginationDetailSet(AbstractPaginationDetailSet):
 
     def _get_exchange_start_time(self) -> int:
         return self.__exchange_start_time
-
-    def _get_limit(self) -> Optional[int]:
-        return self.__limit
-
-    def _get_markets(self) -> Optional[List[str]]:
-        return self.__markets
-
-    def _get_params(self) -> Optional[Dict[str, Union[int, str, None]]]:
-        return self.__params
 
 
 class CustomDateBasedPaginationDetailSet(DateBasedPaginationDetailSet):
@@ -129,29 +135,16 @@ class IdBasedPaginationDetailSet(AbstractPaginationDetailSet):
         markets: Optional[List[str]] = None,
         params: Optional[Dict[str, Union[int, str, None]]] = None,
     ) -> None:
-        params = {} if params is None else params
-        super().__init__()
+        super().__init__(limit, markets, params)
         self.__id_param: str = id_param
-        self.__limit: Optional[int] = limit
-        self.__markets: Optional[List[str]] = markets
-        self.__params: Optional[Dict[str, Union[int, str, None]]] = params
 
     def __iter__(self) -> "IdBasedPaginationDetailsIterator":
         return IdBasedPaginationDetailsIterator(
             self.__id_param,
-            self.__limit,
-            self.__markets,
-            self.__params,
+            self._get_limit(),
+            self._get_markets(),
+            self._get_params(),
         )
-
-    def _get_limit(self) -> Optional[int]:
-        return self.__limit
-
-    def _get_markets(self) -> Optional[List[str]]:
-        return self.__markets
-
-    def _get_params(self) -> Optional[Dict[str, Union[int, str, None]]]:
-        return self.__params
 
 
 class AbstractPaginationDetailsIterator:
