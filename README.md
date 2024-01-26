@@ -168,8 +168,8 @@ dali_us --help
 Finally compute taxes with RP2 using the generated input files (using both FIFO and LIFO accounting methods):
 
 ```console
-rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
-rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
+rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.ini output/test_crypto_data.ods
+rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.ini output/test_crypto_data.ods
 ```
 
 ## Configuration File
