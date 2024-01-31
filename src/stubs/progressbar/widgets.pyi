@@ -12,17 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-class Widgets:
-    pass
+class AdaptiveETA(Widgets):
+    def __init__(self, samples: int) -> None: ...
 
-class Percentage(Widgets):
+class AdaptiveTransferSpeed(Widgets):
     pass
 
 class Bar(Widgets):
     pass
 
+class BouncingBar(Widgets):
+    pass
+
+class DataSize(Widgets):
+    pass
+
+class Percentage(Widgets):
+    pass
+
 class Timer(Widgets):
     pass
 
-class AdaptiveETA(Widgets):
-    def __init__(self, samples: int) -> None: ...
+class Widgets:
+    pass
