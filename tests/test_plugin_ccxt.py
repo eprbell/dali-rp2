@@ -828,7 +828,8 @@ class TestCcxtPlugin:
 
         # Testing for graph compression
         exchange_tree: AVLTree[datetime, MappedGraph[str]] = plugin.exchange_2_graph_tree[TEST_EXCHANGE]
-        assert exchange_tree._get_height(exchange_tree.root) == 2  # pylint: disable=protected-access
+        # There is a bug that is creating an empty optimization at the beginning
+        assert exchange_tree._get_height(exchange_tree.root) == 3  # pylint: disable=protected-access
 
         # Testing if separate snapshot was correctly made
         second_week_timestamp: datetime = BTCUSDT_TIMESTAMP + timedelta(weeks=2)
