@@ -15,18 +15,19 @@
 # Kraken CSV format: (epoch) timestamp, open, high, low, close, volume, trades
 
 import logging
+import re
 from csv import reader, writer
 from datetime import datetime, timedelta, timezone
 from gzip import open as gopen
-from io import BytesIO
 from json import JSONDecodeError
 from multiprocessing.pool import ThreadPool
-from os import makedirs, path
-from typing import Any, Dict, Generator, List, NamedTuple, Optional, Set, Tuple, cast
-from zipfile import ZipFile
+from os import makedirs, path, remove
+from typing import Dict, Generator, List, NamedTuple, Optional, Set, Tuple, cast
+from zipfile import BadZipFile, ZipFile, is_zipfile
 
 import requests
-from requests.models import Response
+from progressbar import ProgressBar, UnknownLength
+from progressbar.widgets import AdaptiveTransferSpeed, BouncingBar, DataSize
 from requests.sessions import Session
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -34,6 +35,7 @@ from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 
 from dali.cache import load_from_cache, save_to_cache
 from dali.historical_bar import HistoricalBar
+from dali.transaction_manifest import TransactionManifest
 
 # Google Drive parameters
 _ACCESS_NOT_CONFIGURED: str = "accessNotConfigured"
@@ -48,11 +50,8 @@ _FILES: str = "files"
 _GOOGLE_APIS_URL: str = "https://www.googleapis.com/drive/v3/files"
 _ID: str = "id"
 
-# File ID for the folder which contains zipped OHLCVT files grouped by asset
-# In Google Drive lingo, this is the 'parent' of the files we need.
-# Files in this folder will be updated every quarter and thus will have new file IDs.
-# However, the file ID for the folder or parent should remain the same.
-_KRAKEN_FOLDER_ID: str = "1aoA6SKgPbS_p3pYStXUXFvmjqShJ2jv9"
+# File ID for the unified CSV file ID. This will need to be replaced every quarter.
+_UNIFIED_CSV_FILE_ID: str = "16YKyFkYlvawCHv3W7WuTFzM8RYgMRWMt"
 _MESSAGE: str = "message"
 _REASON: str = "reason"
 
@@ -123,9 +122,12 @@ class _PairStartEnd(NamedTuple):
 
 class Kraken:
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
+    DEFAULT_TIMEOUT: int = 10
     __KRAKEN_OHLCVT: str = "Kraken.com_CSVOHLCVT"
 
     __CACHE_DIRECTORY: str = ".dali_cache/kraken/"
+    __CSV_DIRECTORY: str = ".dali_cache/kraken/csv/"
+    __UNIFIED_CSV_FILE: str = __CSV_DIRECTORY + "Kraken_OHLCVT.zip"
     __CACHE_KEY: str = "Kraken-csv-download"
 
     __TIMEOUT: int = 30
@@ -141,18 +143,22 @@ class Kraken:
 
     __DELIMITER: str = ","
 
-    def __init__(
-        self,
-        google_api_key: str,
-    ) -> None:
-        self.__google_api_key: str = google_api_key
+    def __init__(self, transaction_manifest: TransactionManifest, force_download: bool = False, unified_csv_file_id: str = _UNIFIED_CSV_FILE_ID) -> None:
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
         self.__cached_pairs: Dict[str, _PairStartEnd] = {}
         self.__cache_loaded: bool = False
+        self.__force_download: bool = force_download
+        self.__unified_csv_file_id: str = unified_csv_file_id
+        self.__unchunked_assets: Set[str] = transaction_manifest.assets
+
+        self.__logger.debug("Assets: %s", self.__unchunked_assets)
 
         if not path.exists(self.__CACHE_DIRECTORY):
             makedirs(self.__CACHE_DIRECTORY)
+
+        if not path.exists(self.__CSV_DIRECTORY):
+            makedirs(self.__CSV_DIRECTORY)
 
     def cache_key(self) -> str:
         return self.__CACHE_KEY
@@ -182,6 +188,58 @@ class Kraken:
         if chunk:
             position = _PAIR_END
             yield position, chunk
+
+    def __download_unified_csv(self) -> None:
+        try:
+            retry_count = 0
+            while True:
+                # Downloading the unified zipfile that contains all the trading pairs
+                response = self.__session.get("https://docs.google.com/uc?export=download&confirm=1", params={"id": self.__unified_csv_file_id}, stream=True)
+
+                html_content = response.text  # Use response.text instead of response.content
+
+                if "Google Drive - Virus scan warning" in html_content:
+                    # Extract the required parameters using regular expressions
+                    id_match = re.search(r'name="id"\s+value="([^"]+)"', html_content)
+                    export_match = re.search(r'name="export"\s+value="([^"]+)"', html_content)
+                    confirm_match = re.search(r'name="confirm"\s+value="([^"]+)"', html_content)
+                    uuid_match = re.search(r'name="uuid"\s+value="([^"]+)"', html_content)
+
+                    if id_match and export_match and confirm_match and uuid_match:
+                        file_id = id_match.group(1)
+                        export = export_match.group(1)
+                        confirm = confirm_match.group(1)
+                        uuid = uuid_match.group(1)
+                    else:
+                        raise ValueError("Failed to extract parameters from HTML")
+
+                    # Set up the parameters for the download
+                    params = {"id": file_id, "export": export, "confirm": confirm, "uuid": uuid}
+
+                    # Make the request and download the file
+                    response = requests.get("https://drive.usercontent.google.com/download", params=params, stream=True, timeout=self.DEFAULT_TIMEOUT)
+
+                with open(self.__UNIFIED_CSV_FILE, "wb") as file, ProgressBar(
+                    max_value=UnknownLength, widgets=["Downloading: ", BouncingBar(), " ", DataSize(), " ", AdaptiveTransferSpeed()]
+                ) as progress_bar:
+                    progress_bar.start()
+                    for chunk in response.iter_content(32768):
+                        if chunk:  # Filter out keep-alive new chunks
+                            file.write(chunk)
+                            progress_bar.update(progress_bar.value + len(chunk))
+                    progress_bar.finish()
+
+                if is_zipfile(self.__UNIFIED_CSV_FILE):
+                    break
+                retry_count += 1
+                if retry_count > 2:
+                    raise RP2RuntimeError("Invalid zipfile. Giving up. Try again later.")
+                self._remove_unified_csv_file()
+                self.__logger.info("Downloaded file is invalid, trying to download again.")
+
+        except JSONDecodeError as exc:
+            self.__logger.debug("Fetching of kraken csv files failed. Try again later.")
+            raise RP2RuntimeError("JSON decode error") from exc
 
     def _split_chunks_size_n(self, file_name: str, csv_file: str, chunk_size: int = _CHUNK_SIZE) -> None:
         pair, duration_in_minutes = file_name.strip(".csv").split("_", 1)
@@ -316,7 +374,7 @@ class Kraken:
                         f"No such file={file_path} (skipping) {timestamp}. Please open an issue at %s %s", self.ISSUES_URL, datetime.fromtimestamp(timestamp)
                     )
 
-                file_timestamp += duration_chunk_size
+                file_timestamp = file_timestamp + duration_chunk_size if all_bars else window_end
 
             if result:
                 return result
@@ -346,13 +404,91 @@ class Kraken:
 
         # Attempt to load smallest duration
         if self.__cached_pairs.get(base_asset + quote_asset + _MINUTE_IN_MINUTES):
-            self.__logger.debug("Retrieving cached bar for %s, %s at %s", base_asset, quote_asset, epoch_timestamp)
+            plural: str = "s" if all_bars else ""
+            self.__logger.debug("Retrieving cached bar%s for %s, %s at %s", plural, base_asset, quote_asset, epoch_timestamp)
             return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
 
-        if self._download_and_chunk(base_asset, quote_asset, all_bars):
+        if self._unzip_and_chunk(base_asset, quote_asset, all_bars):
             return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
 
         return None
 
+    def _unzip_and_chunk(self, base_asset: str, quote_asset: str, all_bars: bool = False) -> bool:
+        # This function was called because the trading pair hasn't been chunked yet.
+        # In order to chunk a new trading pair, we need the unified CSV file.
+        if not path.exists(self.__UNIFIED_CSV_FILE) and (self.__force_download or self._prompt_download_confirmation()):
+            self.__download_unified_csv()
+
+        self.__logger.info("Attempting to load %s%s from Kraken Google Drive.", base_asset, quote_asset)
+        successful = False
+        for _ in range(2):
+            try:
+                with ZipFile(self.__UNIFIED_CSV_FILE, "r") as zip_ref:
+                    all_timespans_for_pair: List[str]
+                    if all_bars:
+                        all_timespans_for_pair = [x for x in zip_ref.namelist() if x.startswith(f"{base_asset}")]
+                    else:
+                        all_timespans_for_pair = [x for x in zip_ref.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
+
+                    self.__logger.debug("Chunking: %s", all_timespans_for_pair)
+
+                    if all_timespans_for_pair:
+                        csv_files: Dict[str, str] = {}
+                        for file_name in all_timespans_for_pair:
+                            self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
+                            csv_files[file_name] = zip_ref.read(file_name).decode(encoding="utf-8")
+
+                        with ThreadPool(self.__THREAD_COUNT) as pool:
+                            pool.starmap(self._split_chunks_size_n, zip(list(csv_files.keys()), list(csv_files.values())))
+                        successful = True
+                        break
+                    self.__logger.debug("Market %s%s not found in Kraken files. Skipping file read.", base_asset, quote_asset)
                     return False
+            except BadZipFile:
+                self.__logger.info("Corrupt unified CSV file found, deleting and trying again.")
+                self._remove_unified_csv_file()
+                if self.__force_download or self._prompt_download_confirmation():
+                    self.__download_unified_csv()
+
+        if not successful:
+            raise RP2RuntimeError("CSV file is either corrupt or not available. Giving up.")
+
+        save_to_cache(self.cache_key(), self.__cached_pairs)
+        self.__unchunked_assets.discard(base_asset)
+        self.__logger.debug("Leftover assets: %s", self.__unchunked_assets)
+        if len(self.__unchunked_assets) == 0 and self._prompt_delete_confirmation():
+            self._remove_unified_csv_file()
+
+        return True
+
+    def _prompt_download_confirmation(self) -> bool:
+        print("\nIn order to provide accurate pricing from Kraken, a large (3.9+ gb) zipfile needs to be download.")
+
+        while True:
+            choice = input("Do you want to download the file now?[yn]")
+            if choice == "y":
+                return True
+            if choice == "n":
+                return False
+            print("Invalid choice. Please enter y or n.")
+
+    def _prompt_delete_confirmation(self) -> bool:
+        print(
+            "\nAll of the CSV files for your assets have been processed. You can probably safely delete the master CSV file. "
+            "However, if you add assets later, you will need to re-download the file."
+        )
+
+        while True:
+            choice = input("Do you want to delete the file now?[yn]")
+            if choice == "y":
+                return True
+            if choice == "n":
+                return False
+            print("Invalid choice. Please enter y or n.")
+
+    def _remove_unified_csv_file(self) -> None:
         try:
+            remove(self.__UNIFIED_CSV_FILE)
+            self.__logger.info("%s has been safely deleted.", self.__UNIFIED_CSV_FILE)
+        except FileNotFoundError:
+            self.__logger.info("File %s not found.", self.__UNIFIED_CSV_FILE)
