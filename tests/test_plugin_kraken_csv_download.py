@@ -49,10 +49,12 @@ FAKE_TRANSACTION: InTransaction = InTransaction(
     notes="notes",
 )
 
-
 class TestKrakenCsvDownload:
     def test_chunking(self, mocker: Any) -> None:
         kraken_csv = Kraken(transaction_manifest=TransactionManifest([FAKE_TRANSACTION], 1, "USD"))
+
+        if not path.exists(_CACHE_DIRECTORY):
+            makedirs(_CACHE_DIRECTORY)
 
         # Flush test cache directory
         for filename in listdir(_CACHE_DIRECTORY):
