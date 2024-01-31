@@ -38,7 +38,7 @@ _QUOTES: str = "quotes"
 _SUCCESS: str = "success"
 
 # exchangerates.host urls
-_EXCHANGE_BASE_URL: str = "http://api.exchangerate.host/"
+_EXCHANGE_BASE_URL: str = "http://api.exchangerate.host/historical"
 _EXCHANGE_SYMBOLS_URL: str = "http://api.exchangerate.host/list"
 
 _DAYS_IN_SECONDS: int = 86400
@@ -251,11 +251,21 @@ class AbstractPairConverterPlugin:
         return asset in self.__fiat_list
 
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+        key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, _FIAT_EXCHANGE)
+        historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)
+
+        if historical_bar is not None:
+            LOGGER.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, _FIAT_EXCHANGE)
+            return historical_bar
+
         self._check_fiat_access_key()
-        if from_asset != "USD":
-            raise RP2ValueError("Fiat conversion is only available from USD at this time.")
+        # Currency has to be USD on free tier
+        if from_asset != "USD" and to_asset != "USD":
+            raise RP2ValueError("Fiat conversion is only available to/from USD at this time.")
+        currency: str = from_asset if from_asset != "USD" else to_asset
         result: Optional[HistoricalBar] = None
-        params: Dict[str, Any] = {_ACCESS_KEY: self.__fiat_access_key, _DATE: timestamp.strftime("%Y-%m-%d"), _CURRENCIES: to_asset}
+
+        params: Dict[str, Any] = {_ACCESS_KEY: self.__fiat_access_key, _DATE: timestamp.strftime("%Y-%m-%d"), _CURRENCIES: currency}
         request_count: int = 0
         # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
         while request_count < 5:
@@ -281,16 +291,37 @@ class AbstractPairConverterPlugin:
                 # }
                 data: Any = response.json()
                 if data[_SUCCESS]:
-                    market: str = f"USD{to_asset}"
-                    result = HistoricalBar(
+                    market: str = f"USD{to_asset}" if to_asset != "USD" else f"USD{from_asset}"
+                    usd_rate: RP2Decimal = RP2Decimal(str(data[_QUOTES][market]))
+                    usd_result = HistoricalBar(
                         duration=timedelta(seconds=_DAYS_IN_SECONDS),
                         timestamp=timestamp,
-                        open=RP2Decimal(str(data[_QUOTES][market])),
-                        high=RP2Decimal(str(data[_QUOTES][market])),
-                        low=RP2Decimal(str(data[_QUOTES][market])),
-                        close=RP2Decimal(str(data[_QUOTES][market])),
+                        open=usd_rate,
+                        high=usd_rate,
+                        low=usd_rate,
+                        close=usd_rate,
                         volume=ZERO,
                     )
+                    self._add_bar_to_cache(key, usd_result)
+
+                    # Note: the from_asset and to_asset are purposely reversed
+                    reverse_key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, to_asset, from_asset, _FIAT_EXCHANGE)
+                    reverse_rate: RP2Decimal = RP2Decimal("1") / usd_rate
+                    reverse_result = HistoricalBar(
+                        duration=timedelta(seconds=_DAYS_IN_SECONDS),
+                        timestamp=timestamp,
+                        open=reverse_rate,
+                        high=reverse_rate,
+                        low=reverse_rate,
+                        close=reverse_rate,
+                        volume=ZERO,
+                    )
+                    self._add_bar_to_cache(reverse_key, reverse_result)
+
+                    if from_asset == "USD":
+                        result = usd_result
+                    else:
+                        result = reverse_result
                 break
 
             except (JSONDecodeError, ReadTimeout) as exc:
