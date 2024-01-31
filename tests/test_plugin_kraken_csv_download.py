@@ -30,7 +30,7 @@ _CACHE_DIRECTORY: str = "output/kraken_test"
 
 class TestKrakenCsvDownload:
     def test_chunking(self, mocker: Any) -> None:
-        kraken_csv = Kraken("whatever")
+        kraken_csv = Kraken(transaction_manifest=TransactionManifest([FAKE_TRANSACTION], 1, "USD"))
 
         # Flush test cache directory
         for filename in listdir(_CACHE_DIRECTORY):

@@ -14,7 +14,6 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from inspect import Signature, signature
 from time import sleep, time
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union
 
@@ -180,9 +179,6 @@ _MS_IN_SECOND: int = 1000
 # Cache
 _CACHE_INTERVAL: int = 200
 
-# CSV Reader
-_GOOGLE_API_KEY: str = "google_api_key"
-
 # Djikstra weights
 # Priority should go to quote assets listed above, then other assets, and finally alternatives
 _STANDARD_WEIGHT: float = 50
@@ -213,7 +209,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         default_exchange: Optional[str] = None,
         fiat_access_key: Optional[str] = None,
         fiat_priority: Optional[str] = None,
-        google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
         untradeable_assets: Optional[str] = None,
         aliases: Optional[str] = None,
@@ -227,7 +222,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
-        self.__google_api_key: Optional[str] = google_api_key
         self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
         self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
 
@@ -428,18 +422,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         elif csv_pricing == self.__default_csv_reader.klass and self.__exchange_csv_reader.get(self.__default_csv_reader.name) is not None:
             csv_reader = self.__exchange_csv_reader.get(self.__default_csv_reader.name)
         elif csv_pricing is not None:
-            csv_signature: Signature = signature(csv_pricing)
-
-            # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
-            if _GOOGLE_API_KEY in csv_signature.parameters:
-                if self.__google_api_key is not None:
-                    csv_reader = csv_pricing(self.__google_api_key)
-                else:
-                    self.__logger.info(
-                        "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
-                    )
-            else:
-                csv_reader = csv_pricing()
+            csv_reader = csv_pricing(self.__manifest)
 
             if csv_pricing == self.__default_csv_reader.klass:
                 self.__exchange_csv_reader[self.__default_csv_reader.name] = csv_reader
