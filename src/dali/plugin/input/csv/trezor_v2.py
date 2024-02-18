@@ -44,6 +44,7 @@ class InputPlugin(AbstractInputPlugin):
     __TRANSACTION_ID_INDEX: int = 4
     __FEE_INDEX: int = 5
     __AMOUNT_INDEX: int = 9
+    __AMOUNT_UNIT: int = 10
 
     __DELIMITER = ";"
 
@@ -82,11 +83,14 @@ class InputPlugin(AbstractInputPlugin):
                 transaction_type: str = line[self.__TYPE_INDEX]
                 spot_price: str = Keyword.UNKNOWN.value
                 crypto_hash: str = line[self.__TRANSACTION_ID_INDEX]
-                fee_number: RP2Decimal = RP2Decimal(line[self.__FEE_INDEX])
+                fee_number: RP2Decimal = RP2Decimal(line[self.__FEE_INDEX]) if line[self.__FEE_INDEX] else ZERO
                 amount_number: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
 
                 if amount_number == ZERO and fee_number > ZERO:
-                    self.__logger.warning("Possible dusting attack (fee > 0, total = 0): %s", raw_data)
+                    self.__logger.warning("Possible dusting attack (fee > 0, total = 0), skipping transaction: %s", raw_data)
+                    continue
+                if line[self.__AMOUNT_UNIT] in self._POSSIBLE_DUST_ATTACKERS:
+                    self.__logger.warning("Possible dusting attack (amount unit %s is suspicious), skipping transaction: %s", line[self.__AMOUNT_UNIT], raw_data)
                     continue
                 if transaction_type in {_RECV, _SENT}:
                     result.append(
