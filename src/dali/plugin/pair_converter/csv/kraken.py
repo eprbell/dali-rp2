@@ -122,6 +122,9 @@ _PAIR_MIDDLE: str = "middle"
 _PAIR_END: str = "end"
 _MAX_MULTIPLIER: int = 500
 
+# Download chunks
+_CHUNK_SIZE_BYTES: int = 32768 # 32kb
+
 
 class _PairStartEnd(NamedTuple):
     end: int
@@ -235,7 +238,7 @@ class Kraken:
                     max_value=UnknownLength, widgets=["Downloading: ", BouncingBar(), " ", DataSize(), " ", AdaptiveTransferSpeed()]
                 ) as progress_bar:
                     progress_bar.start()
-                    for chunk in response.iter_content(32768):
+                    for chunk in response.iter_content(_CHUNK_SIZE_BYTES):
                         if chunk:  # Filter out keep-alive new chunks
                             file.write(chunk)
                             progress_bar.update(progress_bar.value + len(chunk))
