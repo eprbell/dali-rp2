@@ -189,7 +189,7 @@ While every commit and push are automatically tested as described, sometimes it'
 * sort imports: `isort .`
 * run pre-commit tests without committing: `pre-commit run --all-files`
 
-Logs are stored in the `log` directory. To generate debug logs in Linux or Mac, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
+Logs are stored in the `log` directory. To generate debug logs on Linux or Mac, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
 ```
 LOG_LEVEL=DEBUG dali_us -s -o output/ config/test_config.ini
 ```

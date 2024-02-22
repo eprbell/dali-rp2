@@ -824,9 +824,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
 
                     # Find the start of the market if it is after the first transaction
-                    # pad it by one week for untradeable assets
                     if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
-                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp  # - timedelta(weeks=1)
+                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp
                     else:
                         market_starts[child_name][neighbor.name] = week_start_date - timedelta(weeks=1)
                 else:
@@ -856,9 +855,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
                     else:
                         optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
-
-            # if crypto_asset in self.__untradeable_assets:
-            #    optimizations[week_start_date][crypto_asset][neighbor_asset] = -1.0
 
         # Sort the optimizations by timestamp
         # while caching the graph snapshots, the partial optimizations will be layered on to the previous

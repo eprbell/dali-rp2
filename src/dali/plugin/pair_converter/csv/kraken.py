@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This plugin facilitates the downloading of the unified CSV located at
+# https://drive.google.com/file/d/16YKyFkYlvawCHv3W7WuTFzM8RYgMRWMt/view?usp=sharing
+# This link will have to be updated quarterly when Kraken releases a new file.
+# Note that you can manually download the unified file as Kraken_OHLCVT.zip
+# to the .dali_cache/kraken/csv/ and dali-rp2 will use that file.
+# For more information on this file visit the following link:
+# https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data
+
 # Kraken CSV format: (epoch) timestamp, open, high, low, close, volume, trades
 
 import logging
@@ -198,6 +206,9 @@ class Kraken:
 
                 html_content = response.text  # Use response.text instead of response.content
 
+                # The unified file is large (3.9gig+), so Google Drive will warn us that it can not automatically scan it for viruses.
+                # Embedded in this warning is a hidden form with an id, export, confirm, and uuid tokens to submit in order to override the warning.
+                # First we harvest them
                 if "Google Drive - Virus scan warning" in html_content:
                     # Extract the required parameters using regular expressions
                     id_match = re.search(r'name="id"\s+value="([^"]+)"', html_content)
@@ -205,6 +216,7 @@ class Kraken:
                     confirm_match = re.search(r'name="confirm"\s+value="([^"]+)"', html_content)
                     uuid_match = re.search(r'name="uuid"\s+value="([^"]+)"', html_content)
 
+                    # Confirm they exist. This is a sanity check to verify the process has remained the same.
                     if id_match and export_match and confirm_match and uuid_match:
                         file_id = id_match.group(1)
                         export = export_match.group(1)
@@ -216,7 +228,7 @@ class Kraken:
                     # Set up the parameters for the download
                     params = {"id": file_id, "export": export, "confirm": confirm, "uuid": uuid}
 
-                    # Make the request and download the file
+                    # Make the request and download the file using the params harvested earlier
                     response = requests.get("https://drive.usercontent.google.com/download", params=params, stream=True, timeout=self.DEFAULT_TIMEOUT)
 
                 with open(self.__UNIFIED_CSV_FILE, "wb") as file, ProgressBar(
