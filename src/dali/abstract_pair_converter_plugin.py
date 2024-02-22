@@ -318,9 +318,8 @@ class AbstractPairConverterPlugin:
                     )
                     self._add_bar_to_cache(reverse_key, reverse_result)
 
-                    if from_asset == "USD":
-                        result = usd_result
-                    else:
+                    result = usd_result
+                    if from_asset != "USD":
                         result = reverse_result
                 break
 
