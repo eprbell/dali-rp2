@@ -23,6 +23,8 @@ from dali.cache import load_from_cache, save_to_cache
 
 class AbstractInputPlugin:
     ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
+    # This is a list of tokens that are associated to possible dust attacks.
+    _POSSIBLE_DUST_ATTACKERS = {"RSWAP.NET"}
 
     def __init__(
         self,
