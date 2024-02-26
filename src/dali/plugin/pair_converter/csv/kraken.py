@@ -123,7 +123,7 @@ _PAIR_END: str = "end"
 _MAX_MULTIPLIER: int = 500
 
 # Download chunks
-_CHUNK_SIZE_BYTES: int = 32768 # 32kb
+_CHUNK_SIZE_BYTES: int = 32768  # 32kb
 
 
 class _PairStartEnd(NamedTuple):
@@ -420,7 +420,7 @@ class Kraken:
         # Attempt to load smallest duration
         if self.__cached_pairs.get(base_asset + quote_asset + _MINUTE_IN_MINUTES):
             plural: str = "s" if all_bars else ""
-            self.__logger.debug("Retrieving cached bar%s for %s, %s at %s", plural, base_asset, quote_asset, epoch_timestamp)
+            self.__logger.debug("Retrieving cached bar %s for %s, %s at %s", plural, base_asset, quote_asset, epoch_timestamp)
             return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
 
         if self._unzip_and_chunk(base_asset, quote_asset, all_bars):
@@ -477,7 +477,7 @@ class Kraken:
         return True
 
     def _prompt_download_confirmation(self) -> bool:
-        print("\nIn order to provide accurate pricing from Kraken, a large (3.9+ gb) zipfile needs to be download.")
+        self.__logger.info("\nIn order to provide accurate pricing from Kraken, a large (3.9+ gb) zipfile needs to be download.")
 
         while True:
             choice = input("Do you want to download the file now?[yn]")
@@ -485,10 +485,10 @@ class Kraken:
                 return True
             if choice == "n":
                 return False
-            print("Invalid choice. Please enter y or n.")
+            self.__logger.info("Invalid choice. Please enter y or n.")
 
     def _prompt_delete_confirmation(self) -> bool:
-        print(
+        self.__logger.info(
             "\nAll of the CSV files for your assets have been processed. You can probably safely delete the master CSV file. "
             "However, if you add assets later, you will need to re-download the file."
         )
@@ -499,7 +499,7 @@ class Kraken:
                 return True
             if choice == "n":
                 return False
-            print("Invalid choice. Please enter y or n.")
+            self.__logger.info("Invalid choice. Please enter y or n.")
 
     def _remove_unified_csv_file(self) -> None:
         try:

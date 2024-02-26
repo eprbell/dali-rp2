@@ -49,6 +49,7 @@ FAKE_TRANSACTION: InTransaction = InTransaction(
     notes="notes",
 )
 
+
 class TestKrakenCsvDownload:
     def test_chunking(self, mocker: Any) -> None:
         kraken_csv = Kraken(transaction_manifest=TransactionManifest([FAKE_TRANSACTION], 1, "USD"))
