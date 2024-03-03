@@ -12,11 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=too-many-lines
+
 import logging
 from datetime import datetime, timedelta, timezone
 from inspect import Signature, signature
+from json import JSONDecodeError
+import requests
+from requests.exceptions import ReadTimeout
+from requests.models import Response
+from requests.sessions import Session
 from time import sleep, time
-from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union
+from typing import cast, Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union
 
 from ccxt import (
     DDoSProtection,
@@ -47,9 +54,40 @@ from dali.abstract_pair_converter_plugin import (
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
+from dali.logger import LOGGER
 from dali.mapped_graph import Alias, MappedGraph
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
 from dali.transaction_manifest import TransactionManifest
+
+# exchangerates.host keywords
+_ACCESS_KEY: str = "access_key"
+_CURRENCIES: str = "currencies"
+_DATE: str = "date"
+_QUOTES: str = "quotes"
+_SUCCESS: str = "success"
+
+# exchangerates.host urls
+_EXCHANGE_BASE_URL: str = "http://api.exchangerate.host/"
+_EXCHANGE_SYMBOLS_URL: str = "http://api.exchangerate.host/list"
+
+_DAYS_IN_SECONDS: int = 86400
+
+# First on the list has the most priority
+# This is hard-coded for now based on volume of each of these markets for BTC on Coinmarketcap.com
+# Any change to this priority should be documented in "docs/configuration_file.md"
+_FIAT_PRIORITY: Dict[str, float] = {
+    "USD": 1,
+    "JPY": 2,
+    "KRW": 3,
+    "EUR": 4,
+    "GBP": 5,
+    "AUD": 6,
+}
+
+# Other Weights
+_STANDARD_INCREMENT: float = 1
+
+_CONFIG_DOC_FILE_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md"
 
 # Native format keywords
 _ID: str = "id"
@@ -207,6 +245,8 @@ class ExchangeNameAndClass(NamedTuple):
 
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
+    __TIMEOUT: int = 30
+
     def __init__(
         self,
         historical_price_type: str,
@@ -222,7 +262,24 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         fiat_priority_cache_modifier = fiat_priority if fiat_priority else ""
         self.__cache_modifier = "_".join(x for x in [exchange_cache_modifier, fiat_priority_cache_modifier] if x)
 
+        self.__session: Session = requests.Session()
+        self.__fiat_list: List[str] = []
+        self.__fiat_priority: Dict[str, float]
+        if fiat_priority:
+            weight: float = _STANDARD_WEIGHT
+            for fiat in fiat_priority:
+                self.__fiat_priority[fiat] = weight
+                weight += _STANDARD_INCREMENT
+        else:
+            self.__fiat_priority = _FIAT_PRIORITY
+        self.__fiat_access_key: Optional[str] = None
+        if fiat_access_key:
+            self.__fiat_access_key = fiat_access_key
+        else:
+            LOGGER.warning("No Fiat Access Key. Fiat pricing will NOT be available for CCXT-based pair converters. "
+                           "To enable fiat pricing, an access key from exchangerate.host is required.")
         super().__init__(historical_price_type=historical_price_type, fiat_access_key=fiat_access_key, fiat_priority=fiat_priority)
+
         self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
         self.__exchanges: Dict[str, Exchange] = {}
@@ -251,14 +308,168 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         self.__untradeable_assets: Set[str] = set(untradeable_assets.split(", ")) if untradeable_assets is not None else set()
         self.__aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None if aliases is None else self._process_aliases(aliases)
 
+    def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
+        self._cache[self._floor_key(key)] = historical_bar
+
+    def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
+        return self._cache.get(self._floor_key(key))
+
+    # All bundle timestamps have 1 millisecond added to them, so will not conflict with the floored timestamps of single bars
+    def _add_bundle_to_cache(self, key: AssetPairAndTimestamp, historical_bars: List[HistoricalBar]) -> None:
+        self._cache[key] = historical_bars
+
+    def _get_bundle_from_cache(self, key: AssetPairAndTimestamp) -> Optional[List[HistoricalBar]]:
+        return cast(List[HistoricalBar], self._cache.get(key))
+
+    # The most granular pricing available is 1 minute, to reduce the size of cache and increase the reuse of pricing data
+    def _floor_key(self, key: AssetPairAndTimestamp) -> AssetPairAndTimestamp:
+        raw_timestamp: datetime = key.timestamp
+        floored_timestamp: datetime = raw_timestamp - timedelta(
+            minutes=raw_timestamp.minute % 1, seconds=raw_timestamp.second, microseconds=raw_timestamp.microsecond
+        )
+        floored_key: AssetPairAndTimestamp = AssetPairAndTimestamp(
+            timestamp=floored_timestamp,
+            from_asset=key.from_asset,
+            to_asset=key.to_asset,
+            exchange=key.exchange,
+        )
+
+        return floored_key
+
     def name(self) -> str:
         return "CCXT-converter"
 
     def cache_key(self) -> str:
         return self.name() + "_" + self.__cache_modifier if self.__cache_modifier else self.name()
 
+    @property
+    def fiat_list(self) -> List[str]:
+        return self.__fiat_list
+
     def optimize(self, transaction_manifest: TransactionManifest) -> None:
         self.__manifest = transaction_manifest
+
+    def _build_fiat_list(self) -> None:
+        self._check_fiat_access_key()
+        try:
+            response: Response = self.__session.get(_EXCHANGE_SYMBOLS_URL, params={_ACCESS_KEY: self.__fiat_access_key}, timeout=self.__TIMEOUT)
+            #  {
+            #     "success": true,
+            #     "terms": "https://exchangerate.host/terms",
+            #     "privacy": "https://exchangerate.host/privacy",
+            #     "currencies": {
+            #         "AED": "United Arab Emirates Dirham",
+            #         "AFN": "Afghan Afghani",
+            #         "ALL": "Albanian Lek",
+            #         "AMD": "Armenian Dram",
+            #         "ANG": "Netherlands Antillean Guilder",
+            #         [...]
+            #     }
+            # }
+            data: Any = response.json()
+            if data[_SUCCESS]:
+                self.__fiat_list = [fiat_iso for fiat_iso in data[_CURRENCIES] if fiat_iso != "BTC"]
+            else:
+                if "message" in data:
+                    LOGGER.error("Error %d: %s: %s", response.status_code, _EXCHANGE_SYMBOLS_URL, data["message"])
+                response.raise_for_status()
+
+        except JSONDecodeError as exc:
+            LOGGER.info("Fetching of fiat symbols failed. The server might be down. Please try again later.")
+            raise RP2RuntimeError("JSON decode error") from exc
+
+    def _add_fiat_edges_to_graph(self, graph: MappedGraph[str], markets: Dict[str, List[str]]) -> None:
+        if not self.__fiat_list:
+            self._build_fiat_list()
+
+        for fiat in self.__fiat_list:
+            to_fiat_list: Dict[str, None] = dict.fromkeys(self.__fiat_list.copy())
+            del to_fiat_list[fiat]
+            # We don't want to add a fiat vertex here because that would allow a double hop on fiat (eg. USD -> KRW -> JPY)
+            if graph.get_vertex(fiat):
+                for to_be_added_fiat in to_fiat_list:
+                    graph.add_neighbor(
+                        fiat,
+                        to_be_added_fiat,
+                        self.__fiat_priority.get(fiat, _STANDARD_WEIGHT),
+                        True,  # use set optimization
+                    )
+
+                LOGGER.debug("Added to assets for %s: %s", fiat, to_fiat_list)
+
+            for to_fiat in to_fiat_list:
+                fiat_market = f"{fiat}{to_fiat}"
+                markets[fiat_market] = [_FIAT_EXCHANGE]
+
+    def _is_fiat_pair(self, from_asset: str, to_asset: str) -> bool:
+        return self._is_fiat(from_asset) and self._is_fiat(to_asset)
+
+    def _is_fiat(self, asset: str) -> bool:
+        if not self.__fiat_list:
+            self._build_fiat_list()
+
+        return asset in self.__fiat_list
+
+    def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
+        self._check_fiat_access_key()
+        if from_asset != "USD":
+            raise RP2ValueError("Fiat conversion is only available from USD at this time.")
+        result: Optional[HistoricalBar] = None
+        params: Dict[str, Any] = {_ACCESS_KEY: self.__fiat_access_key, _DATE: timestamp.strftime("%Y-%m-%d"), _CURRENCIES: to_asset}
+        request_count: int = 0
+        # exchangerate.host only gives us daily accuracy, which should be suitable for tax reporting
+        while request_count < 5:
+            try:
+                response: Response = self.__session.get(f"{_EXCHANGE_BASE_URL}", params=params, timeout=self.__TIMEOUT)
+                # {
+                #     "success": true,
+                #     "terms": "https://exchangerate.host/terms",
+                #     "privacy": "https://exchangerate.host/privacy",
+                #     "historical": true,
+                #     "date": "2005-02-01",
+                #     "timestamp": 1107302399,
+                #     "source": "USD",
+                #     "quotes": {
+                #         "USDAED": 3.67266,
+                #         "USDALL": 96.848753,
+                #         "USDAMD": 475.798297,
+                #         "USDANG": 1.790403,
+                #         "USDARS": 2.918969,
+                #         "USDAUD": 1.293878,
+                #         [...]
+                #     }
+                # }
+                data: Any = response.json()
+                if data[_SUCCESS]:
+                    market: str = f"USD{to_asset}"
+                    result = HistoricalBar(
+                        duration=timedelta(seconds=_DAYS_IN_SECONDS),
+                        timestamp=timestamp,
+                        open=RP2Decimal(str(data[_QUOTES][market])),
+                        high=RP2Decimal(str(data[_QUOTES][market])),
+                        low=RP2Decimal(str(data[_QUOTES][market])),
+                        close=RP2Decimal(str(data[_QUOTES][market])),
+                        volume=ZERO,
+                    )
+                break
+
+            except (JSONDecodeError, ReadTimeout) as exc:
+                LOGGER.debug("Fetching of fiat exchange rates failed. The server might be down. Retrying the connection.")
+                request_count += 1
+                if request_count > 4:
+                    LOGGER.info("Giving up after 4 tries. Saving to Cache.")
+                    self.save_historical_price_cache()
+                    raise RP2RuntimeError("JSON decode error") from exc
+
+        return result
+
+    def _check_fiat_access_key(self) -> None:
+        if self.__fiat_access_key is None:
+            raise RP2ValueError(
+                f"No fiat access key. To convert fiat assets, please acquire an access key from exchangerate.host."
+                f"The access key will then need to be added to the configuration file. For more details visit "
+                f"{_CONFIG_DOC_FILE_URL}"
+            )
 
     @property
     def exchanges(self) -> Dict[str, Exchange]:
@@ -515,9 +726,14 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                             timeframe,
                         )
                     break
-                except (DDoSProtection, ExchangeError) as exc:
+                except (ExchangeError) as exc:
+                    self.__logger.debug("ExchangeError exception from server. Exception - %s", exc)
+                    sleep(0.1)
+                    break
+                except (DDoSProtection) as exc:
                     self.__logger.debug(
-                        "Exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc
+                        "DDosProtection exception from server, most likely too many requests. "
+                        "Making another attempt after 0.1 second delay. Exception - %s", exc
                     )
                     # logger INFO for retry?
                     sleep(0.1)
