@@ -14,6 +14,7 @@
 
 from datetime import datetime, timedelta
 from json import JSONDecodeError
+from os import path
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
@@ -56,6 +57,9 @@ _FIAT_PRIORITY: Dict[str, float] = {
     "AUD": 6,
 }
 
+# If Exchangerates.host is not available or the user does not have an access key, we can use this list
+_DEFAULT_FIAT_LIST: List[str] = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD", "USD"]
+
 # Other Weights
 _STANDARD_WEIGHT: float = 1
 _STANDARD_INCREMENT: float = 1
@@ -73,6 +77,7 @@ class AssetPairAndTimestamp(NamedTuple):
 class AbstractPairConverterPlugin:
     __ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
     __TIMEOUT: int = 30
+    __CSV_DIRECTORY: str = ".dali_cache/forex/"
 
     def __init__(self, historical_price_type: str, fiat_access_key: Optional[str] = None, fiat_priority: Optional[str] = None) -> None:
         if not isinstance(historical_price_type, str):
@@ -190,7 +195,10 @@ class AbstractPairConverterPlugin:
         return result
 
     def _build_fiat_list(self) -> None:
-        self._check_fiat_access_key()
+        if not self._check_fiat_access_key():
+            self.__fiat_list = _DEFAULT_FIAT_LIST
+            return
+
         try:
             response: Response = self.__session.get(_EXCHANGE_SYMBOLS_URL, params={_ACCESS_KEY: self.__fiat_access_key}, timeout=self.__TIMEOUT)
             #  {
@@ -258,7 +266,9 @@ class AbstractPairConverterPlugin:
             LOGGER.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, _FIAT_EXCHANGE)
             return historical_bar
 
-        self._check_fiat_access_key()
+        if not self._check_fiat_access_key():
+            return self._get_rate_from_csv(key)
+
         # Currency has to be USD on free tier
         if from_asset != "USD" and to_asset != "USD":
             raise RP2ValueError("Fiat conversion is only available to/from USD at this time.")
@@ -338,10 +348,69 @@ class AbstractPairConverterPlugin:
 
         return result
 
-    def _check_fiat_access_key(self) -> None:
+    def _get_rate_from_csv(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
+        result: Optional[HistoricalBar] = None
+        csv_file: str = f"{self.__CSV_DIRECTORY}{key.from_asset}_{key.to_asset}.csv"
+        file_exist = path.exists(csv_file)
+        reverse_pair: bool = False
+        if not file_exist:
+            csv_file = f"{self.__CSV_DIRECTORY}{key.to_asset}_{key.from_asset}.csv"
+            reverse_pair = path.exists(csv_file)
+            if not reverse_pair:
+                LOGGER.info("No CSV file found for %s for %s/%s", key.timestamp, key.from_asset, key.to_asset)
+                LOGGER.info("Please save a CSV file with pricing information named %s_%s.csv to %s ", key.from_asset, key.to_asset, self.__CSV_DIRECTORY)
+                LOGGER.info("And try to process your transactions again.")
+                LOGGER.info("For more details, check the documentation. %s", _FOREX_CSV_DOC_URL)
+                return result
+        try:
+            with open(csv_file, encoding="utf-8") as file:
+                lines: List[str] = file.readlines()
+                for line in lines:
+                    if line.startswith("Time"):
+                        continue
+                    parts: List[str] = line.split(",")
+                    if len(parts) != 6:
+                        continue
+                    date: datetime = datetime.strptime(parts[0], "%Y-%m-%d %H:%M:%S")
+                    if date.strftime("%Y-%m-%d") == key.timestamp.strftime("%Y-%m-%d"):
+                        result = HistoricalBar(
+                            duration=timedelta(days=1),
+                            timestamp=key.timestamp,
+                            open=RP2Decimal(parts[1]),
+                            high=RP2Decimal(parts[2]),
+                            low=RP2Decimal(parts[3]),
+                            close=RP2Decimal(parts[4]),
+                            volume=RP2Decimal(parts[5]),
+                        )
+                        self._add_bar_to_cache(key, result)
+
+                        # Note: the from_asset and to_asset are purposely reversed
+                        reverse_key: AssetPairAndTimestamp = AssetPairAndTimestamp(key.timestamp, key.to_asset, key.from_asset, _FIAT_EXCHANGE)
+                        reverse_result = HistoricalBar(
+                            duration=timedelta(days=1),
+                            timestamp=key.timestamp,
+                            open=RP2Decimal("1") / result.close,
+                            high=RP2Decimal("1") / result.low,
+                            low=RP2Decimal("1") / result.high,
+                            close=RP2Decimal("1") / result.open,
+                            volume=ZERO,
+                        )
+                        self._add_bar_to_cache(reverse_key, reverse_result)
+                        if reverse_pair:
+                            return reverse_result
+                        return result
+        except FileNotFoundError:
+            LOGGER.debug("File not found: %s", csv_file)
+        return result
+
+    def _check_fiat_access_key(self) -> bool:
         if self.__fiat_access_key is None:
-            raise RP2ValueError(
-                f"No fiat access key. To convert fiat assets, please acquire an access key from exchangerate.host."
-                f"The access key will then need to be added to the configuration file. For more details visit "
-                f"{_CONFIG_DOC_FILE_URL}"
+            LOGGER.info(
+                "No fiat access key. To convert fiat assets using prices from exchangerate.host, an access key is required. "
+                "Please sign up at exchangerate.host and add the access key to the configuration file. %s"
+                "Dali-rp2 will attempt to retrieve pricing from CSV files stored in %s",
+                _CONFIG_DOC_FILE_URL,
+                self.__CSV_DIRECTORY,
             )
+            return False
+        return True
