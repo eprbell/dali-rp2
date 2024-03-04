@@ -510,6 +510,16 @@ Be aware that:
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 * Some exchanges, in particular Binance.com, might not be available in certain territories.
 
+#### Note on Forex CSV file
+
+If you do not want to use Exchangerate.host for Forex prices, you can use CSV files by saving them to the folder .dali_cache/forex. The files must be in the format of quote_asset_base_asset.csv (e.g. USD_JPY.csv). The format should be Time, high, low, open, close, volume. Like the below example:
+
+Time               |Open  |High  |Low   |Close |Volume
+-------------------|------|------|------|------|------
+2008-02-22 00:00:00|210.45|215.45|211.56|213.45|8900
+
+Historical CSV Files are available from several places on the web for free. [Forexsb.com](https://forexsb.com/historical-forex-data) is a good source. Currently only 1 day candles are supported.
+
 #### A Special Note for Prices from Kraken Exchange
 Prices for the latest quarter from the Kraken exchange may be inaccurate due to the restrictions of the Kraken REST API. Only the latest 720 bars can be retrieved, so different candles must be used depending on how old the transaction is from the time you are pulling the pricing data. The following chart provides a rough estimate of what candles are used for which timeframe.
 
@@ -523,7 +533,7 @@ transaction age    | candle used
 
 Accuracy will improve once new CSV data is released, which is typically 2 weeks after the end of a quarter. Also, the Kraken REST API is very slow. It may take 20-30 seconds per transaction to retrieve prices for the latest quarter.
 
-##### Note on Unified CSV File  
+##### Note on Unified CSV File
 The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. You can also manually download the file from <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
 
 ### Binance Locked CCXT
