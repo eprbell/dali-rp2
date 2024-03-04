@@ -65,6 +65,7 @@ _STANDARD_WEIGHT: float = 1
 _STANDARD_INCREMENT: float = 1
 
 _CONFIG_DOC_FILE_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md"
+_FOREX_CSV_DOC_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md"
 
 
 class AssetPairAndTimestamp(NamedTuple):
