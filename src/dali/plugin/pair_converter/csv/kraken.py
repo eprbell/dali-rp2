@@ -211,7 +211,7 @@ class Kraken:
 
                 # The unified file is large (3.9gig+), so Google Drive will warn us that it can not automatically scan it for viruses.
                 # Embedded in this warning is a hidden form with an id, export, confirm, and uuid tokens to submit in order to override the warning.
-                # First we harvest them
+                # First we harvest the tokens.
                 if "Google Drive - Virus scan warning" in html_content:
                     # Extract the required parameters using regular expressions
                     id_match = re.search(r'name="id"\s+value="([^"]+)"', html_content)
