@@ -58,6 +58,9 @@ _FILES: str = "files"
 _GOOGLE_APIS_URL: str = "https://www.googleapis.com/drive/v3/files"
 _ID: str = "id"
 
+# The URL for downloading the actual file from Google Drive with security params
+_GOOGLE_DRIVE_DOWNLOAD_URL: str = "https://drive.usercontent.google.com/download"
+
 # File ID for the unified CSV file ID. This will need to be replaced every quarter.
 _UNIFIED_CSV_FILE_ID: str = "16YKyFkYlvawCHv3W7WuTFzM8RYgMRWMt"
 _MESSAGE: str = "message"
@@ -230,9 +233,11 @@ class Kraken:
 
                     # Set up the parameters for the download
                     params = {"id": file_id, "export": export, "confirm": confirm, "uuid": uuid}
+                    query_string = "&".join(f"{key}={value}" for key, value in params.items())
 
                     # Make the request and download the file using the params harvested earlier
-                    response = requests.get("https://drive.usercontent.google.com/download", params=params, stream=True, timeout=self.DEFAULT_TIMEOUT)
+                    response = requests.get(_GOOGLE_DRIVE_DOWNLOAD_URL, params=params, stream=True, timeout=self.DEFAULT_TIMEOUT)
+                    self.__logger.info("Downloading the unified CSV from %s?%s", _GOOGLE_DRIVE_DOWNLOAD_URL, query_string)
 
                 with open(self.__UNIFIED_CSV_FILE, "wb") as file, ProgressBar(
                     max_value=UnknownLength, widgets=["Downloading: ", BouncingBar(), " ", DataSize(), " ", AdaptiveTransferSpeed()]
