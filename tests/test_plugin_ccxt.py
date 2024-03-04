@@ -677,6 +677,41 @@ class TestCcxtPlugin:
         assert data.close == EUR_USD_RATE
         assert data.volume == ZERO
 
+    def test_fiat_pair_with_csv(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+
+        # Need to be mocked to prevent logger spam
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: ["WHATEVER"]})
+        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
+
+        mocker.patch.object(plugin, "_get_rate_from_csv").return_value = HistoricalBar(
+            duration=timedelta(seconds=86400),
+            timestamp=EUR_USD_TIMESTAMP,
+            open=RP2Decimal(str(EUR_USD_RATE)),
+            high=RP2Decimal(str(EUR_USD_RATE)),
+            low=RP2Decimal(str(EUR_USD_RATE)),
+            close=RP2Decimal(str(EUR_USD_RATE)),
+            volume=ZERO,
+        )
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange})
+
+        data = plugin.get_historic_bar_from_native_source(EUR_USD_TIMESTAMP, "EUR", "USD", TEST_EXCHANGE)
+
+        assert data
+        assert data.timestamp == EUR_USD_TIMESTAMP
+        assert data.low == EUR_USD_RATE
+        assert data.high == EUR_USD_RATE
+        assert data.open == EUR_USD_RATE
+        assert data.close == EUR_USD_RATE
+        assert data.volume == ZERO
+
     @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
     @pytest.mark.vcr
     def disabled_test_kraken_csv(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
@@ -882,3 +917,30 @@ class TestCcxtPlugin:
         assert data.open == BTCUSDT_OPEN * USDTUSD_OPEN * RP2Decimal("0.001")
         assert data.close == BTCUSDT_CLOSE * USDTUSD_CLOSE * RP2Decimal("0.001")
         assert data.volume == BTCUSDT_VOLUME + USDTUSD_VOLUME + RP2Decimal("1")
+
+    def test_get_rate_from_csv(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+        plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        exchange = binance(
+            {
+                "apiKey": "key",
+                "secret": "secret",
+            }
+        )
+
+        # Need to be mocked to prevent logger spam
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: ["WHATEVER"]})
+        mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
+        mocker.patch.object(plugin, "_AbstractPairConverterPlugin__CSV_DIRECTORY", "input/")
+        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange})
+
+        key = AssetPairAndTimestamp(EUR_USD_TIMESTAMP, "EUR", "USD", TEST_EXCHANGE)
+        data = plugin._get_rate_from_csv(key)  # pylint: disable=protected-access
+
+        assert data
+        assert data.timestamp == EUR_USD_TIMESTAMP
+        assert data.low == EUR_USD_RATE
+        assert data.high == EUR_USD_RATE
+        assert data.open == EUR_USD_RATE
+        assert data.close == EUR_USD_RATE
+        assert data.volume == ZERO
