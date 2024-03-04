@@ -90,8 +90,9 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.warning("Possible dusting attack (fee > 0, total = 0), skipping transaction: %s", raw_data)
                     continue
                 if line[self.__AMOUNT_UNIT] in self._POSSIBLE_DUST_ATTACKERS:
-                    self.__logger.warning("Possible dusting attack (amount unit %s is suspicious), skipping transaction: %s",
-                                          line[self.__AMOUNT_UNIT], raw_data)
+                    self.__logger.warning(
+                        "Possible dusting attack (amount unit %s is suspicious), skipping transaction: %s", line[self.__AMOUNT_UNIT], raw_data
+                    )
                     continue
                 if transaction_type in {_RECV, _SENT}:
                     result.append(
