@@ -209,7 +209,8 @@ class Kraken:
                 # Downloading the unified zipfile that contains all the trading pairs
                 response = self.__session.get("https://docs.google.com/uc?export=download&confirm=1", params={"id": _UNIFIED_CSV_FILE_ID}, stream=True)
 
-                html_content = response.text  # Use response.text instead of response.content
+                # Use response.text instead of response.content since an html form will be returned that we need to grab strings from.
+                html_content = response.text
 
                 # The unified file is large (3.9gig+), so Google Drive will warn us that it can not automatically scan it for viruses.
                 # Embedded in this warning is a hidden form with an id, export, confirm, and uuid tokens to submit in order to override the warning.
@@ -438,7 +439,7 @@ class Kraken:
         if not path.exists(self.__UNIFIED_CSV_FILE) and (self.__force_download or self._prompt_download_confirmation()):
             self.__download_unified_csv()
 
-        self.__logger.info("Attempting to load %s%s from Kraken Google Drive.", base_asset, quote_asset)
+        self.__logger.info("Attempting to retrieve %s%s pair from the unified Kraken CSV file.", base_asset, quote_asset)
         successful = False
         for _ in range(2):
             try:
@@ -481,7 +482,7 @@ class Kraken:
         return True
 
     def _prompt_download_confirmation(self) -> bool:
-        self.__logger.info("\nIn order to provide accurate pricing from Kraken, a large (3.9+ gb) zipfile needs to be download.")
+        self.__logger.info("\nIn order to provide accurate pricing from Kraken, a large (3.9+ gb) zipfile needs to be downloaded.")
 
         while True:
             choice = input("Do you want to download the file now?[yn]")
@@ -493,8 +494,9 @@ class Kraken:
 
     def _prompt_delete_confirmation(self) -> bool:
         self.__logger.info(
-            "\nAll of the CSV files for your assets have been processed. You can probably safely delete the master CSV file. "
-            "However, if you add assets later, you will need to re-download the file."
+            "\nAll of the CSV files for your assets have been processed. You can probably safely delete the master CSV file "
+            "located at %s. However, if you add assets later, you will need to re-download the file.",
+            self.__UNIFIED_CSV_FILE,
         )
 
         while True:

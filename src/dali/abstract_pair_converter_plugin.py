@@ -290,6 +290,9 @@ class AbstractPairConverterPlugin:
                 #     }
                 # }
                 data: Any = response.json()
+
+                # Exchangerate.host only returns one rate for the whole day and does not provide OHLCV, so
+                # all rates are the same.
                 if data[_SUCCESS]:
                     market: str = f"USD{to_asset}" if to_asset != "USD" else f"USD{from_asset}"
                     usd_rate: RP2Decimal = RP2Decimal(str(data[_QUOTES][market]))
@@ -304,6 +307,8 @@ class AbstractPairConverterPlugin:
                     )
                     self._add_bar_to_cache(key, usd_result)
 
+                    # Exchangerate.host only returns one rate for the whole day and does not provide OHLCV, so
+                    # all rates are the same.
                     # Note: the from_asset and to_asset are purposely reversed
                     reverse_key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, to_asset, from_asset, _FIAT_EXCHANGE)
                     reverse_rate: RP2Decimal = RP2Decimal("1") / usd_rate

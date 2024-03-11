@@ -318,7 +318,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     volume=ZERO,
                 )
             raise RP2RuntimeError(
-                f"The asset {from_asset}({from_asset_vertex}) or {to_asset}({to_asset_vertex}) " "is missing from {exchange} graph for {timestamp}"
+                f"The asset {from_asset}({from_asset_vertex}) or {to_asset}({to_asset_vertex}) is missing from {exchange} graph for {timestamp}"
             )
 
         pricing_path = current_graph.dijkstra(from_asset_vertex, to_asset_vertex, False)
