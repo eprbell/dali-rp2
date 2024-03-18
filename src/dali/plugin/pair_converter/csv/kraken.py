@@ -157,13 +157,12 @@ class Kraken:
 
     __DELIMITER: str = ","
 
-    def __init__(self, transaction_manifest: TransactionManifest, force_download: bool = False, unified_csv_file_id: str = _UNIFIED_CSV_FILE_ID) -> None:
+    def __init__(self, transaction_manifest: TransactionManifest, force_download: bool = False) -> None:
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
         self.__cached_pairs: Dict[str, _PairStartEnd] = {}
         self.__cache_loaded: bool = False
         self.__force_download: bool = force_download
-        self.__unified_csv_file_id: str = unified_csv_file_id
         self.__unchunked_assets: Set[str] = transaction_manifest.assets
 
         self.__logger.debug("Assets: %s", self.__unchunked_assets)
@@ -208,7 +207,7 @@ class Kraken:
             retry_count = 0
             while True:
                 # Downloading the unified zipfile that contains all the trading pairs
-                response = self.__session.get("https://docs.google.com/uc?export=download&confirm=1", params={"id": self.__unified_csv_file_id}, stream=True)
+                response = self.__session.get("https://docs.google.com/uc?export=download&confirm=1", params={"id": _UNIFIED_CSV_FILE_ID}, stream=True)
 
                 html_content = response.text  # Use response.text instead of response.content
 
