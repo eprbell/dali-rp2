@@ -85,7 +85,7 @@ class InputPlugin(AbstractInputPlugin):
         with open(file_path, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
 
-            header = next(lines)
+            header = str(next(lines)).encode("utf-8")
             self.__logger.debug("Header: %s", header)
             for line in lines:
                 if line[self.__DEPOSIT_STATUS] == "DONE":
@@ -126,7 +126,7 @@ class InputPlugin(AbstractInputPlugin):
         with open(file_path, encoding="utf-8") as csv_file:
             lines = reader(csv_file)
 
-            header = next(lines)
+            header = str(next(lines)).encode("utf-8")
             self.__logger.debug("Header: %s", header)
             for line in lines:
                 if line[self.__STATUS] == "DONE":

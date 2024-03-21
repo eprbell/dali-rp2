@@ -14,7 +14,6 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from inspect import Signature, signature
 from time import sleep, time
 from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union
 
@@ -125,37 +124,45 @@ _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
 _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "ASTUSDT": _OKEX,
     "ARKKRW": _UPBIT,
-    "XYMUSDT": _GATE,
     "ATDUSDT": _GATE,
     "BETHETH": _BINANCE,
     "BNBUSDT": _BINANCEUS,
     "BSVUSDT": _GATE,
     "BOBAUSDT": _GATE,
     "BUSDUSDT": _BINANCE,
+    "CYBERUSDT": _BINANCE,
     "EDGUSDT": _GATE,
     "ETHWUSD": _KRAKEN,
+    "MAVUSDT": _BINANCE,
     "NEXOUSDT": _BITFINEX,  # To be replaced with Huobi once a CSV plugin is available
+    "RVNUSDT": _BINANCE,
+    "SEIUSDT": _BINANCE,
     "SGBUSD": _KRAKEN,
     "SOLOUSDT": _GATE,  # To be replaced with Binance or Huobi once a CSV plugin is available
     "USDTUSD": _KRAKEN,
+    "XYMUSDT": _GATE,
 }
 
 _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "AST": "USDT",
     "ARK": "KRW",
-    "XYM": "USDT",
     "ATD": "USDT",
     "BETH": "ETH",
     "BNB": "USDT",
     "BOBA": "USDT",
     "BSV": "USDT",
     "BUSD": "USDT",
+    "CYBER": "USDT",
     "EDG": "USDT",
     "ETHW": "USD",
+    "MAV": "USDT",
     "NEXO": "USDT",
+    "RVN": "USDT",
+    "SEI": "USDT",
     "SGB": "USD",
     "SOLO": "USDT",
     "USDT": "USD",
+    "XYM": "USDT",
 }
 
 # Priority for quote asset. If asset is not listed it will be filtered out.
@@ -179,9 +186,6 @@ _MS_IN_SECOND: int = 1000
 
 # Cache
 _CACHE_INTERVAL: int = 200
-
-# CSV Reader
-_GOOGLE_API_KEY: str = "google_api_key"
 
 # Djikstra weights
 # Priority should go to quote assets listed above, then other assets, and finally alternatives
@@ -213,7 +217,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         default_exchange: Optional[str] = None,
         fiat_access_key: Optional[str] = None,
         fiat_priority: Optional[str] = None,
-        google_api_key: Optional[str] = None,
         exchange_locked: Optional[bool] = None,
         untradeable_assets: Optional[str] = None,
         aliases: Optional[str] = None,
@@ -227,7 +230,6 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
-        self.__google_api_key: Optional[str] = google_api_key
         self.__exchange_locked: bool = exchange_locked if exchange_locked is not None else False
         self.__default_exchange: str = _DEFAULT_EXCHANGE if default_exchange is None else default_exchange
 
@@ -296,9 +298,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         pricing_path: Optional[Iterator[Vertex[str]]] = None
 
         # TO BE IMPLEMENTED - bypass routing if conversion can be done with one market on the exchange
-        if market_symbol in current_markets and (exchange in current_markets[market_symbol]):
+        if market_symbol in current_markets:
             self.__logger.debug("Found market - %s on single exchange, skipping routing.", market_symbol)
-            result = self.find_historical_bar(from_asset, to_asset, timestamp, exchange)
+            result = self.find_historical_bar(from_asset, to_asset, timestamp, current_markets[market_symbol][0])
             return result
         # else:
         # Graph building goes here.
@@ -315,7 +317,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     close=ZERO,
                     volume=ZERO,
                 )
-            raise RP2RuntimeError(f"The asset {from_asset} or {to_asset} is missing from graph")
+            raise RP2RuntimeError(
+                f"The asset {from_asset}({from_asset_vertex}) or {to_asset}({to_asset_vertex}) is missing from {exchange} graph for {timestamp}"
+            )
+
         pricing_path = current_graph.dijkstra(from_asset_vertex, to_asset_vertex, False)
 
         if pricing_path is None:
@@ -428,18 +433,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         elif csv_pricing == self.__default_csv_reader.klass and self.__exchange_csv_reader.get(self.__default_csv_reader.name) is not None:
             csv_reader = self.__exchange_csv_reader.get(self.__default_csv_reader.name)
         elif csv_pricing is not None:
-            csv_signature: Signature = signature(csv_pricing)
-
-            # a Google API key is necessary to interact with Google Drive since Google restricts API calls to avoid spam, etc...
-            if _GOOGLE_API_KEY in csv_signature.parameters:
-                if self.__google_api_key is not None:
-                    csv_reader = csv_pricing(self.__google_api_key)
-                else:
-                    self.__logger.info(
-                        "Google API Key is not set. Setting the Google API key in the CCXT pair converter plugin could speed up pricing resolution"
-                    )
-            else:
-                csv_reader = csv_pricing()
+            csv_reader = csv_pricing(self.__manifest)
 
             if csv_pricing == self.__default_csv_reader.klass:
                 self.__exchange_csv_reader[self.__default_csv_reader.name] = csv_reader
@@ -643,7 +637,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
             # If the asset name doesn't exist, the MappedGraph will create a vertex with that name and add it to the graph
             # If it does exist it will look it up in the dictionary by name and add the neighbor to that vertex.
-            graph.add_neighbor(base_asset, quote_asset, _ALTERNATIVE_MARKET_WEIGHT)
+            if base_asset not in self.__untradeable_assets:
+                self.__logger.debug("Added %s:%s to graph.", base_asset, quote_asset)
+                graph.add_neighbor(base_asset, quote_asset, _ALTERNATIVE_MARKET_WEIGHT)
 
     def _cache_graph_snapshots(self, exchange: str) -> None:
         # TO BE IMPLEMENTED - If asset is missing from manifest, warn user and reoptimize.
@@ -745,6 +741,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         # Add alternative markets if they don't exist
         if not self.__exchange_locked:
+            self.__logger.debug("Adding alternative markets to %s graph.", exchange)
             self._add_alternative_markets(current_graph, current_markets)
 
         self._add_fiat_edges_to_graph(current_graph, current_markets)
@@ -789,6 +786,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
 
         child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
         optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}
+        optimizations[week_start_date] = {}
+
+        # Alternative market correction
+        for asset in self.__untradeable_assets:
+            optimizations[week_start_date][asset] = {}
 
         # Retrieve historical week bars/candles to use for optimization
         for child_name in unoptimized_assets:
@@ -822,9 +824,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
 
                     # Find the start of the market if it is after the first transaction
-                    # pad it by one week for untradeable assets
                     if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
-                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp - timedelta(weeks=1)
+                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp
                     else:
                         market_starts[child_name][neighbor.name] = week_start_date - timedelta(weeks=1)
                 else:

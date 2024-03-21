@@ -476,7 +476,6 @@ historical_price_type = <em>&lt;historical_price_type&gt;</em>
 default_exchange = <em>&lt;default_exchange&gt;</em>
 fiat_access_key = <em>&lt;fiat_access_key&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
-google_api_key = <em>&lt;google_api_key&gt;</em>
 untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
 aliases = <em>&lt;untradeable_assets&gt;</em>
 </pre>
@@ -486,7 +485,6 @@ Where:
 * `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Kraken(US) is used. If you would like an exchange added please open an issue. The current available exchanges are "Binance.com", "Gate", "Huobi" and "Kraken".
 * `fiat_access_key` is an optional access key that can be obtained from [Exchangerate.host](https://exchangerate.host/). It is required for any fiat conversions, which are typically required if the base fiat is other than USD.
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
-* `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
 * `untradeable_assets` is a comma separated list of assets that have no market, yet. These are typically assets that are farmed or given away as a part of promotion before a market is available to price them and CCXT can not automatically assign a price. If you get the error "The asset XXX or XXX is missing from graph" and the asset is untradeable, adding the untradeable asset to this list will resolve it.
 * `aliases` is a list of aliases separated by semicolons. Each alias has 4 properties: exchange, from asset, to asset, factor. `exchange` is the name of the exchange if the alias is specific or `UNIVERSAL` if you want it applied to all exchanges. The current exchanges recognized by the CCXT plugin are "Binance.com", "Binance US", "Bitfinex", "Coinbase Pro", "Gate", "Huobi", "Kraken", "Okex", "Pionex" and "Upbit". `from asset` and `to asset` are the ISO codes in all caps of the assets you want to make an alias for. Finally, `factor` is the price factor for the alias (e.g. "1" if it is one to one). Here are some examples:
 
@@ -525,6 +523,8 @@ transaction age    | candle used
 
 Accuracy will improve once new CSV data is released, which is typically 2 weeks after the end of a quarter. Also, the Kraken REST API is very slow. It may take 20-30 seconds per transaction to retrieve prices for the latest quarter.
 
+##### Note on Unified CSV File  
+The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. You can also manually download the file from <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
 
 ### Binance Locked CCXT
 This plugin makes use of the CCXT plugin, but locks all routes to Binance.com.

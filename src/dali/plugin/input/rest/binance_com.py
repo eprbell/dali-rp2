@@ -133,6 +133,7 @@ _WITHDRAWAL_RECORD_LIMIT: int = 1000
 
 # Types of Binance Dividends
 _BNB_VAULT = "BNB Vault"
+_EARN_REWARDS = "Earn Rewards"
 _ETH_STAKING = "ETH 2.0 Staking"
 _FLEXIBLE = "Flexible"
 _FLEXIBLE_SAVINGS = "Flexible Savings"
@@ -148,7 +149,7 @@ _LAUNCHPAD = "launchpad"
 _SAVINGS_TRAIL_FUND = "Savings Trail Fund"
 
 _AIRDROP_LIST = [_SOLO_AIRDROP]
-_INTEREST_LIST = [_FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS, _SAVINGS_TRAIL_FUND]
+_INTEREST_LIST = [_EARN_REWARDS, _FLEXIBLE, _FLEXIBLE_SAVINGS, _LOCKED, _LOCKED_SAVINGS, _SAVINGS_TRAIL_FUND]
 _STAKING_LIST = [_ETH_STAKING, _LOCKED_STAKING, _BNB_VAULT, _LAUNCH_POOL, _GENERAL_STAKING, _LAUNCHPAD]
 _INCOME_LIST = [_CASH_VOUCHER]
 
@@ -483,61 +484,6 @@ class InputPlugin(AbstractCcxtInputPlugin):
             else:
                 current_start = now_time - 1  # int(locked_redemptions[0][_TIME]) + 1
                 current_end = now_time  # current_start + _THIRTY_DAYS_IN_MS
-
-        # Old system Flexible Savings
-
-        # Reset window
-        current_start = self._start_time_ms
-        current_end = current_start + _THIRTY_DAYS_IN_MS
-
-        # We will step backward in time from the switch over
-        while current_start < earliest_record_epoch:
-            self._logger.debug("Pulling flexible saving from older api system from %s to %s", current_start, current_end)
-
-            flexible_saving = self._client.sapi_get_lending_union_interesthistory(
-                params=({_START_TIME: current_start, _END_TIME: current_end, _LENDING_TYPE: _DAILY, _SIZE: _INTEREST_SIZE_LIMIT})
-            )
-            # [
-            #     {
-            #         "asset": "BUSD",
-            #         "interest": "0.00006408",
-            #         "lendingType": "DAILY",
-            #         "productName": "BUSD",
-            #         "time": 1577233578000
-            #     },
-            #     {
-            #         "asset": "USDT",
-            #         "interest": "0.00687654",
-            #         "lendingType": "DAILY",
-            #         "productName": "USDT",
-            #         "time": 1577233562000
-            #     }
-            # ]
-            processing_result_list = []
-            for saving in flexible_saving:
-                self._logger.debug("Flexible Saving: %s", json.dumps(saving))
-                saving[_EN_INFO] = "Flexible Savings (OLD)"
-                saving[_ID] = Keyword.UNKNOWN.value
-                saving[_DIV_TIME] = saving[_TIME]
-                saving[_AMOUNT] = saving[_INTEREST_FIELD]
-                processing_result_list.append(self._process_gain(saving, Keyword.INTEREST))
-                old_savings = True
-
-            for processing_result in processing_result_list:
-                if processing_result is None:
-                    continue
-                if processing_result.in_transactions:
-                    in_transactions.extend(processing_result.in_transactions)
-
-            # if we returned the limit, we need to roll the window forward to the last time
-            if len(flexible_saving) < _INTEREST_SIZE_LIMIT:
-                current_start = current_end + 1
-                current_end = current_start + _THIRTY_DAYS_IN_MS
-            else:
-                current_start = int(flexible_saving[0][_TIME]) + 1
-                current_end = current_start + _THIRTY_DAYS_IN_MS
-
-            current_end = min(current_end, earliest_record_epoch)
 
         if old_savings:
             # Since we are making a guess at the cut off, there might be errors.
