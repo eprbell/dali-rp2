@@ -130,11 +130,13 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "BSVUSDT": _GATE,
     "BOBAUSDT": _GATE,
     "BUSDUSDT": _BINANCE,
+    "CAKEUSDT": _BINANCE,
     "CYBERUSDT": _BINANCE,
     "EDGUSDT": _GATE,
     "ETHWUSD": _KRAKEN,
     "MAVUSDT": _BINANCE,
     "NEXOUSDT": _BITFINEX,  # To be replaced with Huobi once a CSV plugin is available
+    "OPUSDT": _BINANCE,
     "RVNUSDT": _BINANCE,
     "SEIUSDT": _BINANCE,
     "SGBUSD": _KRAKEN,
@@ -152,17 +154,25 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "BOBA": "USDT",
     "BSV": "USDT",
     "BUSD": "USDT",
+    "CAKE": "USDT",
     "CYBER": "USDT",
     "EDG": "USDT",
     "ETHW": "USD",
     "MAV": "USDT",
     "NEXO": "USDT",
+    "OP": "USDT",
     "RVN": "USDT",
     "SEI": "USDT",
     "SGB": "USD",
     "SOLO": "USDT",
     "USDT": "USD",
     "XYM": "USDT",
+}
+
+# Sometimes an indirect route (eg. BTC -> USDT -> USD) exists before a native one (eg. BTC -> USD)
+# We need to force routing in these cases.
+_FORCE_ROUTING: Set[str] = {
+    "OPUSD"
 }
 
 # Priority for quote asset. If asset is not listed it will be filtered out.
@@ -298,7 +308,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         pricing_path: Optional[Iterator[Vertex[str]]] = None
 
         # TO BE IMPLEMENTED - bypass routing if conversion can be done with one market on the exchange
-        if market_symbol in current_markets:
+        if market_symbol in current_markets and market_symbol not in _FORCE_ROUTING:
             self.__logger.debug("Found market - %s on single exchange, skipping routing.", market_symbol)
             result = self.find_historical_bar(from_asset, to_asset, timestamp, current_markets[market_symbol][0])
             return result
@@ -573,8 +583,10 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         self.__kraken_warning = True
                     elif exchange != "Kraken":  # This is a different exchange that is having pricing issues, so warn the user.
                         self.__logger.info(
-                            "The most accurate candle was not able to be used for pricing the asset %s at %s. The %s candle for %s was used. "
-                            "The price may be inaccurate. If you feel like you're getting this message in error, please open an issue at %s",
+                            "The most accurate candle was not able to be used for pricing the asset %s at %s. \n"
+                            "The %s candle for %s was used. \n"
+                            "The price may be inaccurate. If you feel like you're getting this message in error, \n"
+                            "please open an issue at %s",
                             from_asset,
                             timestamp,
                             timeframe,
@@ -821,6 +833,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     bar_check = [no_market_padding] + bar_check
 
                     child_bars[child_name][neighbor.name] = bar_check
+                    # Zero out all optimizations before they start
+                    if child_name not in optimizations[week_start_date]:
+                        optimizations[week_start_date][child_name] = {}
+                    if neighbor.name not in optimizations[week_start_date][child_name]:
+                        optimizations[week_start_date][child_name][neighbor.name] = -1.0
                     timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
 
                     # Find the start of the market if it is after the first transaction
@@ -851,7 +868,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                         optimizations[timestamp][crypto_asset] = {}
 
                     # This deletes markets before they start by setting the weight to a negative
-                    if timestamp < market_starts[crypto_asset].get(neighbor_asset, start_date):
+                    if timestamp < market_starts[crypto_asset].get(neighbor_asset, start_date):                       
                         optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
                     else:
                         optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
