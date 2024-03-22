@@ -679,7 +679,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 intra_transaction_list.append(
                     IntraTransaction(
                         plugin=self.plugin_name(),
-                        unique_id=transaction[_TX_ID],
+                        unique_id=transaction[_ID],
                         raw_data=json.dumps(transaction),
                         timestamp=transaction[_DATE_TIME],
                         asset=transaction[_CURRENCY],
@@ -696,7 +696,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                 intra_transaction_list.append(
                     IntraTransaction(
                         plugin=self.plugin_name(),
-                        unique_id=transaction[_TX_ID],
+                        unique_id=transaction[_ID],
                         raw_data=json.dumps(transaction),
                         timestamp=transaction[_DATE_TIME],
                         asset=transaction[_CURRENCY],
