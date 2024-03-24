@@ -191,6 +191,20 @@ class InputPlugin(AbstractCcxtInputPlugin):
             }
         )
 
+    @staticmethod
+    def _to_trade(market_pair: str, base_amount: str, quote_amount: str) -> Trade:
+        assets = market_pair.split("/")
+        if assets[0] == "USD4":
+            assets[0] = "USD"
+        if assets[1] == "USD4":
+            assets[1] = "USD"
+        return Trade(
+            base_asset=assets[0],
+            quote_asset=assets[1],
+            base_info=f"{base_amount} {assets[0]}",
+            quote_info=f"{quote_amount} {assets[1]}",
+        )
+
     @property
     def _client(self) -> binanceus:
         super_client: Exchange = super()._client
@@ -828,7 +842,264 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
     def _process_gain(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessOperationResult:
         pass 
+
+    def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Buy: %s", json.dumps(transaction))
+        in_transaction_list: List[InTransaction] = []
+        out_transaction_list: List[OutTransaction] = []
+        crypto_in: RP2Decimal
+        crypto_fee: RP2Decimal
+        fee_asset: str = transaction[_FEE][_CURRENCY]
+        
+        
+
+        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+
+        if fee_asset == "USD4":
+            fee_asset = "USD"
+        
+        
+
+
+        if transaction[_SIDE] == _BUY:
+            out_asset = trade.quote_asset
+            in_asset = trade.base_asset
+            crypto_in = RP2Decimal(str(transaction[_AMOUNT]))
+            conversion_info = f"{trade.quote_info} -> {trade.base_info}"
+        elif transaction[_SIDE] == _SELL:
+            out_asset = trade.base_asset
+            in_asset = trade.quote_asset
+            crypto_in = RP2Decimal(str(transaction[_COST]))
+            conversion_info = f"{trade.base_info} -> {trade.quote_info}"
+        else:
+            raise RP2RuntimeError(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
+
+        if fee_asset == in_asset:
+            crypto_fee = RP2Decimal(str(transaction[_FEE][_COST]))
+        else:
+            crypto_fee = ZERO
+            transaction_fee = RP2Decimal(str(transaction[_FEE][_COST]))
+
+            # Users can use other crypto assets to pay for trades
+            if fee_asset != out_asset and RP2Decimal(transaction_fee) > ZERO:
+                out_transaction_list.append(
+                    OutTransaction(
+                        plugin=self.plugin_name(),
+                        unique_id=transaction[_ID],
+                        raw_data=json.dumps(transaction),
+                        timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                        asset=transaction[_FEE][_CURRENCY],
+                        exchange=self.exchange_name(),
+                        holder=self.account_holder,
+                        transaction_type=Keyword.FEE.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_out_no_fee="0",
+                        crypto_fee=str(transaction_fee),
+                        crypto_out_with_fee=str(transaction_fee),
+                        fiat_out_no_fee=str(transaction_fee) if self.is_native_fiat(fee_asset) else None,
+                        fiat_fee=str(transaction_fee) if self.is_native_fiat(fee_asset) else None,
+                        notes=(f"{notes + '; ' if notes else ''} Fee for conversion from " f"{conversion_info}"),
+                    )
+                )
+
+        # Is this a plain buy or a conversion?
+        if self.is_native_fiat(trade.quote_asset):
+            fiat_in_with_fee = RP2Decimal(str(transaction[_COST]))
+            fiat_fee = RP2Decimal(crypto_fee)
+            spot_price = RP2Decimal(str(transaction[_PRICE]))
+            if transaction[_SIDE] == _BUY:
+                transaction_notes = f"Fiat buy of {trade.base_asset} with {trade.quote_asset}"
+                fiat_in_no_fee = fiat_in_with_fee - (fiat_fee * spot_price)
+            elif transaction[_SIDE] == _SELL:
+                transaction_notes = f"Fiat sell of {trade.base_asset} into {trade.quote_asset}"
+                fiat_in_no_fee = fiat_in_with_fee - fiat_fee
+
+            in_transaction_list.append(
+                InTransaction(
+                    plugin=self.plugin_name(),
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    asset=in_asset,
+                    exchange=self.exchange_name(),
+                    holder=self.account_holder,
+                    transaction_type=Keyword.BUY.value,
+                    spot_price=str(spot_price),
+                    crypto_in=str(crypto_in),
+                    crypto_fee=None if self.is_native_fiat(in_asset) else str(crypto_fee),
+                    fiat_in_no_fee=str(fiat_in_no_fee),
+                    fiat_in_with_fee=str(fiat_in_with_fee),
+                    fiat_fee=str(fiat_fee) if self.is_native_fiat(in_asset) else None,
+                    fiat_ticker=trade.quote_asset,
+                    notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
+                )
+            )
+
+        else:
+            transaction_notes = f"Buy side of conversion from " f"{conversion_info}" f"({out_asset} out-transaction unique id: {transaction[_ID]}"
+
+            in_transaction_list.append(
+                InTransaction(
+                    plugin=self.plugin_name(),
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    asset=in_asset,
+                    exchange=self.exchange_name(),
+                    holder=self.account_holder,
+                    transaction_type=Keyword.BUY.value,
+                    spot_price=Keyword.UNKNOWN.value,
+                    crypto_in=str(crypto_in),
+                    crypto_fee=str(crypto_fee),
+                    fiat_in_no_fee=None,
+                    fiat_in_with_fee=None,
+                    fiat_fee=None,
+                    notes=(f"{notes + '; ' if notes else ''} {transaction_notes}"),
+                )
+            )
+
+        return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=out_transaction_list, intra_transactions=[])
+
+    def _process_sell(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
+        self._logger.debug("Sell: %s", json.dumps(transaction))
+        out_transaction_list: List[OutTransaction] = []
+        trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
+        fee_asset = transaction[_FEE][_CURRENCY]
+        if fee_asset == "USD4":
+            fee_asset = "USD"
+
+
+        # For some reason CCXT outputs amounts in float
+        if transaction[_SIDE] == _BUY:
+            out_asset = trade.quote_asset
+            in_asset = trade.base_asset
+            crypto_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
+            conversion_info = f"{trade.quote_info} -> {trade.base_info}"
+        elif transaction[_SIDE] == _SELL:
+            out_asset = trade.base_asset
+            in_asset = trade.quote_asset
+            crypto_out_no_fee = RP2Decimal(str(transaction[_AMOUNT]))
+            conversion_info = f"{trade.base_info} -> {trade.quote_info}"
+        else:
+            raise RP2RuntimeError(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
+
+        if fee_asset == out_asset:
+            crypto_fee: RP2Decimal = RP2Decimal(str(transaction[_FEE][_COST]))
+        else:
+            crypto_fee = ZERO
+        crypto_out_with_fee: RP2Decimal = crypto_out_no_fee + crypto_fee
+
+        # Is this a plain buy or a conversion?
+        if self.is_native_fiat(trade.quote_asset):
+            fiat_out_no_fee: RP2Decimal = RP2Decimal(str(transaction[_COST]))
+            fiat_fee: RP2Decimal = crypto_fee
+            spot_price: RP2Decimal = RP2Decimal(str(transaction[_PRICE]))
+
+            out_transaction_list.append(
+                OutTransaction(
+                    plugin=self.plugin_name(),
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    asset=out_asset,
+                    exchange=self.exchange_name(),
+                    holder=self.account_holder,
+                    transaction_type=Keyword.SELL.value,
+                    spot_price=str(spot_price),
+                    crypto_out_no_fee=str(crypto_out_no_fee),
+                    crypto_fee=str(crypto_fee),
+                    crypto_out_with_fee=str(crypto_out_with_fee),
+                    fiat_out_no_fee=str(fiat_out_no_fee),
+                    fiat_fee=str(fiat_fee),
+                    fiat_ticker=trade.quote_asset,
+                    notes=(f"{notes + ';' if notes else ''} Fiat sell of {trade.base_asset} with {trade.quote_asset}."),
+                )
+            )
+
+        else:
+            # CCXT does not report the value of the transaction in fiat
+            out_transaction_list.append(
+                OutTransaction(
+                    plugin=self.plugin_name(),
+                    unique_id=transaction[_ID],
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIMESTAMP]),
+                    asset=out_asset,
+                    exchange=self.exchange_name(),
+                    holder=self.account_holder,
+                    transaction_type=Keyword.SELL.value,
+                    spot_price=Keyword.UNKNOWN.value,
+                    crypto_out_no_fee=str(crypto_out_no_fee),
+                    crypto_fee=str(crypto_fee),
+                    crypto_out_with_fee=str(crypto_out_with_fee),
+                    fiat_out_no_fee=None,
+                    fiat_fee=None,
+                    notes=(
+                        f"{notes + '; ' if notes else ''} Sell side of conversion from "
+                        f"{conversion_info}"
+                        f"({in_asset} in-transaction unique id: {transaction[_ID]}"
+                    ),
+                )
+            )
+
+        return ProcessOperationResult(out_transactions=out_transaction_list, in_transactions=[], intra_transactions=[])
+
+    def _process_transfer(self, transaction: Any) -> ProcessOperationResult:
+        self._logger.debug("Transfer: %s", json.dumps(transaction))
+        if transaction[_STATUS] == "failed":
+            self._logger.info("Skipping failed transfer %s", json.dumps(transaction))
+        else:
+            intra_transaction_list: List[IntraTransaction] = []
+            converted_asset = transaction[_CURRENCY]
+            if converted_asset == "USD4":
+                converted_asset = "USD"
+
+            # This is a CCXT list must convert to string from float
+            amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
+
+            if transaction[_TYPE] == _DEPOSIT:
+                intra_transaction_list.append(
+                    IntraTransaction(
+                        plugin=self.plugin_name(),
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=json.dumps(transaction),
+                        timestamp=transaction[_DATE_TIME],
+                        asset=converted_asset,
+                        from_exchange=Keyword.UNKNOWN.value,
+                        from_holder=Keyword.UNKNOWN.value,
+                        to_exchange=self.exchange_name(),
+                        to_holder=self.account_holder,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_sent=Keyword.UNKNOWN.value,
+                        crypto_received=str(amount),
+                    )
+                )
+            elif transaction[_TYPE] == _WITHDRAWAL:
+                intra_transaction_list.append(
+                    IntraTransaction(
+                        plugin=self.plugin_name(),
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=json.dumps(transaction),
+                        timestamp=transaction[_DATE_TIME],
+                        asset=converted_asset,
+                        from_exchange=self.exchange_name(),
+                        from_holder=self.account_holder,
+                        to_exchange=Keyword.UNKNOWN.value,
+                        to_holder=Keyword.UNKNOWN.value,
+                        spot_price=Keyword.UNKNOWN.value,
+                        crypto_sent=str(amount),
+                        crypto_received=Keyword.UNKNOWN.value,
+                    )
+                )
+            else:
+                self._logger.error("Unrecognized Crypto transfer: %s", json.dumps(transaction))
+
+        return ProcessOperationResult(out_transactions=[], in_transactions=[], intra_transactions=intra_transaction_list)
+
+
+  
     """
+
         self._logger.debug("Gain: %s", json.dumps(transaction))
         in_transaction_list: List[InTransaction] = []
 
