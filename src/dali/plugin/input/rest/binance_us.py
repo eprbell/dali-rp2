@@ -841,7 +841,59 @@ class InputPlugin(AbstractCcxtInputPlugin):
         return self._process_buy_and_sell(dust, notes)
 
     def _process_gain(self, transaction: Any, transaction_type: Keyword, notes: Optional[str] = None) -> ProcessOperationResult:
-        pass 
+       """
+        self._logger.debug("Gain: %s", json.dumps(transaction))
+        in_transaction_list: List[InTransaction] = []
+
+        if transaction_type == Keyword.MINING:
+            amount: RP2Decimal = RP2Decimal(str(transaction[_PROFIT_AMOUNT]))
+            notes = f"{notes + '; ' if notes else ''}'Mining profit'"
+            in_transaction_list.append(
+                InTransaction(
+                    plugin=self.__PLUGIN_NAME,
+                    unique_id=Keyword.UNKNOWN.value,
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIME]),
+                    asset=transaction[_COIN_NAME],
+                    exchange=self.__EXCHANGE_NAME,
+                    holder=self.account_holder,
+                    transaction_type=transaction_type.value,
+                    spot_price=Keyword.UNKNOWN.value,
+                    crypto_in=str(amount),
+                    crypto_fee=None,
+                    fiat_in_no_fee=None,
+                    fiat_in_with_fee=None,
+                    fiat_fee=None,
+                    notes=notes,
+                )
+            )
+        elif RP2Decimal(transaction[_AMOUNT]) != ZERO:  # Sometimes Binance reports interest payments with zero amounts
+            amount = RP2Decimal(transaction[_AMOUNT])
+            notes = f"{notes + '; ' if notes else ''}{transaction[_EN_INFO]}"
+
+            in_transaction_list.append(
+                InTransaction(
+                    plugin=self.__PLUGIN_NAME,
+                    unique_id=str(transaction[_ID]),  # Binance sometimes has two ids for one tranid
+                    raw_data=json.dumps(transaction),
+                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_DIV_TIME]),
+                    asset=transaction[_ASSET],
+                    exchange=self.__EXCHANGE_NAME,
+                    holder=self.account_holder,
+                    transaction_type=transaction_type.value,
+                    spot_price=Keyword.UNKNOWN.value,
+                    crypto_in=str(amount),
+                    crypto_fee=None,
+                    fiat_in_no_fee=None,
+                    fiat_in_with_fee=None,
+                    fiat_fee=None,
+                    notes=notes,
+                )
+            )
+
+        return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
+        """
+    pass 
 
     def _process_buy(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
         self._logger.debug("Buy: %s", json.dumps(transaction))
@@ -1100,56 +1152,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
   
     """
 
-        self._logger.debug("Gain: %s", json.dumps(transaction))
-        in_transaction_list: List[InTransaction] = []
 
-        if transaction_type == Keyword.MINING:
-            amount: RP2Decimal = RP2Decimal(str(transaction[_PROFIT_AMOUNT]))
-            notes = f"{notes + '; ' if notes else ''}'Mining profit'"
-            in_transaction_list.append(
-                InTransaction(
-                    plugin=self.__PLUGIN_NAME,
-                    unique_id=Keyword.UNKNOWN.value,
-                    raw_data=json.dumps(transaction),
-                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_TIME]),
-                    asset=transaction[_COIN_NAME],
-                    exchange=self.__EXCHANGE_NAME,
-                    holder=self.account_holder,
-                    transaction_type=transaction_type.value,
-                    spot_price=Keyword.UNKNOWN.value,
-                    crypto_in=str(amount),
-                    crypto_fee=None,
-                    fiat_in_no_fee=None,
-                    fiat_in_with_fee=None,
-                    fiat_fee=None,
-                    notes=notes,
-                )
-            )
-        elif RP2Decimal(transaction[_AMOUNT]) != ZERO:  # Sometimes Binance reports interest payments with zero amounts
-            amount = RP2Decimal(transaction[_AMOUNT])
-            notes = f"{notes + '; ' if notes else ''}{transaction[_EN_INFO]}"
-
-            in_transaction_list.append(
-                InTransaction(
-                    plugin=self.__PLUGIN_NAME,
-                    unique_id=str(transaction[_ID]),  # Binance sometimes has two ids for one tranid
-                    raw_data=json.dumps(transaction),
-                    timestamp=self._rp2_timestamp_from_ms_epoch(transaction[_DIV_TIME]),
-                    asset=transaction[_ASSET],
-                    exchange=self.__EXCHANGE_NAME,
-                    holder=self.account_holder,
-                    transaction_type=transaction_type.value,
-                    spot_price=Keyword.UNKNOWN.value,
-                    crypto_in=str(amount),
-                    crypto_fee=None,
-                    fiat_in_no_fee=None,
-                    fiat_in_with_fee=None,
-                    fiat_fee=None,
-                    notes=notes,
-                )
-            )
-
-        return ProcessOperationResult(in_transactions=in_transaction_list, out_transactions=[], intra_transactions=[])
        
 
     def _process_fiat_deposit_order(self, transaction: Any, notes: Optional[str] = None) -> ProcessOperationResult:
