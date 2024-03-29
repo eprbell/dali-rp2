@@ -351,7 +351,7 @@ The `out_csv_file` contains transactions describing crypto being disposed of. Li
 * `asset`: which cryptocurrency was transacted (e.g. BTC, ETH, etc.);
 * `exchange`: exchange or wallet on which the transaction occurred;
 * `holder`: exchange account or wallet owner;
-* `transaction_type`: DONATE, GIFT or SELL;
+* `transaction_type`: DONATE, FEE, GIFT or SELL;
 * `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_out_no_fee`: how much of the given cryptocurrency was sold or sent with the transaction (excluding fee);
 * `crypto_fee`: crypto value of the transaction fee;
