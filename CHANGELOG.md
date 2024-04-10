@@ -14,6 +14,15 @@
 
 # RP2 Change Log
 
+## 0.6.10
+* Add support for Spain (#187)
+* Kraken pair converter can now handle the new unified CSV format (#223)
+* Fixed pricing bug when using default exchange (#207)
+* Added access keys for Exchangerates.host (#212)
+* Added Binance dividends (#188) and fiat data pull (#186)
+* Added progress bar when resolving transactions (#153)
+* misc bug fixes (#146, #198, #207) and internal features (#196, #213, #215)
+
 ## 0.6.9
 * new Dijkstra-based pair converter implementation (#142)
 * added Coinbase Pro-based CCXT pair converter (#150)
