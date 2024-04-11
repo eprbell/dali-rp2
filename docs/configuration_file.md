@@ -351,7 +351,7 @@ The `out_csv_file` contains transactions describing crypto being disposed of. Li
 * `asset`: which cryptocurrency was transacted (e.g. BTC, ETH, etc.);
 * `exchange`: exchange or wallet on which the transaction occurred;
 * `holder`: exchange account or wallet owner;
-* `transaction_type`: DONATE, GIFT or SELL;
+* `transaction_type`: DONATE, FEE, GIFT or SELL;
 * `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_out_no_fee`: how much of the given cryptocurrency was sold or sent with the transaction (excluding fee);
 * `crypto_fee`: crypto value of the transaction fee;
@@ -385,10 +385,12 @@ The manual CSV plugin is typically used for two purposes:
 Partial transactions occur when an intra transaction is sent from a wallet or exchange supported by DaLI and is received at a wallet or exchange that is not yet supported by DaLI or viceversa. This causes DaLI to generate an partial transaction. Partial transactions can be identified in the generated ODS file, because they have some fields marked with `__unknown`.
 
 For the case of supported origin and unsupported destination, DaLI models the source side of the transaction by generating either:
+
 1. a partial intra transaction with defined `from_exchange`/`from_holder`/`crypto_sent` and empty `to_exchange`/`to_holder`/`crypto_received` or
 2. an out transaction.
 
 For the case of unsupported origin and supported destination, DaLI models the destination side of the transaction by generating either:
+
 3. a partial intra transaction with empty `from_exchange`/`from_holder`/`crypto_sent` and defined `to_exchange`/`to_holder`/`crypto_received` or
 4. a in transaction.
 

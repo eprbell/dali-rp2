@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.6.9
+# DaLI for RP2 v0.6.10
 
 Privacy-focused, free, extensible data loader for RP2 (the crypto tax calculator)
 
