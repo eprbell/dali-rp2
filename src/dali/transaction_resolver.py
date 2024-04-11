@@ -135,25 +135,30 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
     # the contract with RP2, which requires spot_price to be > 0. If this situation is detected and the user passed the read_spot_price_from_web, then
     # ignore the 0 and use a price read from the Internet.
     if is_unknown(transaction.spot_price) or RP2Decimal(transaction.spot_price) == ZERO:  # type: ignore
-        conversion: RateAndPairConverter = _get_pair_conversion_rate(
-            timestamp=transaction.timestamp_value,
-            from_asset=transaction.asset,
-            to_asset=global_configuration[Keyword.NATIVE_FIAT.value],
-            exchange=_get_originating_exchange(transaction),
-            global_configuration=global_configuration,
-        )
-        if conversion.rate is None:
-            raise RP2RuntimeError(
-                f"Spot price for {transaction.unique_id + ':' if transaction.unique_id else ''}"
-                f"{transaction.timestamp_value}:{transaction.asset}->{global_configuration[Keyword.NATIVE_FIAT.value]}"
-                " not found on any pair converter plugin"
+        conversion_rate = RP2Decimal("1")
+        notes = "Native fiat spot_price set to 1."
+        if transaction.asset != global_configuration[Keyword.NATIVE_FIAT.value]:
+            conversion: RateAndPairConverter = _get_pair_conversion_rate(
+                timestamp=transaction.timestamp_value,
+                from_asset=transaction.asset,
+                to_asset=global_configuration[Keyword.NATIVE_FIAT.value],
+                exchange=_get_originating_exchange(transaction),
+                global_configuration=global_configuration,
             )
+            if conversion.rate is None:
+                raise RP2RuntimeError(
+                    f"Spot price for {transaction.unique_id + ':' if transaction.unique_id else ''}"
+                    f"{transaction.timestamp_value}:{transaction.asset}->{global_configuration[Keyword.NATIVE_FIAT.value]}"
+                    " not found on any pair converter plugin"
+                )
 
-        notes: str = (
-            f"{conversion.pair_converter.historical_price_type} spot_price read from {conversion.pair_converter.name()} "
-            f"plugin; {transaction.notes if transaction.notes else ''}"
-        )
-        init_parameters[Keyword.SPOT_PRICE.value] = str(conversion.rate)
+            notes: str = (
+                f"{conversion.pair_converter.historical_price_type} spot_price read from {conversion.pair_converter.name()} "
+                f"plugin; {transaction.notes if transaction.notes else ''}"
+            )
+            conversion_rate = conversion.rate
+
+        init_parameters[Keyword.SPOT_PRICE.value] = str(conversion_rate)
         init_parameters[Keyword.NOTES.value] = notes
         init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = True
         init_parameters[Keyword.FIAT_TICKER.value] = transaction.fiat_ticker
