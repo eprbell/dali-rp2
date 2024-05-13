@@ -1,0 +1,58 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      User-Agent:
+      - python-requests/2.31.0
+    method: GET
+    uri: https://api.frankfurter.app/currencies
+  response:
+    body:
+      string: "{\"AUD\":\"Australian Dollar\",\"BGN\":\"Bulgarian Lev\",\"BRL\":\"Brazilian
+        Real\",\"CAD\":\"Canadian Dollar\",\"CHF\":\"Swiss Franc\",\"CNY\":\"Chinese
+        Renminbi Yuan\",\"CZK\":\"Czech Koruna\",\"DKK\":\"Danish Krone\",\"EUR\":\"Euro\",\"GBP\":\"British
+        Pound\",\"HKD\":\"Hong Kong Dollar\",\"HUF\":\"Hungarian Forint\",\"IDR\":\"Indonesian
+        Rupiah\",\"ILS\":\"Israeli New Sheqel\",\"INR\":\"Indian Rupee\",\"ISK\":\"Icelandic
+        Kr\xF3na\",\"JPY\":\"Japanese Yen\",\"KRW\":\"South Korean Won\",\"MXN\":\"Mexican
+        Peso\",\"MYR\":\"Malaysian Ringgit\",\"NOK\":\"Norwegian Krone\",\"NZD\":\"New
+        Zealand Dollar\",\"PHP\":\"Philippine Peso\",\"PLN\":\"Polish Z\u0142oty\",\"RON\":\"Romanian
+        Leu\",\"SEK\":\"Swedish Krona\",\"SGD\":\"Singapore Dollar\",\"THB\":\"Thai
+        Baht\",\"TRY\":\"Turkish Lira\",\"USD\":\"United States Dollar\",\"ZAR\":\"South
+        African Rand\"}"
+    headers:
+      CF-Cache-Status:
+      - REVALIDATED
+      CF-RAY:
+      - 87fdb7e9eecde014-NRT
+      Cache-Control:
+      - public, max-age=14400
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Tue, 07 May 2024 02:18:16 GMT
+      ETag:
+      - W/"6b87aeaa86dd34fcfdd4220f664e37c4"
+      NEL:
+      - '{"success_fraction":0,"report_to":"cf-nel","max_age":604800}'
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=jp%2F42Wi%2Fu%2FxDjaTYl4LYdhghiTclboJLqKQnOFS%2BhtFfD%2Fu7B2mocf7p9sheTr1yZgpAxqF8HoIZHmu7VrFb1bnBS1Qs6vVAQNawjhztlAzF8v%2BMumsqQI0rOqOwuKmi9%2BCZ1ko%3D"}],"group":"cf-nel","max_age":604800}'
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      vary:
+      - Origin, Accept-Encoding
+    status:
+      code: 200
+      message: OK
+version: 1
