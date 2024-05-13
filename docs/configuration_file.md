@@ -351,7 +351,7 @@ The `out_csv_file` contains transactions describing crypto being disposed of. Li
 * `asset`: which cryptocurrency was transacted (e.g. BTC, ETH, etc.);
 * `exchange`: exchange or wallet on which the transaction occurred;
 * `holder`: exchange account or wallet owner;
-* `transaction_type`: DONATE, GIFT or SELL;
+* `transaction_type`: DONATE, FEE, GIFT or SELL;
 * `spot_price`: value of 1 unit of the given cryptocurrency at the time the transaction occurred; If the value is unavailable, to direct DaLI to read it from Internet historical data, write in `__unknown` and use the `-s` command line switch;
 * `crypto_out_no_fee`: how much of the given cryptocurrency was sold or sent with the transaction (excluding fee);
 * `crypto_fee`: crypto value of the transaction fee;
@@ -385,10 +385,12 @@ The manual CSV plugin is typically used for two purposes:
 Partial transactions occur when an intra transaction is sent from a wallet or exchange supported by DaLI and is received at a wallet or exchange that is not yet supported by DaLI or viceversa. This causes DaLI to generate an partial transaction. Partial transactions can be identified in the generated ODS file, because they have some fields marked with `__unknown`.
 
 For the case of supported origin and unsupported destination, DaLI models the source side of the transaction by generating either:
+
 1. a partial intra transaction with defined `from_exchange`/`from_holder`/`crypto_sent` and empty `to_exchange`/`to_holder`/`crypto_received` or
 2. an out transaction.
 
 For the case of unsupported origin and supported destination, DaLI models the destination side of the transaction by generating either:
+
 3. a partial intra transaction with empty `from_exchange`/`from_holder`/`crypto_sent` and defined `to_exchange`/`to_holder`/`crypto_received` or
 4. a in transaction.
 
@@ -482,7 +484,7 @@ aliases = <em>&lt;untradeable_assets&gt;</em>
 
 Where:
 * `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
-* `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Kraken(US) is used. If you would like an exchange added please open an issue. The current available exchanges are "Binance.com", "Gate", "Huobi" and "Kraken".
+* `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Kraken(US) is used. If you would like an exchange added please open an issue. The current available exchanges are "Binance.com", "Gate", "Huobi" and "Kraken". Please note that the Binance.com API is not accessible from the US, Canada, Netherlands, and other [prohibited countries](https://www.binance.com/en/legal/list-of-prohibited-countries).
 * `fiat_access_key` is an optional access key that can be obtained from [Exchangerate.host](https://exchangerate.host/). It is required for any fiat conversions, which are typically required if the base fiat is other than USD.
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `untradeable_assets` is a comma separated list of assets that have no market, yet. These are typically assets that are farmed or given away as a part of promotion before a market is available to price them and CCXT can not automatically assign a price. If you get the error "The asset XXX or XXX is missing from graph" and the asset is untradeable, adding the untradeable asset to this list will resolve it.
@@ -534,7 +536,7 @@ transaction age    | candle used
 Accuracy will improve once new CSV data is released, which is typically 2 weeks after the end of a quarter. Also, the Kraken REST API is very slow. It may take 20-30 seconds per transaction to retrieve prices for the latest quarter.
 
 ##### Note on Unified CSV File
-The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. You can also manually download the file from <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
+The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. It is 4 GB as of April 2024. You can also manually download the file from the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
 
 ### Binance Locked CCXT
 This plugin makes use of the CCXT plugin, but locks all routes to Binance.com.
