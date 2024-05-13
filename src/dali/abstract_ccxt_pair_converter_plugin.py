@@ -581,7 +581,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     break
                 except DDoSProtection as exc:
                     self.__logger.debug(
-                        "DDosProtection exception from server, most likely too many requests. " "Making another attempt after 0.1 second delay. Exception - %s",
+                        "DDosProtection exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s",
                         exc,
                     )
                     # logger INFO for retry?
