@@ -171,7 +171,7 @@ class MappedGraph(Graph[ValueType]):
             for optimized_asset, neighbor_weights in optimization.items():
                 for neighbor_name in neighbor_weights.keys():
                     if original_vertex.name == optimized_asset:
-                        cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor_name, neighbor_weights[neighbor_name])
+                        cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor_name, neighbor_weights[neighbor_name], True)
 
         return cloned_mapped_graph
 
