@@ -12,10 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Disabled for now. Hopefully, we can refactor some of the logic out to MappedGraph.
+# pylint: disable=too-many-lines
+
 import logging
 from datetime import datetime, timedelta, timezone
 from time import sleep, time
-from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union
+from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union, cast
 
 from ccxt import (
     DDoSProtection,
@@ -294,11 +297,15 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         return cast(List[HistoricalBar], self._cache.get(key))
 
     # The most granular pricing available is 1 minute, to reduce the size of cache and increase the reuse of pricing data
-    def _floor_key(self, key: AssetPairAndTimestamp) -> AssetPairAndTimestamp:
+    def _floor_key(self, key: AssetPairAndTimestamp, daily: bool = False) -> AssetPairAndTimestamp:
         raw_timestamp: datetime = key.timestamp
-        floored_timestamp: datetime = raw_timestamp - timedelta(
-            minutes=raw_timestamp.minute % 1, seconds=raw_timestamp.second, microseconds=raw_timestamp.microsecond
-        )
+        floored_timestamp: datetime
+        if daily:
+            floored_timestamp = raw_timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            floored_timestamp = raw_timestamp - timedelta(
+                minutes=raw_timestamp.minute % 1, seconds=raw_timestamp.second, microseconds=raw_timestamp.microsecond
+            )
         floored_key: AssetPairAndTimestamp = AssetPairAndTimestamp(
             timestamp=floored_timestamp,
             from_asset=key.from_asset,
@@ -568,14 +575,14 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                             timeframe,
                         )
                     break
-                except (ExchangeError) as exc:
+                except ExchangeError as exc:
                     self.__logger.debug("ExchangeError exception from server. Exception - %s", exc)
                     sleep(0.1)
                     break
-                except (DDoSProtection) as exc:
+                except DDoSProtection as exc:
                     self.__logger.debug(
-                        "DDosProtection exception from server, most likely too many requests. "
-                        "Making another attempt after 0.1 second delay. Exception - %s", exc
+                        "DDosProtection exception from server, most likely too many requests. " "Making another attempt after 0.1 second delay. Exception - %s",
+                        exc,
                     )
                     # logger INFO for retry?
                     sleep(0.1)

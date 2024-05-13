@@ -50,7 +50,7 @@ class TestCcxtPlugin:
         plugin._build_fiat_list()  # pylint: disable=protected-access
 
         # This will change over time, but the test will alert us to new pairs available
-        assert plugin._fiat_list == [
+        assert plugin._fiat_list == [  # pylint: disable=protected-access
             "AUD",
             "BGN",
             "BRL",
