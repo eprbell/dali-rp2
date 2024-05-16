@@ -476,7 +476,6 @@ Initialize this plugin section as follows:
 [dali.plugin.pair_converter.ccxt</em>]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
 default_exchange = <em>&lt;default_exchange&gt;</em>
-fiat_access_key = <em>&lt;fiat_access_key&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
 aliases = <em>&lt;untradeable_assets&gt;</em>
@@ -485,7 +484,7 @@ aliases = <em>&lt;untradeable_assets&gt;</em>
 Where:
 * `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
 * `default_exchange` is an optional string for the name of an exchange to use if the exchange listed in a transaction is not currently supported by the CCXT plugin. If no default is set, Kraken(US) is used. If you would like an exchange added please open an issue. The current available exchanges are "Binance.com", "Gate", "Huobi" and "Kraken". Please note that the Binance.com API is not accessible from the US, Canada, Netherlands, and other [prohibited countries](https://www.binance.com/en/legal/list-of-prohibited-countries).
-* `fiat_access_key` is an optional access key that can be obtained from [Exchangerate.host](https://exchangerate.host/). It is required for any fiat conversions, which are typically required if the base fiat is other than USD.
+* The CCXT plugin makes use of the default forex exchange API, Frankfurter, which provides daily rates from the European Central Bank. Rates for bank holidays and weekends are taken from the previous trading day, so if a rate is requested for Saturday, the Friday rate will be used. Two other plugins are also available for forex - one that makes use of Exchangerate.host free plan and requires a fiat_access_key and another plugin that makes use of a CSV file for forex rates.
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `untradeable_assets` is a comma separated list of assets that have no market, yet. These are typically assets that are farmed or given away as a part of promotion before a market is available to price them and CCXT can not automatically assign a price. If you get the error "The asset XXX or XXX is missing from graph" and the asset is untradeable, adding the untradeable asset to this list will resolve it.
 * `aliases` is a list of aliases separated by semicolons. Each alias has 4 properties: exchange, from asset, to asset, factor. `exchange` is the name of the exchange if the alias is specific or `UNIVERSAL` if you want it applied to all exchanges. The current exchanges recognized by the CCXT plugin are "Binance.com", "Binance US", "Bitfinex", "Coinbase Pro", "Gate", "Huobi", "Kraken", "Okex", "Pionex" and "Upbit". `from asset` and `to asset` are the ISO codes in all caps of the assets you want to make an alias for. Finally, `factor` is the price factor for the alias (e.g. "1" if it is one to one). Here are some examples:
@@ -512,16 +511,6 @@ Be aware that:
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 * Some exchanges, in particular Binance.com, might not be available in certain territories.
 
-#### Note on Forex CSV file
-
-If you do not want to use Exchangerate.host for Forex prices, you can use CSV files by saving them to the folder .dali_cache/forex. The files must be in the format of quote_asset_base_asset.csv (e.g. USD_JPY.csv). The format should be Time, high, low, open, close, volume. Like the below example:
-
-Time               |Open  |High  |Low   |Close |Volume
--------------------|------|------|------|------|------
-2008-02-22 00:00:00|210.45|215.45|211.56|213.45|8900
-
-Historical CSV Files are available from several places on the web for free. [Forexsb.com](https://forexsb.com/historical-forex-data) is a good source. Currently only 1 day candles are supported.
-
 #### A Special Note for Prices from Kraken Exchange
 Prices for the latest quarter from the Kraken exchange may be inaccurate due to the restrictions of the Kraken REST API. Only the latest 720 bars can be retrieved, so different candles must be used depending on how old the transaction is from the time you are pulling the pricing data. The following chart provides a rough estimate of what candles are used for which timeframe.
 
@@ -537,6 +526,49 @@ Accuracy will improve once new CSV data is released, which is typically 2 weeks 
 
 ##### Note on Unified CSV File
 The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. It is 4 GB as of April 2024. You can also manually download the file from the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
+
+### CCXT Exchangerate Host
+This plugin is based on the CCXT Python library. It uses the Exchangerate.host API for forex rates.
+
+Initialize this plugin section as follows:
+<pre>
+[dali.plugin.pair_converter.ccxt</em>]
+historical_price_type = <em>&lt;historical_price_type&gt;</em>
+default_exchange = <em>&lt;default_exchange&gt;</em>
+fiat_access_key = <em>&lt;fiat_access_key&gt;</em>
+fiat_priority = <em>&lt;fiat_priority&gt;</em>
+untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
+aliases = <em>&lt;untradeable_assets&gt;</em>
+</pre>
+
+Where:
+* `fiat_access_key` is an optional access key that can be obtained from [Exchangerate.host](https://exchangerate.host/). It is required for any fiat conversions, which are typically required if the base fiat is other than USD.
+* For other parameters see the [CCXT plugin](#ccxt) section above.
+
+## CCXT Fiat from CSV
+This plugin is based on the CCXT Python library. It uses CSV files for forex rates.
+
+Initialize this plugin section as follows:
+<pre>
+[dali.plugin.pair_converter.ccxt</em>]
+historical_price_type = <em>&lt;historical_price_type&gt;</em>
+default_exchange = <em>&lt;default_exchange&gt;</em>
+fiat_priority = <em>&lt;fiat_priority&gt;</em>
+untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
+aliases = <em>&lt;untradeable_assets&gt;</em>
+</pre>
+
+Check the [CCXT plugin](#ccxt) section above for more information on the parameters.
+
+#### Note on Forex CSV file
+
+If you do not want to use Exchangerate.host or the Frankfurter API for Forex prices, you can use CSV files by saving them to the folder `.dali_cache/forex`. The files must be in the format of quote_asset_base_asset.csv (e.g. USD_JPY.csv). The format should be Time, high, low, open, close, volume. Like the below example:
+
+Time               |Open  |High  |Low   |Close |Volume
+-------------------|------|------|------|------|------
+2008-02-22 00:00:00|210.45|215.45|211.56|213.45|8900
+
+Historical CSV Files are available from several places on the web for free. [Forexsb.com](https://forexsb.com/historical-forex-data) is a good source. Currently only 1 day candles are supported. One row per day a rate is needed is required. For example, if you want to use the [official yearly rates from the IRS](https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates), you will need to copy and paste the same rate for all days of the calendar year. CSV files can contain multiple years of rates.
 
 ### Binance Locked CCXT
 This plugin makes use of the CCXT plugin, but locks all routes to Binance.com.
@@ -559,6 +591,7 @@ Be aware that:
 * The router only uses Binance.com and the fiat exchange rates to build the graph to calculate the route.
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
 * Binance.com might not be available in certain territories.
+* All locked plugins make use of the default forex exchange API, Frankfurter, which provides daily rates from the European Central Bank. Rates for bank holidays and weekends are taken from the previous trading day, so if a rate is requested for Saturday, the Friday rate will be used.
 
 
 ### Coinbase Pro Locked CCXT
@@ -581,6 +614,7 @@ Be aware that:
 * Exchange rates for fiat transactions are based on the daily rate and not minute or hourly rates.
 * The router only uses Coinbase Pro and the fiat exchange rates to build the graph to calculate the route.
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
+* All locked plugins make use of the default forex exchange API, Frankfurter, which provides daily rates from the European Central Bank. Rates for bank holidays and weekends are taken from the previous trading day, so if a rate is requested for Saturday, the Friday rate will be used.
 
 
 ### Kraken Locked CCXT
@@ -605,6 +639,7 @@ Be aware that:
 * Exchange rates for fiat transactions are based on the daily rate and not minute or hourly rates.
 * The router only uses Kraken and the fiat exchange rates to build the graph to calculate the route.
 * `fiat_priority` determines what fiat the router will attempt to route through first while trying to find a path to your quote asset.
+* All locked plugins make use of the default forex exchange API, Frankfurter, which provides daily rates from the European Central Bank. Rates for bank holidays and weekends are taken from the previous trading day, so if a rate is requested for Saturday, the Friday rate will be used.
 
 
 ### Historic Crypto
