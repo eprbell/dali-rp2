@@ -538,6 +538,8 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             elif transaction[_SIDE] == _SELL:
                 transaction_notes = f"Fiat sell of {trade.base_asset} into {trade.quote_asset}"
                 fiat_in_no_fee = fiat_in_with_fee - fiat_fee
+            else:
+                raise RP2RuntimeError(f"Internal error: unrecognized transaction side: {transaction[_SIDE]}")
 
             in_transaction_list.append(
                 InTransaction(
