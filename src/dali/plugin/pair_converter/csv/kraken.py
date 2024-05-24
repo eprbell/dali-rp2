@@ -62,7 +62,7 @@ _ID: str = "id"
 _GOOGLE_DRIVE_DOWNLOAD_URL: str = "https://drive.usercontent.google.com/download"
 
 # File ID for the unified CSV file ID. This will need to be replaced every quarter.
-_UNIFIED_CSV_FILE_ID: str = "16YKyFkYlvawCHv3W7WuTFzM8RYgMRWMt"
+_UNIFIED_CSV_FILE_ID: str = "11WtjXA9kvVYV9KDoebGV5U75dmcA3bJa"
 _MESSAGE: str = "message"
 _REASON: str = "reason"
 
@@ -482,7 +482,7 @@ class Kraken:
         return True
 
     def _prompt_download_confirmation(self) -> bool:
-        self.__logger.info("\nIn order to provide accurate pricing from Kraken, a large (3.9+ gb) zipfile needs to be downloaded.")
+        self.__logger.info("\nIn order to provide accurate pricing from Kraken, a large (4.1+ gb) zipfile needs to be downloaded.")
 
         while True:
             choice = input("Do you want to download the file now?[yn]")
