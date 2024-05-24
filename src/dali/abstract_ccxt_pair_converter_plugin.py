@@ -254,7 +254,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         self.__cache_modifier = "_".join(x for x in [exchange_cache_modifier, cache_modifier] if x)
 
         super().__init__(historical_price_type=historical_price_type)
-        self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
+        self._logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
 
         self.__exchanges: Dict[str, Exchange] = {}
         self.__exchange_markets: Dict[str, Dict[str, List[str]]] = {}
@@ -274,9 +274,9 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         self._manifest: Optional[TransactionManifest] = None
         self.__transaction_count: int = 0
         if exchange_locked:
-            self.__logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
+            self._logger.debug("Routing locked to single exchange %s.", self.__default_exchange)
         else:
-            self.__logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
+            self._logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
         self.__kraken_warning: bool = False
         self.__untradeable_assets: Set[str] = set(untradeable_assets.split(", ")) if untradeable_assets is not None else set()
         self.__aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None if aliases is None else self._process_aliases(aliases)
@@ -341,7 +341,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         return self._fiat_list
 
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
-        self.__logger.debug("Converting %s to %s", from_asset, to_asset)
+        self._logger.debug("Converting %s to %s", from_asset, to_asset)
 
         # If both assets are fiat, skip further processing
         if self._is_fiat_pair(from_asset, to_asset):
@@ -365,7 +365,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
         # TO BE IMPLEMENTED - bypass routing if conversion can be done with one market on the exchange
         if market_symbol in current_markets and market_symbol not in _FORCE_ROUTING:
-            self.__logger.debug("Found market - %s on single exchange, skipping routing.", market_symbol)
+            self._logger.debug("Found market - %s on single exchange, skipping routing.", market_symbol)
             result = self.find_historical_bar(from_asset, to_asset, timestamp, current_markets[market_symbol][0])
             return result
         # else:
@@ -373,7 +373,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
         if not from_asset_vertex or not to_asset_vertex:
             if from_asset in self.__untradeable_assets:
-                self.__logger.info("Untradeable asset found - %s. Assigning ZERO price.", from_asset)
+                self._logger.info("Untradeable asset found - %s. Assigning ZERO price.", from_asset)
                 return HistoricalBar(
                     duration=timedelta(seconds=604800),
                     timestamp=timestamp,
@@ -390,11 +390,11 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         pricing_path = current_graph.dijkstra(from_asset_vertex, to_asset_vertex, False)
 
         if pricing_path is None:
-            self.__logger.debug("No path found for %s to %s. Please open an issue at %s.", from_asset, to_asset, self.issues_url)
+            self._logger.debug("No path found for %s to %s. Please open an issue at %s.", from_asset, to_asset, self.issues_url)
             return None
 
         pricing_path_list: List[str] = [v.name for v in pricing_path]
-        self.__logger.debug("Found path - %s", pricing_path_list)
+        self._logger.debug("Found path - %s", pricing_path_list)
 
         for asset in pricing_path_list:
             if not current_graph.is_optimized(asset):
@@ -431,7 +431,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                 # Replacing an immutable attribute
                 conversion_route[i] = conversion_route[i]._replace(historical_data=hop_bar)
             else:
-                self.__logger.debug(
+                self._logger.debug(
                     """No pricing data found for hop. This could be caused by airdropped
                     coins that do not have a market yet. Market - %s%s, Timestamp - %s, Exchange - %s""",
                     hop_data.from_asset,
@@ -460,7 +460,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)
 
         if historical_bar is not None:
-            self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
+            self._logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, exchange)
             return historical_bar
 
         historical_bars: Optional[List[HistoricalBar]] = self.find_historical_bars(from_asset, to_asset, timestamp, exchange)
@@ -518,7 +518,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                 if all_bars:
                     timestamp = csv_bar[-1].timestamp + timedelta(milliseconds=1)
                     ms_timestamp = int(timestamp.timestamp() * _MS_IN_SECOND)
-                    self.__logger.debug(
+                    self._logger.debug(
                         "Retrieved bars up to %s from cache for %s/%s for %s. Continuing with REST API.",
                         str(ms_timestamp),
                         from_asset,
@@ -527,7 +527,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     )
                     result = csv_bar
                 else:
-                    self.__logger.debug("Retrieved bar from cache - %s for %s/%s->%s for %s", csv_bar, timestamp, from_asset, to_asset, exchange)
+                    self._logger.debug("Retrieved bar from cache - %s for %s/%s->%s for %s", csv_bar, timestamp, from_asset, to_asset, exchange)
                     return csv_bar
 
         within_last_week: bool = False
@@ -556,7 +556,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     if self._get_request_delay(exchange) > 0:
                         current_time = time()
                         second_delay = max(0, self._get_request_delay(exchange) - (current_time - self.__exchange_last_request.get(exchange, 0)))
-                        self.__logger.debug("Delaying for %s seconds", second_delay)
+                        self._logger.debug("Delaying for %s seconds", second_delay)
                         sleep(second_delay)
                         self.__exchange_last_request[exchange] = time()
 
@@ -567,7 +567,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                             ms_timestamp = int(historical_data[-1][0]) + 1
                     else:
                         historical_data = current_exchange.fetchOHLCV(f"{from_asset}/{to_asset}", timeframe, ms_timestamp, 1)
-                        self.__logger.debug(
+                        self._logger.debug(
                             "Got historical_data: %s with ms_timestamp - %s with exchange %s with timeframe - %s",
                             historical_data,
                             ms_timestamp,
@@ -576,11 +576,11 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                         )
                     break
                 except ExchangeError as exc:
-                    self.__logger.debug("ExchangeError exception from server. Exception - %s", exc)
+                    self._logger.debug("ExchangeError exception from server. Exception - %s", exc)
                     sleep(0.1)
                     break
                 except DDoSProtection as exc:
-                    self.__logger.debug(
+                    self._logger.debug(
                         "DDosProtection exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s",
                         exc,
                     )
@@ -591,25 +591,25 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     request_count += 1
                     if request_count > 9:
                         if exchange == _BINANCE:
-                            self.__logger.info(
+                            self._logger.info(
                                 """
                                 Binance server unavailable. Try a non-Binance locked exchange pair converter.
                                 Saving to cache and exiting.
                                 """
                             )
                         else:
-                            self.__logger.info("Maximum number of retries reached. Saving to cache and exiting.")
+                            self._logger.info("Maximum number of retries reached. Saving to cache and exiting.")
                         self.save_historical_price_cache()
                         raise RP2RuntimeError("Server error") from exc_na
 
-                    self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
+                    self._logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
                     sleep(10)
 
             if len(historical_data) > 0:
                 returned_timestamp = datetime.fromtimestamp(int(historical_data[0][0]) / _MS_IN_SECOND, timezone.utc)
                 if (returned_timestamp - timestamp).total_seconds() > _TIME_GRANULARITY_STRING_TO_SECONDS[timeframe] and not all_bars:
                     if retry_count == len(_TIME_GRANULARITY_DICT.get(exchange, _TIME_GRANULARITY)) - 1:  # If this is the last try
-                        self.__logger.info(
+                        self._logger.info(
                             "For %s/%s requested candle for %s (ms %s) doesn't match the returned timestamp %s. It is assumed the asset was not tradeable at "
                             "the time of acquisition, so the first weekly candle is used for pricing. Please check the price of %s at %s.",
                             from_asset,
@@ -621,7 +621,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                             timestamp,
                         )
                     else:
-                        self.__logger.debug(
+                        self._logger.debug(
                             "For %s/%s requested candle for %s (ms %s), but got %s. Continuing with larger timeframe.",
                             from_asset,
                             to_asset,
@@ -636,14 +636,14 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                 # and addressed with the message above.
                 if retry_count > 0 and timeframe != "1w":
                     if exchange == "Kraken" and not self.__kraken_warning:
-                        self.__logger.info(
+                        self._logger.info(
                             "Prices from the Kraken exchange for the latest quarter may not be accurate until CSV data is available. For more "
                             "information visit the following URL: %s",
                             _KRAKEN_PRICE_EXPLAINATION_URL,
                         )
                         self.__kraken_warning = True
                     elif exchange != "Kraken":  # This is a different exchange that is having pricing issues, so warn the user.
-                        self.__logger.info(
+                        self._logger.info(
                             "The most accurate candle was not able to be used for pricing the asset %s at %s. \n"
                             "The %s candle for %s was used. \n"
                             "The price may be inaccurate. If you feel like you're getting this message in error, \n"
@@ -704,14 +704,14 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
             # Cache the exchange so that we can pull prices from it later
             if alt_exchange_name not in self.__exchanges:
-                self.__logger.debug("Added Alternative Exchange: %s", alt_exchange_name)
+                self._logger.debug("Added Alternative Exchange: %s", alt_exchange_name)
                 alt_exchange: Exchange = _EXCHANGE_DICT[alt_exchange_name]()
                 self.__exchanges[alt_exchange_name] = alt_exchange
 
             # If the asset name doesn't exist, the MappedGraph will create a vertex with that name and add it to the graph
             # If it does exist it will look it up in the dictionary by name and add the neighbor to that vertex.
             if base_asset not in self.__untradeable_assets:
-                self.__logger.debug("Added %s:%s to graph.", base_asset, quote_asset)
+                self._logger.debug("Added %s:%s to graph.", base_asset, quote_asset)
                 graph.add_neighbor(base_asset, quote_asset, _ALTERNATIVE_MARKET_WEIGHT)
 
     def _cache_graph_snapshots(self, exchange: str) -> None:
@@ -735,7 +735,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
             self._manifest.assets,
             exchange,
         )
-        self.__logger.debug("Optimizations created for graph: %s", optimizations)
+        self._logger.debug("Optimizations created for graph: %s", optimizations)
 
         exchange_tree: AVLTree[datetime, MappedGraph[str]] = AVLTree[datetime, MappedGraph[str]]()
         for timestamp, optimization in optimizations.items():
@@ -748,7 +748,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
             else:
                 graph_snapshot = unoptimized_graph.clone_with_optimization(optimization)
             exchange_tree.insert_node(timestamp, graph_snapshot)
-            self.__logger.debug("Added graph snapshot AVLTree for %s for timestamp: %s", exchange, timestamp)
+            self._logger.debug("Added graph snapshot AVLTree for %s for timestamp: %s", exchange, timestamp)
 
         self.__exchange_2_graph_tree[exchange] = exchange_tree
 
@@ -762,9 +762,9 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
     def _get_pricing_exchange_for_exchange(self, exchange: str) -> str:
         if exchange == Keyword.UNKNOWN.value or exchange not in _EXCHANGE_DICT or self.__exchange_locked:
             if self.__exchange_locked:
-                self.__logger.debug("Price routing locked to %s type for %s.", self.__default_exchange, exchange)
+                self._logger.debug("Price routing locked to %s type for %s.", self.__default_exchange, exchange)
             else:
-                self.__logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
+                self._logger.debug("Using default exchange %s type for %s.", self.__default_exchange, exchange)
 
             csv_pricing_class: Any = self.__csv_pricing_dict.get(self.__default_exchange)
             if csv_pricing_class:
@@ -788,21 +788,21 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         if exchange_name not in self.__exchanges:
             # initializes the cctx exchange instance which is used to get the historical data
             # https://docs.ccxt.com/en/latest/manual.html#notes-on-rate-limiter
-            self.__logger.debug("Trying to instantiate exchange %s", exchange)
+            self._logger.debug("Trying to instantiate exchange %s", exchange)
             current_exchange = _EXCHANGE_DICT[pricing_exchange]({"enableRateLimit": True})
         else:
             current_exchange = self.__exchanges[exchange_name]
 
         # key: market, value: exchanges where the market is available in order of priority
         current_markets: Dict[str, List[str]] = {}
-        self.__logger.debug("Creating graph for %s", pricing_exchange)
+        self._logger.debug("Creating graph for %s", pricing_exchange)
         current_graph: MappedGraph[str] = MappedGraph[str](exchange_name, aliases=self.__aliases)
 
         for alias in current_graph.aliases:
             current_markets[f"{alias.from_asset}{alias.to_asset}"] = [exchange]
 
         for market in filter(lambda x: x[_TYPE] == "spot" and x[_QUOTE] in _QUOTE_PRIORITY, current_exchange.fetch_markets()):
-            self.__logger.debug("Market: %s", market)
+            self._logger.debug("Market: %s", market)
 
             current_markets[f"{market[_BASE]}{market[_QUOTE]}"] = [exchange]
 
@@ -814,11 +814,11 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
         # Add alternative markets if they don't exist
         if not self.__exchange_locked:
-            self.__logger.debug("Adding alternative markets to %s graph.", exchange)
+            self._logger.debug("Adding alternative markets to %s graph.", exchange)
             self._add_alternative_markets(current_graph, current_markets)
 
         self._add_fiat_edges_to_graph(current_graph, current_markets)
-        self.__logger.debug("Created unoptimized graph for %s : %s", exchange, current_graph)
+        self._logger.debug("Created unoptimized graph for %s : %s", exchange, current_graph)
         self.__exchanges[exchange_name] = current_exchange
         self.__exchange_markets[exchange_name] = current_markets
 
@@ -849,13 +849,13 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
             # Find all the neighbors of this vertex and all their neighbors as a set
             children: Optional[Set[Vertex[str]]] = unoptimized_graph.get_all_children_of_vertex(current_vertex)
             if children:
-                self.__logger.debug("For vertex - %s, found all the children - %s", current_vertex.name, [child.name for child in children])
+                self._logger.debug("For vertex - %s, found all the children - %s", current_vertex.name, [child.name for child in children])
                 optimization_candidates.update(children)
 
         # This prevents the algo from optimizing fiat assets which do not need optimization
-        self.__logger.debug("Checking if any of the following candidates are optimized - %s", [candidate.name for candidate in optimization_candidates])
+        self._logger.debug("Checking if any of the following candidates are optimized - %s", [candidate.name for candidate in optimization_candidates])
         unoptimized_assets = {candidate.name for candidate in optimization_candidates if not unoptimized_graph.is_optimized(candidate.name)}
-        self.__logger.debug("Found unoptimized assets %s", unoptimized_assets)
+        self._logger.debug("Found unoptimized assets %s", unoptimized_assets)
 
         child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
         optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}

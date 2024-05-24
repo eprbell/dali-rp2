@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 from datetime import datetime, timedelta
 from json import JSONDecodeError
 from typing import Any, Dict, Optional, Set, Tuple
@@ -21,7 +20,6 @@ import requests
 from requests.exceptions import ReadTimeout
 from requests.models import Response
 from requests.sessions import Session
-from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 from rp2.rp2_error import RP2RuntimeError, RP2ValueError
 
@@ -69,7 +67,6 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
             aliases=aliases,
             cache_modifier=cache_modifier,
         )
-        self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
         if fiat_priority:
             weight: float = STANDARD_WEIGHT
             for fiat in fiat_priority:
@@ -85,7 +82,7 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
         historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)
 
         if historical_bar is not None:
-            self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, _FRANKFURTER_EXCHANGE)
+            self._logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, _FRANKFURTER_EXCHANGE)
             return historical_bar
 
         result: Optional[HistoricalBar] = None
@@ -177,10 +174,10 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
                     break
 
             except (JSONDecodeError, ReadTimeout) as exc:
-                self.__logger.debug("Fetching of fiat exchange rates failed. The server might be down. Retrying the connection.")
+                self._logger.debug("Fetching of fiat exchange rates failed. The server might be down. Retrying the connection.")
                 request_count += 1
                 if request_count > 4:
-                    self.__logger.info("Giving up after 4 tries. Saving to Cache.")
+                    self._logger.info("Giving up after 4 tries. Saving to Cache.")
                     self.save_historical_price_cache()
                     raise RP2RuntimeError("JSON decode error") from exc
 

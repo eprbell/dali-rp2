@@ -12,12 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 from datetime import datetime, timedelta
 from os import path
 from typing import List, Optional
 
-from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
 
 from dali.abstract_ccxt_pair_converter_plugin import (
@@ -44,7 +42,6 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
         aliases: Optional[str] = None,
     ) -> None:
         cache_modifier = fiat_priority if fiat_priority else ""
-        self.__logger: logging.Logger = create_logger(f"{self.name()}/{historical_price_type}")
         self._fiat_list = DEFAULT_FIAT_LIST
         super().__init__(
             historical_price_type=historical_price_type,
@@ -59,7 +56,7 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
         historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)
 
         if historical_bar is not None:
-            self.__logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, _FIAT_EXCHANGE)
+            self._logger.debug("Retrieved cache for %s/%s->%s for %s", timestamp, from_asset, to_asset, _FIAT_EXCHANGE)
             return historical_bar
 
         csv_file: str = f"{self.__CSV_DIRECTORY}{key.from_asset}_{key.to_asset}.csv"
@@ -71,10 +68,10 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
             reverse_pair = path.exists(csv_file)
 
             if not reverse_pair:
-                self.__logger.info("No CSV file found for %s for %s/%s", key.timestamp, key.from_asset, key.to_asset)
-                self.__logger.info("Please save a CSV file with pricing information named %s_%s.csv to %s ", key.from_asset, key.to_asset, self.__CSV_DIRECTORY)
-                self.__logger.info("And try to process your transactions again.")
-                self.__logger.info("For more details, check the documentation. %s", _FOREX_CSV_DOC_URL)
+                self._logger.info("No CSV file found for %s for %s/%s", key.timestamp, key.from_asset, key.to_asset)
+                self._logger.info("Please save a CSV file with pricing information named %s_%s.csv to %s ", key.from_asset, key.to_asset, self.__CSV_DIRECTORY)
+                self._logger.info("And try to process your transactions again.")
+                self._logger.info("For more details, check the documentation. %s", _FOREX_CSV_DOC_URL)
                 return None
 
         try:
@@ -114,7 +111,7 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
                             return reverse_result
                         return result
         except FileNotFoundError:
-            self.__logger.debug("File not found: %s", csv_file)
+            self._logger.debug("File not found: %s", csv_file)
 
         # No historical bar found or file not found, return None
         return None
