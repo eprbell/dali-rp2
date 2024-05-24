@@ -63,7 +63,14 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
         untradeable_assets: Optional[str] = None,
         aliases: Optional[str] = None,
     ) -> None:
-        super().__init__(historical_price_type=historical_price_type, exchange_locked=exchange_locked, untradeable_assets=untradeable_assets, aliases=aliases)
+        cache_modifier = fiat_priority if fiat_priority else ""
+        super().__init__(
+            historical_price_type=historical_price_type,
+            exchange_locked=exchange_locked,
+            untradeable_assets=untradeable_assets,
+            aliases=aliases,
+            cache_modifier=cache_modifier,
+        )
         self.__fiat_list: List[str] = []
         self._fiat_priority: Dict[str, float]
         if fiat_priority:
