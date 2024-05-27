@@ -61,38 +61,6 @@ class AbstractPairConverterPlugin:
     def optimize(self, transaction_manifest: TransactionManifest) -> None:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
-    def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
-        self._cache[self._floor_key(key)] = historical_bar
-
-    def _get_bar_from_cache(self, key: AssetPairAndTimestamp) -> Optional[HistoricalBar]:
-        return self._cache.get(self._floor_key(key))
-
-    # All bundle timestamps have 1 millisecond added to them, so will not conflict with the floored timestamps of single bars
-    def _add_bundle_to_cache(self, key: AssetPairAndTimestamp, historical_bars: List[HistoricalBar]) -> None:
-        self._cache[key] = historical_bars
-
-    def _get_bundle_from_cache(self, key: AssetPairAndTimestamp) -> Optional[List[HistoricalBar]]:
-        return cast(List[HistoricalBar], self._cache.get(key))
-
-    # The most granular pricing available is 1 minute, to reduce the size of cache and increase the reuse of pricing data
-    def _floor_key(self, key: AssetPairAndTimestamp, daily: bool = False) -> AssetPairAndTimestamp:
-        raw_timestamp: datetime = key.timestamp
-        floored_timestamp: datetime
-        if daily:
-            floored_timestamp = raw_timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
-        else:
-            floored_timestamp = raw_timestamp - timedelta(
-                minutes=raw_timestamp.minute % 1, seconds=raw_timestamp.second, microseconds=raw_timestamp.microsecond
-            )
-        floored_key: AssetPairAndTimestamp = AssetPairAndTimestamp(
-            timestamp=floored_timestamp,
-            from_asset=key.from_asset,
-            to_asset=key.to_asset,
-            exchange=key.exchange,
-        )
-
-        return floored_key
-
     @property
     def historical_price_type(self) -> str:
         return self.__historical_price_type
