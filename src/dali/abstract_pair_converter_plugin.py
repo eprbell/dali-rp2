@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, NamedTuple, Optional, cast
+from datetime import datetime
+from typing import Any, Dict, NamedTuple, Optional, cast
 
 from rp2.rp2_decimal import RP2Decimal
 from rp2.rp2_error import RP2TypeError
