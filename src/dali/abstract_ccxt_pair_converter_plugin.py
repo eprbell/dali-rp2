@@ -894,11 +894,6 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     bar_check = [no_market_padding] + bar_check
 
                     child_bars[child_name][neighbor.name] = bar_check
-                    # Zero out all optimizations before they start
-                    if child_name not in optimizations[week_start_date]:
-                        optimizations[week_start_date][child_name] = {}
-                    if neighbor.name not in optimizations[week_start_date][child_name]:
-                        optimizations[week_start_date][child_name][neighbor.name] = -1.0
                     timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
 
                     # Find the start of the market if it is after the first transaction
@@ -961,6 +956,8 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     if neighbor_volume != -1.0:
                         neighbors[neighbor_name] = weight
                         weight += 1.0
+                    else:
+                        neighbors[neighbor_name] = -1.0
 
             # mark duplicate successive snapshots
             if snapshot_assets == previous_assets:
