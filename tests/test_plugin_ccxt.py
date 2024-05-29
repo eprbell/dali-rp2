@@ -119,3 +119,25 @@ class TestCcxtPlugin:
         # Did it cache an entire year?
         # 365 + 2020 was a leap year (+1), Jan 1st, 2020 is a holiday and not generated (-1), but Jan 1st-3rd of 2021 is generated from Dec 31, 2020 (+3).
         assert plugin._add_bar_to_cache.call_count == 368  # type: ignore # pylint: disable=protected-access, no-member
+
+        # Clear cache for the reverse test
+        plugin._cache = {}  # pylint: disable=protected-access
+
+        # Friday rate is used for Saturday and Sunday since there is no trading for ECB on weekends
+        # Check to see if plugin will retrieve Friday rate when Saturday is requested first
+        saturday_data = plugin._get_fiat_exchange_rate(datetime(2021, 1, 2, 0, 0), "EUR", "USD")  # pylint: disable=protected-access
+        friday_data = plugin._get_fiat_exchange_rate(datetime(2020, 12, 31, 0, 0), "EUR", "USD")  # pylint: disable=protected-access
+
+        assert friday_data
+        assert saturday_data
+        assert friday_data.timestamp == datetime(2020, 12, 31, 0, 0)
+        assert saturday_data.timestamp == datetime(2021, 1, 2, 0, 0)
+        assert friday_data.low == saturday_data.low == EUR_USD_RATE
+        assert friday_data.high == saturday_data.high == EUR_USD_RATE
+        assert friday_data.open == saturday_data.open == EUR_USD_RATE
+        assert friday_data.close == saturday_data.close == EUR_USD_RATE
+        assert friday_data.volume == saturday_data.volume == ZERO
+
+        # Did it cache an entire year, again? 368 x 2 = 736
+        assert plugin._add_bar_to_cache.call_count == 736  # type: ignore # pylint: disable=protected-access, no-member
+

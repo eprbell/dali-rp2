@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from json import JSONDecodeError
 from typing import Any, Dict, Optional, Set, Tuple
 
@@ -126,12 +126,13 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
 
                     for day in range((end_of_year - beginning_of_year).days + 1):
                         current_day: datetime = beginning_of_year + timedelta(days=day)
+                        print(f"current_day: {current_day}, timestamp: {key.timestamp}")
 
                         try:
                             forex_rate: RP2Decimal = RP2Decimal(str(rates[current_day.strftime("%Y-%m-%d")][to_asset]))
                             forex_result = HistoricalBar(
                                 duration=timedelta(seconds=_DAYS_IN_SECONDS),
-                                timestamp=timestamp,
+                                timestamp=current_day,
                                 open=forex_rate,
                                 high=forex_rate,
                                 low=forex_rate,
@@ -140,18 +141,28 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
                             )
                         except KeyError as exc:
                             if previous_result:
-                                forex_result = previous_result
+                                forex_result = HistoricalBar(
+                                    duration=timedelta(seconds=_DAYS_IN_SECONDS),
+                                    timestamp=current_day,
+                                    open=previous_result.open,
+                                    high=previous_result.high,
+                                    low=previous_result.low,
+                                    close=previous_result.close,
+                                    volume=ZERO,
+                                )
                             else:
                                 raise RP2ValueError(f"No forex rate found for {current_day} for {from_asset} to {to_asset} in {market}") from exc
+
 
                         self._add_bar_to_cache(
                             self._floor_key(AssetPairAndTimestamp(current_day, from_asset, to_asset, _FRANKFURTER_EXCHANGE), True), forex_result
                         )
                         previous_result = forex_result
-                        # print (f"current_day: {current_day}, timestamp: {timestamp}")
-                        if current_day == timestamp:
+                        if current_day == key.timestamp:
+                            print(f"current_day: {current_day}, timestamp: {timestamp}")
                             result = forex_result
 
+                    # Add weekends
                     extra_days: Set[datetime] = {current_day + timedelta(days=1)}
                     if (current_day + timedelta(days=2)).weekday() in [5, 6]:
                         extra_days.add(current_day + timedelta(days=2))
@@ -168,6 +179,8 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
                             close=forex_rate,
                             volume=ZERO,
                         )
+                        if extra_day == key.timestamp:
+                            result = forex_result
                         self._add_bar_to_cache(
                             self._floor_key(AssetPairAndTimestamp(extra_day, from_asset, to_asset, _FRANKFURTER_EXCHANGE), True), forex_result
                         )
@@ -235,14 +248,18 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
             raise RP2RuntimeError("JSON decode error") from exc
 
     def _year_start_end(self, date: datetime) -> Tuple[datetime, datetime]:
+        year: int = date.year
         # Check if the input date is January 1st (a holiday) or 2nd or 3rd and is a Saturday or Sunday
         # If it is, use the previous year's data to extrapolate the rates
         if (date.month == 1 and date.day <= 3) and ((date.weekday() in [5, 6]) or date.day == 1):
-            previous_year = date.year - 1
-            start_of_year = datetime(previous_year, 1, 2)
-            end_of_year = datetime(previous_year, 12, 31)
-        else:
-            start_of_year = datetime(date.year, 1, 2)
-            end_of_year = datetime(date.year, 12, 31)
+            year = date.year - 1
+
+        start_of_year = datetime(year, 1, 2).replace(tzinfo=timezone.utc)
+
+        # Adjust start_of_year if it falls on a weekend
+        while start_of_year.weekday() >= 5:
+            start_of_year += timedelta(days=1)
+
+        end_of_year = datetime(year, 12, 31).replace(tzinfo=timezone.utc)
 
         return start_of_year, end_of_year
