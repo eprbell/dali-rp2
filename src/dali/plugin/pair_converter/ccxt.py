@@ -152,7 +152,7 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
                             else:
                                 raise RP2ValueError(f"No forex rate found for {current_day} for {from_asset} to {to_asset} in {market}") from exc
 
-                        self._add_bar_to_cache(    
+                        self._add_bar_to_cache(
                             self._floor_key(AssetPairAndTimestamp(current_day, from_asset, to_asset, _FRANKFURTER_EXCHANGE), True), forex_result
                         )
                         previous_result = forex_result

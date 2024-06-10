@@ -292,22 +292,24 @@ class Kraken:
 
                 # Adjust the chunk to start from the next Monday
                 adjusted_chunk = [row for row in chunk if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) >= next_monday]
-                
+
                 i = 0
                 while i < len(adjusted_chunk):
 
                     # When there is no volume for a day, Kraken doesn't create a row for that day
                     # So we have to find 1-7 rows that are less than or equal to a week from the start of the week
                     following_monday = next_monday + timedelta(days=7)
-                    week_of_chunks = [row for row in adjusted_chunk[i : i + 7] if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday]
+                    week_of_chunks = [
+                        row for row in adjusted_chunk[i : i + 7] if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday
+                    ]
 
                     # The timestamp of the first row becomes the timestamp for the weekly row
-                    column_sums: List[str] = [next_monday.timestamp()]
+                    column_sums: List[str] = [str(next_monday.timestamp())]
 
                     # We don't want/need to add up the timestamp column
                     for column in range(self.__OPEN, self.__TRADES + 1):
                         if len(week_of_chunks) == 0:
-                            column_sums.extend([ZERO, ZERO, ZERO, ZERO, ZERO, ZERO])
+                            column_sums.extend(["0", "0", "0", "0", "0", "0"])
                             break
 
                         column_sum = str(sum((RP2Decimal(row[column]) for row in week_of_chunks), ZERO))

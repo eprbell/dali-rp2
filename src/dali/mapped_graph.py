@@ -189,7 +189,7 @@ class MappedGraph(Graph[ValueType]):
         # Add new neighbors
         for optimized_asset, neighbor_weights in optimization.items():
             for neighbor_name in neighbor_weights.keys():
-                if self.get_vertex(optimized_asset) in self.vertexes:
+                if self.get_vertex(optimized_asset) in list(self.vertexes):
                     cloned_mapped_graph.add_neighbor(optimized_asset, neighbor_name, neighbor_weights[neighbor_name], True)
                     LOGGER.debug("Added while cloning %s to %s", optimized_asset, neighbor_name)
 

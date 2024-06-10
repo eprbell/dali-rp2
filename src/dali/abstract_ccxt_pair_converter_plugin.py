@@ -899,7 +899,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     # market becomes available. Later, when the price is retrieved, the timestamps won't match and the user will be warned.
                     no_market_padding: HistoricalBar = HistoricalBar(
                         duration=bar_check[0].duration,
-                        timestamp=bar_check[0].timestamp - timedelta(weeks=4), # Make this a parameter users can set?
+                        timestamp=bar_check[0].timestamp - timedelta(weeks=4),  # Make this a parameter users can set?
                         open=bar_check[0].open,
                         high=bar_check[0].high,
                         low=bar_check[0].low,
@@ -1004,7 +1004,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
         return processed_aliases
 
-    def _get_previous_monday(self, date):
+    def _get_previous_monday(self, date: datetime) -> datetime:
         days_behind = (date.weekday() + 1) % 7
         return date - timedelta(days=days_behind)
 
