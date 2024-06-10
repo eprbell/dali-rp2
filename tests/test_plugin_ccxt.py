@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 import pytest
@@ -103,13 +103,13 @@ class TestCcxtPlugin:
         mocker.patch.object(plugin, "_add_bar_to_cache").side_effect = plugin._add_bar_to_cache  # pylint: disable=protected-access
 
         # Friday rate is used for Saturday and Sunday since there is no trading for ECB on weekends
-        friday_data = plugin._get_fiat_exchange_rate(datetime(2020, 12, 31, 0, 0), "EUR", "USD")  # pylint: disable=protected-access
-        saturday_data = plugin._get_fiat_exchange_rate(datetime(2021, 1, 2, 0, 0), "EUR", "USD")  # pylint: disable=protected-access
+        friday_data = plugin._get_fiat_exchange_rate(datetime(2020, 12, 31, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD")  # pylint: disable=protected-access
+        saturday_data = plugin._get_fiat_exchange_rate(datetime(2021, 1, 2, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD")  # pylint: disable=protected-access
 
         assert friday_data
         assert saturday_data
-        assert friday_data.timestamp == datetime(2020, 12, 31, 0, 0)
-        assert saturday_data.timestamp == datetime(2021, 1, 2, 0, 0)
+        assert friday_data.timestamp == datetime(2020, 12, 31, 0, 0).replace(tzinfo=timezone.utc)
+        assert saturday_data.timestamp == datetime(2021, 1, 2, 0, 0).replace(tzinfo=timezone.utc)
         assert friday_data.low == saturday_data.low == EUR_USD_RATE
         assert friday_data.high == saturday_data.high == EUR_USD_RATE
         assert friday_data.open == saturday_data.open == EUR_USD_RATE
@@ -125,13 +125,13 @@ class TestCcxtPlugin:
 
         # Friday rate is used for Saturday and Sunday since there is no trading for ECB on weekends
         # Check to see if plugin will retrieve Friday rate when Saturday is requested first
-        saturday_data = plugin._get_fiat_exchange_rate(datetime(2021, 1, 2, 0, 0), "EUR", "USD")  # pylint: disable=protected-access
-        friday_data = plugin._get_fiat_exchange_rate(datetime(2020, 12, 31, 0, 0), "EUR", "USD")  # pylint: disable=protected-access
+        saturday_data = plugin._get_fiat_exchange_rate(datetime(2021, 1, 2, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD")  # pylint: disable=protected-access
+        friday_data = plugin._get_fiat_exchange_rate(datetime(2020, 12, 31, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD")  # pylint: disable=protected-access
 
         assert friday_data
         assert saturday_data
-        assert friday_data.timestamp == datetime(2020, 12, 31, 0, 0)
-        assert saturday_data.timestamp == datetime(2021, 1, 2, 0, 0)
+        assert friday_data.timestamp == datetime(2020, 12, 31, 0, 0).replace(tzinfo=timezone.utc)
+        assert saturday_data.timestamp == datetime(2021, 1, 2, 0, 0).replace(tzinfo=timezone.utc)
         assert friday_data.low == saturday_data.low == EUR_USD_RATE
         assert friday_data.high == saturday_data.high == EUR_USD_RATE
         assert friday_data.open == saturday_data.open == EUR_USD_RATE

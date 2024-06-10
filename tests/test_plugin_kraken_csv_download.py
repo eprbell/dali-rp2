@@ -92,12 +92,12 @@ class TestKrakenCsvDownload:
         assert test_bar
         assert test_bar.low == RP2Decimal("1.6668")
 
-        test_bars = kraken_csv.find_historical_bars("USDT", "USD", datetime.fromtimestamp(1601683200), True, "1w")
+        test_bars = kraken_csv.find_historical_bars("USDT", "USD", datetime.fromtimestamp(1601856000, timezone.utc), True, "1w")
 
         assert test_bars
         test_bar = test_bars[0]
 
         # Test to make sure it only emulates full weeks
-        assert len(test_bars) == 1
-        assert test_bar.low == RP2Decimal("1.952314285714285714285714286")
-        assert test_bar.volume == RP2Decimal("12016.1594")
+        assert len(test_bars) == 5
+        assert test_bar.low == RP2Decimal("1.9999")
+        assert test_bar.volume == RP2Decimal("5999.9997")
