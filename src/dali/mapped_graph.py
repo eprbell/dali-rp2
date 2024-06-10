@@ -79,6 +79,17 @@ class MappedGraph(Graph[ValueType]):
     def aliases(self) -> Iterator[Alias]:
         return iter(self.__aliases.keys())
 
+    def __str__(self) -> str:
+        return (
+            f"MappedGraph("
+            f"exchange={self.__exchange}, "
+            f"vertexes={self.__name_to_vertex}, "
+            f"optimized_assets_count={len(self.__optimized_assets)}, "
+            f"fiat_assets_count={len(self.__fiat_assets)}, "
+            f"alias_count={len(self.__aliases)}"
+            f")"
+        )
+
     def add_vertex_if_missing(self, name: str) -> None:
         if not self.__name_to_vertex.get(name):
             self.add_vertex(Vertex[ValueType](name=name))
