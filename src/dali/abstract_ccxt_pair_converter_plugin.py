@@ -345,6 +345,18 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         self._logger.debug("Converting %s to %s", from_asset, to_asset)
 
+        # If the assets are the same, return a bar with a price of 1
+        if from_asset == to_asset:
+            return HistoricalBar(
+                duration=timedelta(seconds=604800),
+                timestamp=timestamp,
+                open=RP2Decimal(1),
+                high=RP2Decimal(1),
+                low=RP2Decimal(1),
+                close=RP2Decimal(1),
+                volume=ZERO,
+            )
+
         # If both assets are fiat, skip further processing
         if self._is_fiat_pair(from_asset, to_asset):
             return self._get_fiat_exchange_rate(timestamp, from_asset, to_asset)
