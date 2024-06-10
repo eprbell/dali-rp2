@@ -58,12 +58,14 @@ class MappedGraph(Graph[ValueType]):
         exchange: str,  # This is temporary until teleportation is implemented
         vertexes: Optional[List["Vertex[ValueType]"]] = None,
         optimized_assets: Optional[Set[str]] = None,
+        fiat_assets: Optional[Set[str]] = None,
         aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None,
     ) -> None:
         super().__init__(vertexes)
         self.__exchange: str = exchange  # Temporary until teleportation
         self.__name_to_vertex: Dict[str, Vertex[ValueType]] = {vertex.name: vertex for vertex in vertexes} if vertexes else {}
         self.__optimized_assets: Set[str] = set() if optimized_assets is None else optimized_assets
+        self.__fiat_assets: Set[str] = set() if fiat_assets is None else fiat_assets
         self.__aliases: Dict[Alias, RP2Decimal] = {}
         self.__aliases.update(_UNIVERSAL_ALIASES)
         self.__aliases.update(_EXCHANGE_SPECIFIC_ALIASES.get(exchange, {}))  # To be removed for teleportation
@@ -158,10 +160,13 @@ class MappedGraph(Graph[ValueType]):
     def clone_with_optimization(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
         # exchange is used here again temporarily
         cloned_mapped_graph: MappedGraph[ValueType] = MappedGraph(
-            self.__exchange, optimized_assets=self.__optimized_assets.copy(), aliases={_UNIVERSAL: self.__aliases}
+            self.__exchange, optimized_assets=self.__optimized_assets.copy(), fiat_assets=self.__fiat_assets.copy(), aliases={_UNIVERSAL: self.__aliases}
         )
 
         for original_vertex in self.vertexes:
+            if len(list(original_vertex.neighbors)) == 0 and original_vertex.name not in self.__fiat_assets:
+                cloned_mapped_graph.add_vertex_if_missing(original_vertex.name)
+                continue
             # Add existing neighbors
             for neighbor in original_vertex.neighbors:
                 neighbor_weight: float
@@ -175,16 +180,42 @@ class MappedGraph(Graph[ValueType]):
                 # Delete neighbor if negative weight
                 if neighbor_weight >= 0.0:
                     cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor.name, neighbor_weight, optimized)
+                elif neighbor.name in self.__fiat_assets:
+                    LOGGER.debug("Adding fiat neighbor while cloning %s to %s", original_vertex.name, neighbor.name)
+                    cloned_mapped_graph.add_fiat_neighbor(original_vertex.name, neighbor.name, neighbor_weight, optimized)
                 else:
                     cloned_mapped_graph.add_vertex_if_missing(original_vertex.name)
 
-            # Add new neighbors
-            for optimized_asset, neighbor_weights in optimization.items():
-                for neighbor_name in neighbor_weights.keys():
-                    if original_vertex.name == optimized_asset:
-                        cloned_mapped_graph.add_neighbor(original_vertex.name, neighbor_name, neighbor_weights[neighbor_name], True)
+        # Add new neighbors
+        for optimized_asset, neighbor_weights in optimization.items():
+            for neighbor_name in neighbor_weights.keys():
+                if self.get_vertex(optimized_asset) in self.vertexes:
+                    cloned_mapped_graph.add_neighbor(optimized_asset, neighbor_name, neighbor_weights[neighbor_name], True)
+                    LOGGER.debug("Added while cloning %s to %s", optimized_asset, neighbor_name)
 
         return cloned_mapped_graph
+
+    # More and more markets are added over time, so we need to prune the first graph down to what is available during the first trade
+    def prune_graph(self, optimization: Dict[str, Dict[str, float]]) -> "MappedGraph[ValueType]":
+        pruned_mapped_graph: MappedGraph[ValueType] = MappedGraph(
+            self.__exchange, optimized_assets=self.__optimized_assets.copy(), aliases={_UNIVERSAL: self.__aliases}
+        )
+        LOGGER.debug("Pruning with these optimizations - %s", optimization)
+        added_assets: Set[str] = set()
+        pruned_assets: Set[str] = set()
+        for vertex in self.vertexes:
+            for neighbor in vertex.neighbors:
+                if neighbor.name in optimization.get(vertex.name, {}) or (vertex.name in self.__fiat_assets and neighbor.name in self.__fiat_assets):
+                    pruned_mapped_graph.add_neighbor(vertex.name, neighbor.name, 0.0, False)
+                    added_assets.add(f"#{vertex.name}:#{neighbor.name}")
+                else:
+                    pruned_mapped_graph.add_vertex_if_missing(vertex.name)
+                    pruned_assets.add(f"#{vertex.name}:#{neighbor.name}")
+
+        LOGGER.debug("Added assets: %s", added_assets)
+        LOGGER.debug("Pruned assets: %s", pruned_assets)
+
+        return pruned_mapped_graph
 
     # Marking weights as optimized prevents REST API calls to re-optimize them
     def add_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0, optimized: bool = False) -> None:
@@ -194,6 +225,11 @@ class MappedGraph(Graph[ValueType]):
             vertex.add_neighbor(neighbor, weight)
         if optimized:
             self.__optimized_assets.add(vertex_name)
+
+    def add_fiat_neighbor(self, vertex_name: str, neighbor_name: str, weight: float = 0.0, optimized: bool = False) -> None:
+        LOGGER.debug("Added fiat neighbor %s to %s", vertex_name, neighbor_name)
+        self.__fiat_assets.add(vertex_name)
+        self.add_neighbor(vertex_name, neighbor_name, weight, optimized)
 
     # No adding aliases after cloning, because that would make MappedGraph mutable
     def __add_aliases(self, aliases: Dict[Alias, RP2Decimal]) -> None:
