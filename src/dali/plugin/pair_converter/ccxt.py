@@ -126,7 +126,6 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
 
                     for day in range((end_of_year - beginning_of_year).days + 1):
                         current_day: datetime = beginning_of_year + timedelta(days=day)
-                        print(f"current_day: {current_day}, timestamp: {key.timestamp}")
 
                         try:
                             forex_rate: RP2Decimal = RP2Decimal(str(rates[current_day.strftime("%Y-%m-%d")][to_asset]))
@@ -153,13 +152,11 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
                             else:
                                 raise RP2ValueError(f"No forex rate found for {current_day} for {from_asset} to {to_asset} in {market}") from exc
 
-
-                        self._add_bar_to_cache(
+                        self._add_bar_to_cache(    
                             self._floor_key(AssetPairAndTimestamp(current_day, from_asset, to_asset, _FRANKFURTER_EXCHANGE), True), forex_result
                         )
                         previous_result = forex_result
-                        if current_day == key.timestamp:
-                            print(f"current_day: {current_day}, timestamp: {timestamp}")
+                        if current_day == key.timestamp.replace(tzinfo=timezone.utc):
                             result = forex_result
 
                     # Add weekends
@@ -179,7 +176,7 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
                             close=forex_rate,
                             volume=ZERO,
                         )
-                        if extra_day == key.timestamp:
+                        if extra_day == key.timestamp.replace(tzinfo=timezone.utc):
                             result = forex_result
                         self._add_bar_to_cache(
                             self._floor_key(AssetPairAndTimestamp(extra_day, from_asset, to_asset, _FRANKFURTER_EXCHANGE), True), forex_result
