@@ -145,6 +145,7 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "SEIUSDT": _BINANCE,
     "SGBUSD": _KRAKEN,
     "SOLOUSDT": _GATE,  # To be replaced with Binance or Huobi once a CSV plugin is available
+    "SWEATUSDT": _GATE,
     "USDTUSD": _KRAKEN,
     "XYMUSDT": _GATE,
 }
@@ -169,6 +170,7 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "SEI": "USDT",
     "SGB": "USD",
     "SOLO": "USDT",
+    "SWEAT": "USDT",
     "USDT": "USD",
     "XYM": "USDT",
 }
