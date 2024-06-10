@@ -752,6 +752,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         self._logger.debug("Optimizations created for graph: %s", optimizations)
 
         exchange_tree: AVLTree[datetime, MappedGraph[str]] = AVLTree[datetime, MappedGraph[str]]()
+        pruned_graph: MappedGraph[str] = unoptimized_graph.prune_graph(optimizations[next(iter(optimizations))])
         for timestamp, optimization in optimizations.items():
             # Since weeks don't align across exchanges, optimizations from previous graphs, which may correspond to different
             # sources with different starting days for weeks (e.g. source A starts on Monday, source B starts on Thursday)
@@ -760,7 +761,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
             if previous_graph:
                 graph_snapshot = previous_graph.clone_with_optimization(optimization)
             else:
-                graph_snapshot = unoptimized_graph.clone_with_optimization(optimization)
+                graph_snapshot = pruned_graph.clone_with_optimization(optimization)
             exchange_tree.insert_node(timestamp, graph_snapshot)
             self._logger.debug("Added graph snapshot AVLTree for %s for timestamp: %s", exchange, timestamp)
 
@@ -848,7 +849,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         optimization_candidates: Set[Vertex[str]] = set()
         market_starts: Dict[str, Dict[str, datetime]] = {}
         # Weekly candles can start on any weekday depending on the exchange, we pull a week early to make sure we pull a full week.
-        week_start_date = start_date - timedelta(weeks=1)
+        week_start_date = self._get_previous_monday(start_date)
 
         # Gather all valid candidates for optimization
         for asset in assets:
@@ -898,7 +899,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     # market becomes available. Later, when the price is retrieved, the timestamps won't match and the user will be warned.
                     no_market_padding: HistoricalBar = HistoricalBar(
                         duration=bar_check[0].duration,
-                        timestamp=bar_check[0].timestamp - timedelta(weeks=1),
+                        timestamp=bar_check[0].timestamp - timedelta(weeks=4), # Make this a parameter users can set?
                         open=bar_check[0].open,
                         high=bar_check[0].high,
                         low=bar_check[0].low,
@@ -939,9 +940,11 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
                     # This deletes markets before they start by setting the weight to a negative
                     if timestamp < market_starts[crypto_asset].get(neighbor_asset, start_date):
+                        self._logger.debug("Optimization for %s to %s at %s is -1.0", crypto_asset, neighbor_asset, timestamp)
                         optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
                     else:
                         optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
+                        self._logger.debug("Optimization for %s to %s at %s is %s", crypto_asset, neighbor_asset, timestamp, volume)
 
         # Sort the optimizations by timestamp
         # while caching the graph snapshots, the partial optimizations will be layered on to the previous
@@ -970,6 +973,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     if neighbor_volume != -1.0:
                         neighbors[neighbor_name] = weight
                         weight += 1.0
+                        self._logger.debug("Optimization for %s to %s at %s is %s", asset, neighbor_name, timestamp, neighbors[neighbor_name])
                     else:
                         neighbors[neighbor_name] = -1.0
 
@@ -1000,6 +1004,10 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
         return processed_aliases
 
+    def _get_previous_monday(self, date):
+        days_behind = (date.weekday() + 1) % 7
+        return date - timedelta(days=days_behind)
+
     ### Abstract Fiat Methods (Must be overridden) ###
 
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
@@ -1027,7 +1035,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
             # We don't want to add a fiat vertex here because that would allow a double hop on fiat (eg. USD -> KRW -> JPY)
             if graph.get_vertex(fiat):
                 for to_be_added_fiat in to_fiat_list:
-                    graph.add_neighbor(
+                    graph.add_fiat_neighbor(
                         fiat,
                         to_be_added_fiat,
                         self._fiat_priority.get(fiat, STANDARD_WEIGHT),
