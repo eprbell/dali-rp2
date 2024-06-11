@@ -119,7 +119,7 @@ _TIME_GRANULARITY_SET: Set[str] = set(_TIME_GRANULARITY) | set(_COINBASE_PRO_GRA
 # It appears Kraken public API is limited to around 12 calls per minute.
 # There also appears to be a limit of how many calls per 2 hour time period.
 # Being authenticated lowers this limit.
-_REQUEST_DELAYDICT: Dict[str, float] = {_KRAKEN: 5.1, _BITFINEX: 5.0}
+_REQUEST_DELAY_DICT: Dict[str, float] = {_KRAKEN: 5.1, _BITFINEX: 5.0}
 
 # CSV Pricing classes
 _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
@@ -218,11 +218,13 @@ _UNIVERSAL: str = "UNIVERSAL"
 # Any change to this priority should be documented in "docs/configuration_file.md"
 FIAT_PRIORITY: Dict[str, float] = {
     "USD": 1,
-    "JPY": 2,
-    "KRW": 3,
-    "EUR": 4,
+    "EUR": 2,
+    "JPY": 3,
+    "KRW": 4,
     "GBP": 5,
-    "AUD": 6,
+    "CAD": 6,
+    "AUD": 7,
+    "CHF": 8,
 }
 
 # If Exchangerates.host is not available or the user does not have an access key, we can use this list
@@ -502,7 +504,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
             else:
                 retry_count = _TIME_GRANULARITY.index(timespan)
         else:
-            raise RP2ValueError("Internal error: Invalid timespan passed to find_historical_bars.")
+            raise RP2ValueError("Internal error: Invalid time span passed to find_historical_bars.")
         current_exchange: Any = self.__exchanges[exchange]
         ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
         csv_pricing: Any = self.__csv_pricing_dict.get(exchange)
@@ -841,7 +843,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
     # Isolated to be mocked
     def _get_request_delay(self, exchange: str) -> float:
-        return _REQUEST_DELAYDICT.get(exchange, 0)
+        return _REQUEST_DELAY_DICT.get(exchange, 0)
 
     def _optimize_assets_for_exchange(
         self, unoptimized_graph: MappedGraph[str], start_date: datetime, assets: Set[str], exchange: str
@@ -1007,8 +1009,6 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
     def _get_previous_monday(self, date: datetime) -> datetime:
         days_behind = (date.weekday() + 1) % 7
         return date - timedelta(days=days_behind)
-
-    ### Abstract Fiat Methods (Must be overridden) ###
 
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
         raise NotImplementedError("The _get_fiat_exchange_rate method must be overridden.")
