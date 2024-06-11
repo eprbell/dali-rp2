@@ -1,4 +1,4 @@
-# Copyright 2024 Neal Chambers
+# Copyright 2022 Neal Chambers
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,6 +75,9 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
         else:
             self._fiat_priority = FIAT_PRIORITY
         self.__session: Session = requests.Session()
+
+    def name(self) -> str:
+        return "Frankfurter"
 
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
         # Floor the key to days because the API only provides daily rates
