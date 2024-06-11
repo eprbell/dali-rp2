@@ -318,7 +318,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         return floored_key
 
     def name(self) -> str:
-        return "CCXT-converter"
+        raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def cache_key(self) -> str:
         return self.name() + "_" + self.__cache_modifier if self.__cache_modifier else self.name()

@@ -83,6 +83,9 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
         self.__fiat_access_key = fiat_access_key
         self.__session: Session = requests.Session()
 
+    def name(self) -> str:
+        return "Fiat from exchangerate.host"
+
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
         key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, _FIAT_EXCHANGE)
         historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)

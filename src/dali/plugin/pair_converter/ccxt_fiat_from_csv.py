@@ -51,6 +51,9 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
             cache_modifier=cache_modifier,
         )
 
+    def name(self) -> str:
+        return "Fiat from CSV"
+
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:
         key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, _FIAT_EXCHANGE)
         historical_bar: Optional[HistoricalBar] = self._get_bar_from_cache(key)
