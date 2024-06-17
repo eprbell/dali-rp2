@@ -230,6 +230,10 @@ FIAT_PRIORITY: Dict[str, float] = {
 # If Exchangerates.host is not available or the user does not have an access key, we can use this list
 DEFAULT_FIAT_LIST: List[str] = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD", "USD"]
 
+# How much padding in weeks should we add to the graph to catch airdropped or new assets that don't yet have a market
+MARKET_PADDING_IN_WEEKS: int = 4
+
+DAYS_IN_WEEK: int = 7
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
@@ -901,7 +905,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     # market becomes available. Later, when the price is retrieved, the timestamps won't match and the user will be warned.
                     no_market_padding: HistoricalBar = HistoricalBar(
                         duration=bar_check[0].duration,
-                        timestamp=bar_check[0].timestamp - timedelta(weeks=4),  # Make this a parameter users can set?
+                        timestamp=bar_check[0].timestamp - timedelta(weeks=MARKET_PADDING_IN_WEEKS),  # Make this a parameter users can set?
                         open=bar_check[0].open,
                         high=bar_check[0].high,
                         low=bar_check[0].low,
@@ -1007,7 +1011,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         return processed_aliases
 
     def _get_previous_monday(self, date: datetime) -> datetime:
-        days_behind = (date.weekday() + 1) % 7
+        days_behind = (date.weekday() + 1) % DAYS_IN_WEEK
         return date - timedelta(days=days_behind)
 
     def _get_fiat_exchange_rate(self, timestamp: datetime, from_asset: str, to_asset: str) -> Optional[HistoricalBar]:

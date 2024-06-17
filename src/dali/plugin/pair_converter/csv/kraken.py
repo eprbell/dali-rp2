@@ -129,6 +129,7 @@ _MAX_MULTIPLIER: int = 500
 # Download chunks
 _CHUNK_SIZE_BYTES: int = 32768  # 32kb
 
+DAYS_IN_WEEK: int = 7
 
 class _PairStartEnd(NamedTuple):
     end: int
@@ -301,7 +302,7 @@ class Kraken:
                     # So we have to find 1-7 rows that are less than or equal to a week from the start of the week
                     following_monday = next_monday + timedelta(days=7)
                     week_of_chunks = [
-                        row for row in adjusted_chunk[i : i + 7] if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday
+                        row for row in adjusted_chunk[i : i + DAYS_IN_WEEK] if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday
                     ]
 
                     # The timestamp of the first row becomes the timestamp for the weekly row
@@ -540,7 +541,7 @@ class Kraken:
             self.__logger.info("File %s not found.", self.__UNIFIED_CSV_FILE)
 
     def _get_next_monday(self, date: datetime) -> datetime:
-        days_ahead = (7 - date.weekday()) % 7
+        days_ahead = (DAYS_IN_WEEK - date.weekday()) % DAYS_IN_WEEK
         if days_ahead == 0:
-            days_ahead = 7
+            days_ahead = DAYS_IN_WEEK
         return date + timedelta(days=days_ahead)
