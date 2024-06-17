@@ -302,8 +302,11 @@ class Kraken:
                     # So we have to find 1-7 rows that are less than or equal to a week from the start of the week
                     following_monday = next_monday + timedelta(days=7)
                     week_of_chunks = [
-                        row for row in adjusted_chunk[i : i + DAYS_IN_WEEK] if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday
+                        row
+                        for row in adjusted_chunk[i : i + DAYS_IN_WEEK]
+                        if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday
                     ]
+
 
                     # The timestamp of the first row becomes the timestamp for the weekly row
                     column_sums: List[str] = [str(next_monday.timestamp())]
