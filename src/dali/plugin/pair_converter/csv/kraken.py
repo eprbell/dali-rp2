@@ -309,7 +309,7 @@ class Kraken:
 
 
                     # The timestamp of the first row becomes the timestamp for the weekly row
-                    column_sums: List[str] = [str(next_monday.timestamp())]
+                    column_sums: List[str] = [str(int(next_monday.timestamp()))]
 
                     # We don't want/need to add up the timestamp column
                     for column in range(self.__OPEN, self.__TRADES + 1):
@@ -394,11 +394,11 @@ class Kraken:
                     with gopen(file_path, "rt") as file:
                         rows = reader(file)
                         for row in rows:
-                            if all_bars and int(float(row[self.__TIMESTAMP_INDEX])) >= duration_timestamp:
+                            if all_bars and int(row[self.__TIMESTAMP_INDEX]) >= duration_timestamp:
                                 result.append(
                                     HistoricalBar(
                                         duration=timedelta(minutes=int(_KRAKEN_TIME_GRANULARITY[retry_count])),
-                                        timestamp=datetime.fromtimestamp(int(float(row[self.__TIMESTAMP_INDEX])), timezone.utc),
+                                        timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
                                         open=RP2Decimal(row[self.__OPEN]),
                                         high=RP2Decimal(row[self.__HIGH]),
                                         low=RP2Decimal(row[self.__LOW]),
@@ -406,11 +406,11 @@ class Kraken:
                                         volume=RP2Decimal(row[self.__VOLUME]),
                                     )
                                 )
-                            elif int(float(row[self.__TIMESTAMP_INDEX])) == duration_timestamp:
+                            elif int(row[self.__TIMESTAMP_INDEX]) == duration_timestamp:
                                 return [
                                     HistoricalBar(
                                         duration=timedelta(minutes=int(_KRAKEN_TIME_GRANULARITY[retry_count])),
-                                        timestamp=datetime.fromtimestamp(int(float(row[self.__TIMESTAMP_INDEX])), timezone.utc),
+                                        timestamp=datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc),
                                         open=RP2Decimal(row[self.__OPEN]),
                                         high=RP2Decimal(row[self.__HIGH]),
                                         low=RP2Decimal(row[self.__LOW]),
