@@ -561,13 +561,13 @@ Check the [CCXT plugin](#ccxt) section above for more information on the paramet
 
 #### Note on Forex CSV file
 
-If you do not want to use Exchangerate.host or the Frankfurter API for Forex prices, you can use CSV files by saving them to the folder `.dali_cache/forex`. The files must be in the format of quote_asset_base_asset.csv (e.g. USD_JPY.csv). The format should be Time, high, low, open, close, volume. Like the below example:
+If you do not want to use Exchangerate.host or the Frankfurter API for Forex prices, you can use CSV files by saving them to the folder `.dali_cache/forex`. The files must be in the format of \<quote_asset\>_\<base_asset.csv\>_ (e.g. USD_JPY.csv). The format should be Time, high, low, open, close, volume. Like the below example:
 
 Time               |Open  |High  |Low   |Close |Volume
 -------------------|------|------|------|------|------
 2008-02-22 00:00:00|210.45|215.45|211.56|213.45|8900
 
-Historical CSV Files are available from several places on the web for free. [Forexsb.com](https://forexsb.com/historical-forex-data) is a good source. Currently only 1 day candles are supported. One row per day a rate is needed is required. For example, if you want to use the [official yearly rates from the IRS](https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates), you will need to copy and paste the same rate for all days of the calendar year. CSV files can contain multiple years of rates.
+Historical CSV Files are available from several places on the web for free. [Forexsb.com](https://forexsb.com/historical-forex-data) is a good source. Currently only 1 day candles are supported. A rate is required for each day with one day per row. For example, if you want to use the [official yearly rates from the IRS](https://www.irs.gov/individuals/international-taxpayers/yearly-average-currency-exchange-rates), you will need to copy and paste the same rate for all days of the calendar year. CSV files can contain multiple years of rates.
 
 ### Binance Locked CCXT
 This plugin makes use of the CCXT plugin, but locks all routes to Binance.com.
