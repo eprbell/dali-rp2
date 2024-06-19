@@ -220,7 +220,7 @@ class InputPlugin(AbstractInputPlugin):
         # Ensure the amount is positive
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT])
         if amount < ZERO:
-            amount = -amount  # type: ignore
+            amount = -amount
         transaction_details: Any = transaction[_DETAILS]
         transfer_id: str = transaction_details[_TRANSFER_ID]
         transfer: Any = self.__get_transfer(transfer_id)
