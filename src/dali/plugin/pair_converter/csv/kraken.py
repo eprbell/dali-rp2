@@ -62,7 +62,8 @@ _ID: str = "id"
 _GOOGLE_DRIVE_DOWNLOAD_URL: str = "https://drive.usercontent.google.com/download"
 
 # File ID for the unified CSV file ID. This will need to be replaced every quarter.
-_UNIFIED_CSV_FILE_ID: str = "16YKyFkYlvawCHv3W7WuTFzM8RYgMRWMt"
+# File can also be manually downloaded from https://drive.google.com/file/d/11WtjXA9kvVYV9KDoebGV5U75dmcA3bJa/view?usp=sharing
+_UNIFIED_CSV_FILE_ID: str = "11WtjXA9kvVYV9KDoebGV5U75dmcA3bJa"
 _MESSAGE: str = "message"
 _REASON: str = "reason"
 
@@ -128,6 +129,7 @@ _MAX_MULTIPLIER: int = 500
 # Download chunks
 _CHUNK_SIZE_BYTES: int = 32768  # 32kb
 
+DAYS_IN_WEEK: int = 7
 
 class _PairStartEnd(NamedTuple):
     end: int
@@ -284,28 +286,51 @@ class Kraken:
             if duration_in_minutes == _ONE_DAY_IN_MINUTES:
                 week_chunk = []
 
-                for i in range(0, len(chunk), 7):
-                    seven_chunks = chunk[i : i + 7]
+                # Convert the first timestamp to a datetime object and find the next Monday
+                first_timestamp = datetime.fromtimestamp(int(chunk[0][self.__TIMESTAMP_INDEX]), timezone.utc)
+                next_monday = self._get_next_monday(first_timestamp)
 
-                    # We want to make sure we have a full week for the averages and accurate pricing
-                    if len(seven_chunks) < 7:
-                        break
+                self.__logger.debug("chunking - %s, %s, %s", file_name, first_timestamp, next_monday)
+
+                # Adjust the chunk to start from the next Monday
+                adjusted_chunk = [row for row in chunk if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) >= next_monday]
+
+                i = 0
+                while i < len(adjusted_chunk):
+
+                    # When there is no volume for a day, Kraken doesn't create a row for that day
+                    # So we have to find 1-7 rows that are less than or equal to a week from the start of the week
+                    following_monday = next_monday + timedelta(days=7)
+                    week_of_chunks = [
+                        row
+                        for row in adjusted_chunk[i : i + DAYS_IN_WEEK]
+                        if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday
+                    ]
+
 
                     # The timestamp of the first row becomes the timestamp for the weekly row
-                    column_sums: List[str] = [seven_chunks[0][self.__TIMESTAMP_INDEX]]
+                    column_sums: List[str] = [str(int(next_monday.timestamp()))]
 
                     # We don't want/need to add up the timestamp column
                     for column in range(self.__OPEN, self.__TRADES + 1):
-                        column_sum = str(sum((RP2Decimal(row[column]) for row in seven_chunks), ZERO))
+                        if len(week_of_chunks) == 0:
+                            column_sums.extend(["0", "0", "0", "0", "0", "0"])
+                            break
+
+                        column_sum = str(sum((RP2Decimal(row[column]) for row in week_of_chunks), ZERO))
 
                         # Average all prices
                         # BUG FIX: shouldn't be averages but reflect a true candle (e.g. high should be the highest)
                         if column in range(self.__OPEN, (self.__CLOSE + 1)):
-                            column_average = str(RP2Decimal(column_sum) / RP2Decimal("7"))
+                            # Divide it by the actual number of available days
+                            self.__logger.debug("column_sum: %s, len(week_of_chunks): %s", column_sum, len(week_of_chunks))
+                            column_average = str(RP2Decimal(column_sum) / RP2Decimal(len(week_of_chunks)))
                             column_sums.append(column_average)
                         else:
                             column_sums.append(column_sum)
                     week_chunk.append(column_sums)
+                    i += len(week_of_chunks)
+                    next_monday = following_monday
 
                 # Same file_timestamp is okay since _ONE_DAY uses _MAX_MULTIPLIER
                 self._write_chunk_to_disk(pair, file_timestamp, _ONE_WEEK_IN_MINUTES, week_chunk)
@@ -334,11 +359,15 @@ class Kraken:
         else:
             raise RP2ValueError("Internal Error: Invalid timespan passed to _retrieve_cached_bars.")
 
+        if pair_name + _KRAKEN_TIME_GRANULARITY[retry_count] not in self.__cached_pairs:
+            self.__logger.debug("No cached pair found for %s, %s", base_asset, quote_asset)
+            return None
+
         while retry_count < len(_KRAKEN_TIME_GRANULARITY):
             window_start: int = self.__cached_pairs[pair_name + _KRAKEN_TIME_GRANULARITY[retry_count]].start
             window_end: int = self.__cached_pairs[pair_name + _KRAKEN_TIME_GRANULARITY[retry_count]].end
 
-            if timestamp < window_start or timestamp > window_end:
+            if (timestamp < window_start or timestamp > window_end) and not all_bars:
                 self.__logger.debug("Out of range - %s < %s or %s > %s", timestamp, window_start, timestamp, window_end)
                 retry_count += 1
                 continue
@@ -425,7 +454,7 @@ class Kraken:
         # Attempt to load smallest duration
         if self.__cached_pairs.get(base_asset + quote_asset + _MINUTE_IN_MINUTES):
             plural: str = "s" if all_bars else ""
-            self.__logger.debug("Retrieving cached bar %s for %s, %s at %s", plural, base_asset, quote_asset, epoch_timestamp)
+            self.__logger.debug("Retrieving cached bar%s for %s, %s at %s", plural, base_asset, quote_asset, epoch_timestamp)
             return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
 
         if self._unzip_and_chunk(base_asset, quote_asset, all_bars):
@@ -482,7 +511,7 @@ class Kraken:
         return True
 
     def _prompt_download_confirmation(self) -> bool:
-        self.__logger.info("\nIn order to provide accurate pricing from Kraken, a large (3.9+ gb) zipfile needs to be downloaded.")
+        self.__logger.info("\nIn order to provide accurate pricing from Kraken, a large (4.1+ gb) zipfile needs to be downloaded.")
 
         while True:
             choice = input("Do you want to download the file now?[yn]")
@@ -513,3 +542,9 @@ class Kraken:
             self.__logger.info("%s has been safely deleted.", self.__UNIFIED_CSV_FILE)
         except FileNotFoundError:
             self.__logger.info("File %s not found.", self.__UNIFIED_CSV_FILE)
+
+    def _get_next_monday(self, date: datetime) -> datetime:
+        days_ahead = (DAYS_IN_WEEK - date.weekday()) % DAYS_IN_WEEK
+        if days_ahead == 0:
+            days_ahead = DAYS_IN_WEEK
+        return date + timedelta(days=days_ahead)
