@@ -18,10 +18,12 @@
 * **[Introduction](#introduction)**
 * **[Data Loader Plugin Sections](#data-loader-plugin-sections)**
   * [Binance.com Section (REST)](#binancecom-section-rest)
+  * [Binance.us Section (REST)](#binanceus-section-rest)
   * [Bitbank Section (REST)](#bitbank-section-rest)
   * [Coinbase Section (REST)](#coinbase-section-rest)
   * [Coinbase Pro Section (REST)](#coinbase-pro-section-rest)
   * [Binance.com Supplemental Section (CSV)](#binancecom-supplemental-section-csv)
+  
   * [Bitbank Supplemental Section (CSV)](#bitbank-supplemental-section-csv)
   * [Coincheck Supplemental Section (CSV)](#coincheck-supplemental-section-csv)
   * [Ledger Section (CSV)](#ledger-section-csv)
@@ -99,6 +101,26 @@ Notes:
 * Due to this discrepency, there may be duplicate locked savings/staked and flexible savings dividends around May 8th, 2021. Please review your payments around this time before processing your transactions with RP2.
 * [Currently only dust 'dribblets' of 100 or less crypto assets can be retrieved at once](https://dev.binance.vision/t/pagination-for-dustlog-asset-dividend-record-swap-history-bswap/4963). If you dust more than 100 crypto assets at one time the REST API will not be able to process the transactions successfully.
 * Due to the information not being available via REST, autoinvest trades and ETH to BETH conversions can not be processed with this plugin. Please download the CSV for these transactions and use the [Binance.com Supplemental CSV plugin](#binance.com-supplemental-section-csv). Note that some files are only available as .xlsx will need to be converted to the CSV format to be processed. BETH/ETH trades are not affected by this limitation and will be read via the REST plugin.
+
+### Binance.us Section (REST)
+This plugin is REST-based and requires setting up API Keys in your Binance.us account settings (click on the API Management link under your profile).
+
+**IMPORTANT NOTE**:
+* When setting up API key/secret, only use read permissions (DaLI does NOT need write permissions).
+* store your API key and secret safely and NEVER share it with anyone!
+
+Initialize this plugin section as follows:
+<pre>
+[dali.plugin.input.rest.binance_us <em>&lt;qualifiers&gt;</em>]
+account_holder = <em>&lt;account_holder&gt;</em>
+api_key = <em>&lt;api_key&gt;</em>
+api_secret = <em>&lt;api_secret&gt;</em>
+username = <em>&lt;username&gt;</em>
+native_fiat = <em>&lt;native_fiat&gt;</em>
+</pre>
+
+Notes:
+* TODO
 
 ### Bitbank Section (REST)
 This plugin is REST-based and requires setting up API Keys in your Bitbank account settings (click on the API link under your profile).
