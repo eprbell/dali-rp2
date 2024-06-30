@@ -18,6 +18,6 @@ from rp2.plugin.country.ie import IE
 from dali.dali_main import dali_main
 
 
-# US-specific entry point
+# IE-specific entry point
 def dali_entry() -> None:
     dali_main(IE())
