@@ -142,6 +142,8 @@ thread_count = <em>&lt;thread_count&gt;</em>
 Note: the `thread_count` parameter is optional and denotes the number of parallel threads used to by the plugin to connect to the endpoint. The higher this number, the faster the execution, however if the number is too high the server may interrupt the connection with a rate-limit error.
 
 ### Coinbase Pro Section (REST)
+Warning: Coinbase Pro intigration is currently broken. When creating API key you will only recieve "API key name" and "Secret". You will not recieve the required api_passphrase.
+
 This plugin is REST-based and requires setting up API Keys in your Coinbase Pro account settings (click on the API link).
 
 **IMPORTANT NOTE**:
