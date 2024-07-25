@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## 0.6.11
+* Add support for generic country
+* Add support for Ireland
+* Enable optional use of CSV files for Forex pricing instead of relying on exchangerate.host (#225)
+
 ## 0.6.10
 * Add support for Spain (#187)
 * Added Kraken REST plugin (#114)
