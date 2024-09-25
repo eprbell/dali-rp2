@@ -163,7 +163,7 @@ class InputPlugin(AbstractInputPlugin):
                     )
                 elif transaction_type == _WITHDRAWAL:
                     amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_INDEX])
-                    amount = -amount  # type: ignore
+                    amount = -amount
                     if last_withdrawal_fee is not None:
                         amount += last_withdrawal_fee
                     last_withdrawal_fee = None
@@ -212,7 +212,7 @@ class InputPlugin(AbstractInputPlugin):
                     continue
                 elif transaction_type == _WITHDRAWAL_FEE:
                     last_withdrawal_fee = RP2Decimal(line[self.__AMOUNT_INDEX])
-                    last_withdrawal_fee = -last_withdrawal_fee  # type: ignore
+                    last_withdrawal_fee = -last_withdrawal_fee
                 else:
                     self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
 

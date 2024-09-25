@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.6.9 Developer Guide
+# DaLI for RP2 v0.6.11 Developer Guide
 [![Static Analysis / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/static_analysis.yml)
 [![Documentation Check / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/documentation_check.yml)
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
@@ -84,7 +84,11 @@ virtualenv -p python3 .venv
 .venv/bin/pip3 install -e '.[dev]'
 ```
 ### Setup on Windows 10
-First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH"), then open a PowerShell window and enter the following commands:
+First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
+
+Then make sure [Microsoft Visual C++](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 14.0 or greater is installed (in the Visual Studio Installer window be sure to click on "Desktop development with C++"), which is needed for multidict.
+
+Then open a PowerShell window and enter the following to install DaLI:
 ```
 python -m pip install virtualenv
 ```
@@ -96,13 +100,19 @@ virtualenv -p python .venv
 .venv\Scripts\activate.ps1
 python -m pip install -e ".[dev]"
 ```
+
+If `activate.ps1` cannot be loaded because running scripts is disabled on the system, run `activate.bat` instead or change the PowerShell execution policy `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`.
 ### Setup on Other Unix-like Systems
 * install python 3.8 or greater
 * install pip3
 * install virtualenv
-* cd _<dali_directory>_
-* `virtualenv -p python3 .venv`
-* `.venv/bin/pip3 install -e '.[dev]'`
+
+Then install DaLI Python package requirements:
+```
+cd <dali_directory>
+virtualenv -p python3 .venv
+.venv/bin/pip3 install -e '.[dev]'
+```
 
 ## Source Code
 The RP2 source tree is organized as follows:
@@ -179,9 +189,14 @@ While every commit and push are automatically tested as described, sometimes it'
 * sort imports: `isort .`
 * run pre-commit tests without committing: `pre-commit run --all-files`
 
-Logs are stored in the `log` directory. To generate debug logs, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
+Logs are stored in the `log` directory. To generate debug logs on Linux or Mac, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
 ```
 LOG_LEVEL=DEBUG dali_us -s -o output/ config/test_config.ini
+```
+
+In Windows Powershell, debug logs can be generated with the following command:
+```
+$env:LOG_LEVEL='DEBUG'; dali_us -s -o output/ config/test_config.ini
 ```
 
 ### Unit Tests

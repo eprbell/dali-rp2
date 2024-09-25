@@ -80,16 +80,16 @@ class InputPlugin(AbstractInputPlugin):
 
     def __init__(
         self,
-        in_csv_file: str,
-        out_csv_file: str,
-        intra_csv_file: str,
+        in_csv_file: Optional[str] = None,
+        out_csv_file: Optional[str] = None,
+        intra_csv_file: Optional[str] = None,
         native_fiat: Optional[str] = None,
     ) -> None:
         super().__init__(account_holder="", native_fiat=native_fiat)
 
-        self.__in_csv_file: str = in_csv_file
-        self.__out_csv_file: str = out_csv_file
-        self.__intra_csv_file: str = intra_csv_file
+        self.__in_csv_file: Optional[str] = in_csv_file
+        self.__out_csv_file: Optional[str] = out_csv_file
+        self.__intra_csv_file: Optional[str] = intra_csv_file
 
         self.__logger: logging.Logger = create_logger(self.__MANUAL)
 

@@ -24,6 +24,7 @@ from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 from dali.transaction_manifest import TransactionManifest
 
+
 class AssetPairAndTimestamp(NamedTuple):
     timestamp: datetime
     from_asset: str
@@ -34,7 +35,7 @@ class AssetPairAndTimestamp(NamedTuple):
 class AbstractPairConverterPlugin:
     __ISSUES_URL: str = "https://github.com/eprbell/dali-rp2/issues"
 
-    def __init__(self, historical_price_type: str, fiat_access_key: Optional[str] = None, fiat_priority: Optional[str] = None) -> None:  # pylint: disable=unused-argument
+    def __init__(self, historical_price_type: str) -> None:
         if not isinstance(historical_price_type, str):
             raise RP2TypeError(f"historical_price_type is not a string: {historical_price_type}")
         if historical_price_type not in HISTORICAL_PRICE_KEYWORD_SET:
@@ -46,7 +47,7 @@ class AbstractPairConverterPlugin:
         except EOFError:
             LOGGER.error("EOFError: Cached file corrupted, no cache found.")
             result = None
-        self.__cache: Dict[AssetPairAndTimestamp, Any] = result if result is not None else {}
+        self._cache: Dict[AssetPairAndTimestamp, Any] = result if result is not None else {}
         self.__historical_price_type: str = historical_price_type
 
     def name(self) -> str:
@@ -57,10 +58,6 @@ class AbstractPairConverterPlugin:
 
     def optimize(self, transaction_manifest: TransactionManifest) -> None:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
-
-    @property
-    def _cache(self) -> Dict[AssetPairAndTimestamp, Any]:
-        return self.__cache
 
     @property
     def historical_price_type(self) -> str:
@@ -74,20 +71,20 @@ class AbstractPairConverterPlugin:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
     def save_historical_price_cache(self) -> None:
-        save_to_cache(self.cache_key(), self.__cache)
+        save_to_cache(self.cache_key(), self._cache)
 
     def get_conversion_rate(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[RP2Decimal]:
         result: Optional[RP2Decimal] = None
         historical_bar: Optional[HistoricalBar] = None
         key: AssetPairAndTimestamp = AssetPairAndTimestamp(timestamp, from_asset, to_asset, exchange)
         log_message_qualifier: str = ""
-        if key in self.__cache:
-            historical_bar = self.__cache[key]
+        if key in self._cache:
+            historical_bar = self._cache[key]
             log_message_qualifier = "cache of "
         else:
             historical_bar = self.get_historic_bar_from_native_source(timestamp, from_asset, to_asset, exchange)
             if historical_bar:
-                self.__cache[key] = historical_bar
+                self._cache[key] = historical_bar
 
         if historical_bar:
             result = historical_bar.derive_transaction_price(timestamp, self.__historical_price_type)

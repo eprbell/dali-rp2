@@ -156,9 +156,10 @@ class InputPlugin(AbstractInputPlugin):
 
                 asset: str = (
                     line[self.__ASSET_TRANSFERED][: -len(line[self.__CHAIN_USED])]
-                    if (line[self.__ASSET_TRANSFERED].endswith(line[self.__CHAIN_USED]))
+                    if (line[self.__CHAIN_USED] != "" and line[self.__ASSET_TRANSFERED].endswith(line[self.__CHAIN_USED]))
                     else (line[self.__ASSET_TRANSFERED])
                 )
+                self.__logger.debug("Asset: %s", asset)
 
                 if line[self.__TRANSACTION_TYPE] == self.__DEPOSIT:
                     result.append(

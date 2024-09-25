@@ -12,7 +12,7 @@
 <!--- See the License for the specific language governing permissions and --->
 <!--- limitations under the License. --->
 
-# DaLI for RP2 v0.6.9
+# DaLI for RP2 v0.6.11
 
 Privacy-focused, free, extensible data loader for RP2 (the crypto tax calculator)
 
@@ -99,7 +99,11 @@ pip install dali-rp2
 ```
 
 ### Installation on Windows 10
-First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH"), then open a PowerShell window and enter the following:
+First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
+
+Then make sure [Microsoft Visual C++](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 14.0 or greater is installed (in the Visual Studio Installer window be sure to click on "Desktop development with C++"), which is needed for multidict.
+
+Then open a PowerShell window and enter the following to install DaLI:
 
 ```console
 pip install dali-rp2
@@ -108,7 +112,12 @@ pip install dali-rp2
 ### Installation on Other Unix-like Systems
 * install python 3.8 or greater
 * install pip3
-* `pip install dali-rp2`
+
+Then install DaLI:
+
+```console
+pip install dali-rp2
+```
 
 ## Running
 DaLI reads in a user-prepared configuration file in [INI format](https://en.wikipedia.org/wiki/INI_file), which is used to initialize data loaders and configure DaLI's behavior. The format of the configuration file is described in detail in the [configuration file](https://github.com/eprbell/dali-rp2/tree/main/docs/configuration_file.md) documentation.
@@ -168,8 +177,8 @@ dali_us --help
 Finally compute taxes with RP2 using the generated input files (using both FIFO and LIFO accounting methods):
 
 ```console
-rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
-rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.config output/test_crypto_data.ods
+rp2_us -m fifo -o output/ -p rp2_ output/test_crypto_data.ini output/test_crypto_data.ods
+rp2_us -m lifo -o output/ -p rp2_ output/test_crypto_data.ini output/test_crypto_data.ods
 ```
 
 ## Configuration File

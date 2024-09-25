@@ -1,4 +1,4 @@
-# Copyright 2023 Christopher Whelan
+# Copyright 2024 advidb
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,26 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-class AdaptiveETA(Widgets):
-    def __init__(self, samples: int) -> None: ...
 
-class AdaptiveTransferSpeed(Widgets):
-    pass
+from rp2.plugin.country.ie import IE
 
-class Bar(Widgets):
-    pass
+from dali.dali_main import dali_main
 
-class BouncingBar(Widgets):
-    pass
 
-class DataSize(Widgets):
-    pass
-
-class Percentage(Widgets):
-    pass
-
-class Timer(Widgets):
-    pass
-
-class Widgets:
-    pass
+# IE-specific entry point
+def dali_entry() -> None:
+    dali_main(IE())
