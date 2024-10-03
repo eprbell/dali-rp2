@@ -12,8 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
+from datetime import datetime
+from typing import Any, Union
 
 class HistoricalData:
     def __init__(self, ticker: str, granularity: int, start_date: str, end_data: str, verbose: bool) -> None: ...
     def retrieve_data(self) -> Any: ...  # type: ignore
+    end_date: str
+    granularity: int
+    start_date: str
+    ticker: str
+    verbose: bool
+    def _date_cleaner(self, date_time: Union[datetime, str]) -> str: ...
+    def _ticker_checker(self) -> None: ...
