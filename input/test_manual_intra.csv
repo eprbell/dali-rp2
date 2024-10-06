@@ -1,3 +1,3 @@
 Unique ID,Timestamp,Asset,From Exchange,From Holder,To Exchange,To Holder,Spot Price,Crypto Sent,Crypto Received,Notes
-28fde44268ac826b66a7ce99a8723b8cf23a836729b1a23cb4986898ad0096bf0,2022-01-14 10:35:10 +0000,BTC,FTX,Bob,,,,0.2002,,"Sent 0.2002 BTC to Bob's Trezor"
-9237a6ed823577c528093ead63568aa25588987534bce3487ff7772ab00589218,2022-01-18 15:27:18 +0000,BTC,,,FTX,Bob,,,0.1,"Received 0.1 BTC from Bob's Trezor"
+28fde44268ac826b66a7ce99a8723b8cf23a836729b1a23cb4986898ad0096bf0,2022-01-14 10:35:10 +0000,BTC,FTX,Bob,,,41952.11,0.2002,,"Sent 0.2002 BTC to Bob's Trezor"
+9237a6ed823577c528093ead63568aa25588987534bce3487ff7772ab00589218,2022-01-18 15:27:18 +0000,BTC,,,FTX,Bob,41736.81,,0.1,"Received 0.1 BTC from Bob's Trezor"
