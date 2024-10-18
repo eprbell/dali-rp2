@@ -62,6 +62,7 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
         cache_modifier = fiat_priority if fiat_priority else ""
         super().__init__(
             historical_price_type=historical_price_type,
+            default_exchange=default_exchange,
             exchange_locked=exchange_locked,
             untradeable_assets=untradeable_assets,
             aliases=aliases,
