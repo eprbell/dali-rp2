@@ -267,7 +267,8 @@ native_fiat = <em>&lt;native_fiat&gt;</em>
 </pre>
 
 Notes:
-* The `trades_csv_file` and `transfers_csv_file` must be extracted from the .zip that is downloadable from the app. How to export transaction history is detailed [here](https://www.pionex.com/blog/how-to-export-pionex-transaction-history-statement%E3%80%90app-version%E3%80%91/).
+<!-- markdown-link-check-disable -->
+* The `trades_csv_file` and `transfers_csv_file` must be extracted from the .zip that is downloadable from the app. How to export transaction history is detailed [here](https://www.pionex.com/blog/how-to-export-pionex-transaction-history-statement%E3%80%90app-version%E3%80%91/).<!-- markdown-link-check-enable-->
 * The `for-cointracker.csv` file is used as input to the `trades_csv_file` parameter.
 * The `deposit-withdraw.csv` file is used as the input to the`transfers_csv_file` parameter.
 
