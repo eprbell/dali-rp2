@@ -454,13 +454,14 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             try:
                 results = function(**params)
                 break
-            except (ExchangeError) as exc:
+            except ExchangeError as exc:
                 self.__logger.debug("ExchangeError exception from server. Exception - %s", exc)
                 sleep(0.1)
                 break
-            except (DDoSProtection) as exc:
-                self.__logger.debug("DDosProtection exception from server, most likely too many requests. "
-                                    "Making another attempt after 0.1 second delay. Exception - %s", exc)
+            except DDoSProtection as exc:
+                self.__logger.debug(
+                    "DDosProtection exception from server, most likely too many requests. Making another attempt after 0.1 second delay. Exception - %s", exc
+                )
                 sleep(0.1)
                 request_count += 3
             except (ExchangeNotAvailable, NetworkError, RequestTimeout) as exc_na:
@@ -469,8 +470,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
                     self.__logger.info("Maximum number of retries reached.")
                     raise RP2RuntimeError("Server error") from exc_na
 
-                self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. "
-                                    "Exception - %s", request_count, exc_na)
+                self.__logger.debug("Server not available. Making attempt #%s of 10 after a ten second delay. Exception - %s", request_count, exc_na)
                 sleep(10)
 
         return results
@@ -504,7 +504,7 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
             else:
                 # On certain exchanges (e.g. Coinbase) sometimes transaction/amount is missing,
                 # so we try to derive it from transaction/cost and transaction/price.
-                crypto_in = RP2Decimal(str(transaction[_COST]))/RP2Decimal(str(transaction[_PRICE]))
+                crypto_in = RP2Decimal(str(transaction[_COST])) / RP2Decimal(str(transaction[_PRICE]))
             conversion_info = f"{trade.quote_info} -> {trade.base_info}"
         elif transaction[_SIDE] == _SELL:
             out_asset = trade.base_asset
