@@ -131,6 +131,7 @@ _CHUNK_SIZE_BYTES: int = 32768  # 32kb
 
 DAYS_IN_WEEK: int = 7
 
+
 class _PairStartEnd(NamedTuple):
     end: int
     start: int
@@ -306,7 +307,6 @@ class Kraken:
                         for row in adjusted_chunk[i : i + DAYS_IN_WEEK]
                         if datetime.fromtimestamp(int(row[self.__TIMESTAMP_INDEX]), timezone.utc) < following_monday
                     ]
-
 
                     # The timestamp of the first row becomes the timestamp for the weekly row
                     column_sums: List[str] = [str(int(next_monday.timestamp()))]

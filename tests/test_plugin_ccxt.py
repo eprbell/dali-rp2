@@ -103,10 +103,10 @@ class TestCcxtPlugin:
         mocker.patch.object(plugin, "_add_bar_to_cache").side_effect = plugin._add_bar_to_cache  # pylint: disable=protected-access
 
         # Friday rate is used for Saturday and Sunday since there is no trading for ECB on weekends
-        friday_data = plugin._get_fiat_exchange_rate(   # pylint: disable=protected-access
+        friday_data = plugin._get_fiat_exchange_rate(  # pylint: disable=protected-access
             datetime(2020, 12, 31, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD"
         )
-        saturday_data = plugin._get_fiat_exchange_rate( # pylint: disable=protected-access
+        saturday_data = plugin._get_fiat_exchange_rate(  # pylint: disable=protected-access
             datetime(2021, 1, 2, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD"
         )
 
@@ -129,10 +129,10 @@ class TestCcxtPlugin:
 
         # Friday rate is used for Saturday and Sunday since there is no trading for ECB on weekends
         # Check to see if plugin will retrieve Friday rate when Saturday is requested first
-        saturday_data = plugin._get_fiat_exchange_rate( # pylint: disable=protected-access
+        saturday_data = plugin._get_fiat_exchange_rate(  # pylint: disable=protected-access
             datetime(2021, 1, 2, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD"
         )
-        friday_data = plugin._get_fiat_exchange_rate(   # pylint: disable=protected-access
+        friday_data = plugin._get_fiat_exchange_rate(  # pylint: disable=protected-access
             datetime(2020, 12, 31, 0, 0).replace(tzinfo=timezone.utc), "EUR", "USD"
         )
 

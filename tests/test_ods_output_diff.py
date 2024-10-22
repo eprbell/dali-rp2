@@ -56,7 +56,6 @@ class TestODSOutputDiff(unittest.TestCase):
     ) -> None:
         arguments: List[str] = [
             "dali_us",
-            "-s",
             "-o",
             str(output_dir),
             "-p",

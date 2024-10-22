@@ -235,6 +235,7 @@ MARKET_PADDING_IN_WEEKS: int = 4
 
 DAYS_IN_WEEK: int = 7
 
+
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
     to_asset: str
