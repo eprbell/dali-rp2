@@ -66,5 +66,7 @@ class AbstractInputPlugin:
     def native_fiat(self) -> Optional[str]:
         return self.__native_fiat
 
-    def is_native_fiat(self, currency: str) -> bool:
+    def is_native_fiat(self, currency: Optional[str]) -> bool:
+        if currency is None:
+            return False
         return currency == self.__native_fiat
