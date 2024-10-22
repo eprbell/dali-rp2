@@ -489,11 +489,11 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
         out_transaction_list: List[OutTransaction] = []
         crypto_in: RP2Decimal
         crypto_fee: RP2Decimal
-        fee_asset: str = transaction[_FEE][_CURRENCY]
+        fee_asset: Optional[str] = transaction[_FEE][_CURRENCY]
         if not fee_asset:
             # On certain exchanges (e.g Coinbase) sometimes fee/currency is missing, so we try
             # to derive it from symbol.
-            fee_asset = transaction[_SYMBOL].split("/")[-1] if "/" in transaction[_SYMBOL] else None
+            fee_asset = str(transaction[_SYMBOL].split("/")[-1]) if "/" in transaction[_SYMBOL] else None
 
         trade: Trade = self._to_trade(transaction[_SYMBOL], str(transaction[_AMOUNT]), str(transaction[_COST]))
         if transaction[_SIDE] == _BUY:
