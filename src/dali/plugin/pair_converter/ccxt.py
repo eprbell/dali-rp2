@@ -130,7 +130,6 @@ class PairConverterPlugin(AbstractCcxtPairConverterPlugin):
 
                     for day in range((end_of_year - beginning_of_year).days + 1):
                         current_day: datetime = beginning_of_year + timedelta(days=day)
-
                         try:
                             forex_rate: RP2Decimal = RP2Decimal(str(rates[current_day.strftime("%Y-%m-%d")][to_asset]))
                             forex_result = HistoricalBar(

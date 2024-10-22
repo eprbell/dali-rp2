@@ -24,8 +24,6 @@ from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 from dali.transaction_manifest import TransactionManifest
 
-_CONFIG_DOC_FILE_URL: str = "https://github.com/eprbell/dali-rp2/blob/main/docs/configuration_file.md"
-
 
 class AssetPairAndTimestamp(NamedTuple):
     timestamp: datetime
@@ -69,7 +67,6 @@ class AbstractPairConverterPlugin:
     def issues_url(self) -> str:
         return self.__ISSUES_URL
 
-    # The exchange parameter is a hint on which exchange to use for price lookups. The plugin is free to use it or ignore it.
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         raise NotImplementedError("Abstract method: it must be implemented in the plugin class")
 
