@@ -692,8 +692,6 @@ class TestCcxtPlugin:
         if not os.path.exists("output/kraken_test"):
             os.makedirs("output/kraken_test")
         mocker.patch.object(kraken_csv, "_Kraken__UNIFIED_CSV_FILE", "input/USD_OHLCVT_test.zip")
-        # with open("input/USD_OHLCVT_test.zip", "rb") as file:
-        #    mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
 
         mocker.patch.object(plugin, "_AbstractCcxtPairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
         exchange = kraken(
