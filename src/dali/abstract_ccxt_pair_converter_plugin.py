@@ -1049,11 +1049,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                         )
                         bar_check = [no_market_padding] + bar_check
                         child_bars[child_name][neighbor.name] = bar_check
-                        timestamp_diff = (bar_check[0].timestamp - week_start_date).total_seconds()
-
-                        market_starts[child_name][neighbor.name] = (
-                            bar_check[0].timestamp if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK] else week_start_date - timedelta(weeks=1)
-                        )
+                        market_starts[child_name][neighbor.name] = bar_check[0].timestamp
                     else:
                         market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
         return child_bars, market_starts
