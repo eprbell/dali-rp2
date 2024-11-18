@@ -18,7 +18,18 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from time import sleep, time
-from typing import Any, Dict, Iterator, List, NamedTuple, Optional, Set, Union, cast
+from typing import (
+    Any,
+    Dict,
+    Iterator,
+    List,
+    NamedTuple,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
 from ccxt import (
     DDoSProtection,
@@ -287,6 +298,8 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         else:
             self._logger.debug("Default exchange assigned as %s. _DEFAULT_EXCHANGE is %s", self.__default_exchange, _DEFAULT_EXCHANGE)
         self.__kraken_warning: bool = False
+
+        # Assets that are not tradeable on any exchange yet
         self.__untradeable_assets: Set[str] = set(untradeable_assets.split(", ")) if untradeable_assets is not None else set()
         self.__aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None if aliases is None else self._process_aliases(aliases)
         self._fiat_priority: Dict[str, float] = FIAT_PRIORITY
@@ -853,80 +866,75 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
     def _optimize_assets_for_exchange(
         self, unoptimized_graph: MappedGraph[str], start_date: datetime, assets: Set[str], exchange: str
     ) -> Dict[datetime, Dict[str, Dict[str, float]]]:
+
+        # Stage 1: Initialization
         optimization_candidates: Set[Vertex[str]] = set()
         market_starts: Dict[str, Dict[str, datetime]] = {}
         # Weekly candles can start on any weekday depending on the exchange, we pull a week early to make sure we pull a full week.
         week_start_date = self._get_previous_monday(start_date)
+        optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}
+        optimizations[week_start_date] = {}
 
-        # Gather all valid candidates for optimization
-        for asset in assets:
-            current_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(asset)
+        ## Alternative market initialization
+        for asset in self.__untradeable_assets:
+            optimizations[week_start_date][asset] = {}
 
-            # Some assets might not be available on this particular exchange
-            if current_vertex is None:
-                continue
+        # Stage 2: Gather all valid candidates for optimization
+        optimization_candidates = self._gather_optimization_candidates(unoptimized_graph, assets)
 
-            optimization_candidates.add(current_vertex)
-
-            # Find all the neighbors of this vertex and all their neighbors as a set
-            children: Optional[Set[Vertex[str]]] = unoptimized_graph.get_all_children_of_vertex(current_vertex)
-            if children:
-                self._logger.debug("For vertex - %s, found all the children - %s", current_vertex.name, [child.name for child in children])
-                optimization_candidates.update(children)
-
-        # This prevents the algo from optimizing fiat assets which do not need optimization
+        # Stage 3: Check if any of the candidates are already optimized
         self._logger.debug("Checking if any of the following candidates are optimized - %s", [candidate.name for candidate in optimization_candidates])
         unoptimized_assets = {candidate.name for candidate in optimization_candidates if not unoptimized_graph.is_optimized(candidate.name)}
         self._logger.debug("Found unoptimized assets %s", unoptimized_assets)
 
-        child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
-        optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}
-        optimizations[week_start_date] = {}
+        # Stage 4: Retrieve historical bars and market starts for all unoptimized assets
+        child_bars, market_starts = self._retrieve_historical_bars(unoptimized_assets, optimization_candidates, week_start_date, exchange, unoptimized_graph)
+        # child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
 
-        # Alternative market correction
-        for asset in self.__untradeable_assets:
-            optimizations[week_start_date][asset] = {}
+        # # Alternative market correction
+        # for asset in self.__untradeable_assets:
+        #     optimizations[week_start_date][asset] = {}
 
-        # Retrieve historical week bars/candles to use for optimization
-        for child_name in unoptimized_assets:
-            child_bars[child_name] = {}
-            bar_check: Optional[List[HistoricalBar]] = None
-            market_starts[child_name] = {}
-            child_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(child_name)
-            child_neighbors: Iterator[Vertex[str]] = child_vertex.neighbors if child_vertex is not None else iter([])
-            for neighbor in child_neighbors:
-                if neighbor in optimization_candidates:
-                    bar_check = self.find_historical_bars(
-                        child_name, neighbor.name, week_start_date, self.__exchange_markets[exchange][child_name + neighbor.name][0], True, _ONE_WEEK
-                    )
+        # # Retrieve historical week bars/candles to use for optimization
+        # for child_name in unoptimized_assets:
+        #     child_bars[child_name] = {}
+        #     bar_check: Optional[List[HistoricalBar]] = None
+        #     market_starts[child_name] = {}
+        #     child_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(child_name)
+        #     child_neighbors: Iterator[Vertex[str]] = child_vertex.neighbors if child_vertex is not None else iter([])
+        #     for neighbor in child_neighbors:
+        #         if neighbor in optimization_candidates:
+        #             bar_check = self.find_historical_bars(
+        #                 child_name, neighbor.name, week_start_date, self.__exchange_markets[exchange][child_name + neighbor.name][0], True, _ONE_WEEK
+        #             )
 
-                # if not None or empty list []
-                if bar_check:
-                    # We pad the first part of the graph in case an asset has been airdropped or otherwise given to a user before a
-                    # market becomes available. Later, when the price is retrieved, the timestamps won't match and the user will be warned.
-                    no_market_padding: HistoricalBar = HistoricalBar(
-                        duration=bar_check[0].duration,
-                        timestamp=bar_check[0].timestamp - timedelta(weeks=MARKET_PADDING_IN_WEEKS),  # Make this a parameter users can set?
-                        open=bar_check[0].open,
-                        high=bar_check[0].high,
-                        low=bar_check[0].low,
-                        close=bar_check[0].close,
-                        volume=bar_check[0].volume,
-                    )
-                    bar_check = [no_market_padding] + bar_check
+        #         # if not None or empty list []
+        #         if bar_check:
+        #             # We pad the first part of the graph in case an asset has been airdropped or otherwise given to a user before a
+        #             # market becomes available. Later, when the price is retrieved, the timestamps won't match and the user will be warned.
+        #             no_market_padding: HistoricalBar = HistoricalBar(
+        #                 duration=bar_check[0].duration,
+        #                 timestamp=bar_check[0].timestamp - timedelta(weeks=MARKET_PADDING_IN_WEEKS),  # Make this a parameter users can set?
+        #                 open=bar_check[0].open,
+        #                 high=bar_check[0].high,
+        #                 low=bar_check[0].low,
+        #                 close=bar_check[0].close,
+        #                 volume=bar_check[0].volume,
+        #             )
+        #             bar_check = [no_market_padding] + bar_check
 
-                    child_bars[child_name][neighbor.name] = bar_check
-                    timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
+        #             child_bars[child_name][neighbor.name] = bar_check
+        #             timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
 
-                    # Find the start of the market if it is after the first transaction
-                    if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
-                        market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp
-                    else:
-                        market_starts[child_name][neighbor.name] = week_start_date - timedelta(weeks=1)
-                else:
-                    # This is a bogus market, either the exchange is misreporting it or it is not available from first transaction datetime
-                    # By setting the start date far into the future this market will be deleted from the graph snapshots
-                    market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
+        #             # Find the start of the market if it is after the first transaction
+        #             if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
+        #                 market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp
+        #             else:
+        #                 market_starts[child_name][neighbor.name] = week_start_date - timedelta(weeks=1)
+        #         else:
+        #             # This is a bogus market, either the exchange is misreporting it or it is not available from first transaction datetime
+        #             # By setting the start date far into the future this market will be deleted from the graph snapshots
+        #             market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
 
         # Save all the bundles of bars we just retrieved
         self.save_historical_price_cache()
@@ -995,6 +1003,60 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
             del composite_optimizations[timestamp]
 
         return composite_optimizations
+
+    def _gather_optimization_candidates(self, unoptimized_graph: MappedGraph[str], assets: Set[str]) -> Set[Vertex[str]]:
+        optimization_candidates = set()
+        for asset in assets:
+            current_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(asset)
+            if current_vertex:
+                optimization_candidates.add(current_vertex)
+                children: Optional[Set[Vertex[str]]] = unoptimized_graph.get_all_children_of_vertex(current_vertex)
+                if children:
+                    self._logger.debug("For vertex - %s, found all the children - %s", current_vertex.name, [child.name for child in children])
+                    optimization_candidates.update(children)
+        return optimization_candidates
+
+    def _retrieve_historical_bars(
+        self,
+        unoptimized_assets: Set[str],
+        optimization_candidates: Set[Vertex[str]],
+        week_start_date: datetime,
+        exchange: str,
+        unoptimized_graph: MappedGraph[str],
+    ) -> Tuple[Dict[str, Dict[str, List[HistoricalBar]]], Dict[str, Dict[str, datetime]]]:
+        child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
+        market_starts: Dict[str, Dict[str, datetime]] = {}
+        for child_name in unoptimized_assets:
+            child_bars[child_name] = {}
+            market_starts[child_name] = {}
+            child_vertex = unoptimized_graph.get_vertex(child_name)
+            child_neighbors = child_vertex.neighbors if child_vertex else iter([])
+
+            for neighbor in child_neighbors:
+                if neighbor in optimization_candidates:
+                    bar_check = self.find_historical_bars(
+                        child_name, neighbor.name, week_start_date, self.__exchange_markets[exchange][child_name + neighbor.name][0], True, _ONE_WEEK
+                    )
+                    if bar_check:
+                        no_market_padding = HistoricalBar(
+                            duration=bar_check[0].duration,
+                            timestamp=bar_check[0].timestamp - timedelta(weeks=MARKET_PADDING_IN_WEEKS),
+                            open=bar_check[0].open,
+                            high=bar_check[0].high,
+                            low=bar_check[0].low,
+                            close=bar_check[0].close,
+                            volume=bar_check[0].volume,
+                        )
+                        bar_check = [no_market_padding] + bar_check
+                        child_bars[child_name][neighbor.name] = bar_check
+                        timestamp_diff = (bar_check[0].timestamp - week_start_date).total_seconds()
+
+                        market_starts[child_name][neighbor.name] = (
+                            bar_check[0].timestamp if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK] else week_start_date - timedelta(weeks=1)
+                        )
+                    else:
+                        market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
+        return child_bars, market_starts
 
     def _process_aliases(self, aliases: str) -> Dict[str, Dict[Alias, RP2Decimal]]:
         alias_list: List[str] = aliases.split(";")
