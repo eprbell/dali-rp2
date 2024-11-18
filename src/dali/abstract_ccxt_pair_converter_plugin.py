@@ -889,52 +889,6 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
         # Stage 4: Retrieve historical bars and market starts for all unoptimized assets
         child_bars, market_starts = self._retrieve_historical_bars(unoptimized_assets, optimization_candidates, week_start_date, exchange, unoptimized_graph)
-        # child_bars: Dict[str, Dict[str, List[HistoricalBar]]] = {}
-
-        # # Alternative market correction
-        # for asset in self.__untradeable_assets:
-        #     optimizations[week_start_date][asset] = {}
-
-        # # Retrieve historical week bars/candles to use for optimization
-        # for child_name in unoptimized_assets:
-        #     child_bars[child_name] = {}
-        #     bar_check: Optional[List[HistoricalBar]] = None
-        #     market_starts[child_name] = {}
-        #     child_vertex: Optional[Vertex[str]] = unoptimized_graph.get_vertex(child_name)
-        #     child_neighbors: Iterator[Vertex[str]] = child_vertex.neighbors if child_vertex is not None else iter([])
-        #     for neighbor in child_neighbors:
-        #         if neighbor in optimization_candidates:
-        #             bar_check = self.find_historical_bars(
-        #                 child_name, neighbor.name, week_start_date, self.__exchange_markets[exchange][child_name + neighbor.name][0], True, _ONE_WEEK
-        #             )
-
-        #         # if not None or empty list []
-        #         if bar_check:
-        #             # We pad the first part of the graph in case an asset has been airdropped or otherwise given to a user before a
-        #             # market becomes available. Later, when the price is retrieved, the timestamps won't match and the user will be warned.
-        #             no_market_padding: HistoricalBar = HistoricalBar(
-        #                 duration=bar_check[0].duration,
-        #                 timestamp=bar_check[0].timestamp - timedelta(weeks=MARKET_PADDING_IN_WEEKS),  # Make this a parameter users can set?
-        #                 open=bar_check[0].open,
-        #                 high=bar_check[0].high,
-        #                 low=bar_check[0].low,
-        #                 close=bar_check[0].close,
-        #                 volume=bar_check[0].volume,
-        #             )
-        #             bar_check = [no_market_padding] + bar_check
-
-        #             child_bars[child_name][neighbor.name] = bar_check
-        #             timestamp_diff: float = (child_bars[child_name][neighbor.name][0].timestamp - start_date).total_seconds()
-
-        #             # Find the start of the market if it is after the first transaction
-        #             if timestamp_diff > _TIME_GRANULARITY_STRING_TO_SECONDS[_ONE_WEEK]:
-        #                 market_starts[child_name][neighbor.name] = child_bars[child_name][neighbor.name][0].timestamp
-        #             else:
-        #                 market_starts[child_name][neighbor.name] = week_start_date - timedelta(weeks=1)
-        #         else:
-        #             # This is a bogus market, either the exchange is misreporting it or it is not available from first transaction datetime
-        #             # By setting the start date far into the future this market will be deleted from the graph snapshots
-        #             market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
 
         # Save all the bundles of bars we just retrieved
         self.save_historical_price_cache()
