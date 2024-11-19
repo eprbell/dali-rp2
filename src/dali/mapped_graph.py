@@ -207,10 +207,10 @@ class MappedGraph(Graph[ValueType]):
             for neighbor in vertex.neighbors:
                 if neighbor.name in optimization.get(vertex.name, {}) or (vertex.name in self.__fiat_assets and neighbor.name in self.__fiat_assets):
                     pruned_mapped_graph.add_neighbor(vertex.name, neighbor.name, 0.0, False)
-                    added_assets.add(f"#{vertex.name}:#{neighbor.name}")
+                    added_assets.add(f"{vertex.name}:{neighbor.name}")
                 else:
                     pruned_mapped_graph.add_vertex_if_missing(vertex.name)
-                    pruned_assets.add(f"#{vertex.name}:#{neighbor.name}")
+                    pruned_assets.add(f"{vertex.name}:{neighbor.name}")
 
         LOGGER.debug("Added assets: %s", added_assets)
         LOGGER.debug("Pruned assets: %s", pruned_assets)
