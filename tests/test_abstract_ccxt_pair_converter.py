@@ -164,3 +164,32 @@ class TestAbstractCcxtPairConverterPlugin:
         # This will cause an error if we try to price an asset that is untradeable (doesn't have a market) at the time it is being priced for
         # The user can then mark it as untradeable in the config file
         assert optimizations[week_start_date - timedelta(weeks=1)]["A"]["B"] == -1.0
+
+    def test_refine_and_finalize_optimizations(self) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        optimizations = {
+            datetime(2023, 1, 1): {"A": {"B": 100.0, "C": -1.0}, "D": {"E": 50.0}},
+            datetime(2023, 1, 2): {"A": {"B": 200.0, "C": 150.0}, "D": {"E": 50.0}},
+            datetime(2023, 1, 3): {"A": {"B": 200.0, "C": 150.0}, "D": {"E": 50.0}},
+            datetime(2023, 1, 4): {"A": {"B": 150.0, "C": 200.0}, "D": {"F": 50.0}},
+        }
+
+        refined_optimizations = plugin._refine_and_finalize_optimizations(optimizations)  # pylint: disable=protected-access
+
+        assert datetime(2023, 1, 1) in refined_optimizations
+        assert datetime(2023, 1, 2) in refined_optimizations
+        assert datetime(2023, 1, 3) not in refined_optimizations  # Duplicate snapshot should be removed
+        assert datetime(2023, 1, 4) in refined_optimizations
+
+        assert refined_optimizations[datetime(2023, 1, 1)]["A"]["B"] == 1.0
+        assert refined_optimizations[datetime(2023, 1, 1)]["A"]["C"] == -1.0
+        assert refined_optimizations[datetime(2023, 1, 1)]["D"]["E"] == 1.0
+
+        assert refined_optimizations[datetime(2023, 1, 2)]["A"]["B"] == 1.0
+        assert refined_optimizations[datetime(2023, 1, 2)]["A"]["C"] == 2.0
+        assert refined_optimizations[datetime(2023, 1, 2)]["D"]["E"] == 1.0
+
+        assert refined_optimizations[datetime(2023, 1, 4)]["A"]["B"] == 2.0
+        assert refined_optimizations[datetime(2023, 1, 4)]["A"]["C"] == 1.0
+        assert refined_optimizations[datetime(2023, 1, 4)]["D"]["F"] == 1.0
+        assert "E" not in refined_optimizations[datetime(2023, 1, 4)]["D"]
