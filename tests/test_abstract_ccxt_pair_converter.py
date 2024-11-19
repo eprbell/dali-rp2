@@ -33,6 +33,9 @@ TEST_MARKETS: Dict[str, List[str]] = {
     "BC": [TEST_EXCHANGE],
 }
 
+MARKET_START: str = "market_start"
+ONE_WEEK_EARLIER: str = "one_week_earlier"
+
 
 class MockAbstractCcxtPairConverterPlugin(AbstractCcxtPairConverterPlugin):
     def name(self) -> str:
@@ -69,7 +72,31 @@ class TestAbstractCcxtPairConverterPlugin:
 
         return graph
 
+    @pytest.fixture
+    def historical_bars(self) -> Dict[str, HistoricalBar]:
+        return {
+            MARKET_START: HistoricalBar(
+                duration=timedelta(weeks=1),
+                timestamp=datetime(2023, 1, 1),
+                open=RP2Decimal("1.0"),
+                high=RP2Decimal("2.0"),
+                low=RP2Decimal("0.5"),
+                close=RP2Decimal("1.5"),
+                volume=RP2Decimal("100.0"),
+            ),
+            ONE_WEEK_EARLIER: HistoricalBar(
+                duration=timedelta(weeks=1),
+                timestamp=datetime(2023, 1, 1) - timedelta(weeks=1),
+                open=RP2Decimal("1.1"),
+                high=RP2Decimal("2.1"),
+                low=RP2Decimal("0.6"),
+                close=RP2Decimal("1.6"),
+                volume=RP2Decimal("110.0"),
+            ),
+        }
+
     ## _optimize_assets_for_exchange Tests ##
+
     def test_gather_optimization_candidates(self, unoptimized_graph: MappedGraph[str]) -> None:
         plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         assets: Set[str] = {"A", "B"}
@@ -83,7 +110,9 @@ class TestAbstractCcxtPairConverterPlugin:
         assert any(vertex.name == "C" for vertex in candidates)
         assert not any(vertex.name == "D" for vertex in candidates)
 
-    def test_retrieve_historical_bars(self, mocker: Any, unoptimized_graph: MappedGraph[str], vertex_list: Dict[str, Vertex[str]]) -> None:
+    def test_retrieve_historical_bars(
+        self, mocker: Any, unoptimized_graph: MappedGraph[str], vertex_list: Dict[str, Vertex[str]], historical_bars: Dict[str, HistoricalBar]
+    ) -> None:
         plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         unoptimized_assets: Set[str] = {"A", "B"}
         optimization_candidates: Set[Vertex[str]] = {vertex_list["A"], vertex_list["B"], vertex_list["C"]}
@@ -95,29 +124,9 @@ class TestAbstractCcxtPairConverterPlugin:
             from_asset: str, to_asset: str, timestamp: datetime, exchange: str, all_bars: bool, timespan: str  # pylint: disable=unused-argument
         ) -> Optional[List[HistoricalBar]]:
             if from_asset == "A":
-                return [
-                    HistoricalBar(
-                        duration=timedelta(weeks=1),
-                        timestamp=week_start_date,
-                        open=RP2Decimal("1.0"),
-                        high=RP2Decimal("2.0"),
-                        low=RP2Decimal("0.5"),
-                        close=RP2Decimal("1.5"),
-                        volume=RP2Decimal("100.0"),
-                    )
-                ]
+                return [historical_bars[MARKET_START]]
             if from_asset == "B":
-                return [
-                    HistoricalBar(
-                        duration=timedelta(weeks=1),
-                        timestamp=week_start_date - timedelta(weeks=1),
-                        open=RP2Decimal("1.1"),
-                        high=RP2Decimal("2.1"),
-                        low=RP2Decimal("0.6"),
-                        close=RP2Decimal("1.6"),
-                        volume=RP2Decimal("110.0"),
-                    )
-                ]
+                return [historical_bars[ONE_WEEK_EARLIER]]
             return []
 
         mocker.patch.object(plugin, "find_historical_bars", side_effect=find_historical_bars_side_effect)
@@ -136,3 +145,22 @@ class TestAbstractCcxtPairConverterPlugin:
         assert "B" in market_starts
         assert market_starts["A"]["B"] == week_start_date - timedelta(weeks=MARKET_PADDING_IN_WEEKS)
         assert market_starts["B"]["C"] == week_start_date - timedelta(weeks=MARKET_PADDING_IN_WEEKS + 1)
+
+    def test_generate_optimizations(self, historical_bars: Dict[str, HistoricalBar]) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        week_start_date = datetime(2023, 1, 1)
+
+        child_bars = {"A": {"B": [historical_bars[MARKET_START], historical_bars[ONE_WEEK_EARLIER]]}}
+
+        market_starts = {"A": {"B": week_start_date}}
+
+        optimizations = plugin._generate_optimizations(child_bars, market_starts, week_start_date)  # pylint: disable=protected-access
+
+        assert week_start_date in optimizations
+        assert "A" in optimizations[week_start_date]
+        assert "B" in optimizations[week_start_date]["A"]
+        assert optimizations[week_start_date]["A"]["B"] == 100.00
+        # We want to delete the market if the bar is before market_start
+        # This will cause an error if we try to price an asset that is untradeable (doesn't have a market) at the time it is being priced for
+        # The user can then mark it as untradeable in the config file
+        assert optimizations[week_start_date - timedelta(weeks=1)]["A"]["B"] == -1.0
