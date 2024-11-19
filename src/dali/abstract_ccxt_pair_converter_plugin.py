@@ -945,6 +945,8 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                         child_bars[child_name][neighbor.name] = bar_check
                         market_starts[child_name][neighbor.name] = bar_check[0].timestamp
                     else:
+                        # This is a bogus market, either the exchange is misreporting it or it is not available from first transaction datetime
+                        # By setting the start date far into the future this market will be deleted from the graph snapshots
                         market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
         return child_bars, market_starts
 
