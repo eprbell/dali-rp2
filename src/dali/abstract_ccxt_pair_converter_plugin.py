@@ -893,27 +893,8 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         # Save all the bundles of bars we just retrieved
         self.save_historical_price_cache()
 
-        # Convert bar dict into dict with optimizations
-        # First we sort the bars
-        for crypto_asset, neighbor_assets in child_bars.items():
-            for neighbor_asset, historical_bars in neighbor_assets.items():
-                for historical_bar in historical_bars:
-                    timestamp: datetime = historical_bar.timestamp
-                    volume: RP2Decimal = historical_bar.volume
-
-                    # sort bars first by timestamp, then asset, then the asset's neighbor and it's volume
-                    if timestamp not in optimizations:
-                        optimizations[timestamp] = {}
-                    if crypto_asset not in optimizations[timestamp]:
-                        optimizations[timestamp][crypto_asset] = {}
-
-                    # This deletes markets before they start by setting the weight to a negative
-                    if timestamp < market_starts[crypto_asset].get(neighbor_asset, start_date):
-                        self._logger.debug("Optimization for %s to %s at %s is -1.0", crypto_asset, neighbor_asset, timestamp)
-                        optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
-                    else:
-                        optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
-                        self._logger.debug("Optimization for %s to %s at %s is %s", crypto_asset, neighbor_asset, timestamp, volume)
+        # Stage 5: Convert bars into optimizations
+        optimizations.update(self._generate_optimizations(child_bars, market_starts, week_start_date))
 
         # Sort the optimizations by timestamp
         # while caching the graph snapshots, the partial optimizations will be layered on to the previous
@@ -1007,6 +988,36 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     else:
                         market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
         return child_bars, market_starts
+
+    # We sort the bars first by timestamp, then by asset, then by the asset's neighbor and
+    # the volume of the market (asset/neighbor) at that time duration. Later, the volumes of all markets
+    # for this asset are compared and used to detemine the weight of the edge in the graph
+    def _generate_optimizations(
+        self,
+        child_bars: Dict[str, Dict[str, List[HistoricalBar]]],
+        market_starts: Dict[str, Dict[str, datetime]],
+        week_start_date: datetime,
+    ) -> Dict[datetime, Dict[str, Dict[str, float]]]:
+        optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {week_start_date: {}}
+        for crypto_asset, neighbor_assets in child_bars.items():
+            for neighbor_asset, historical_bars in neighbor_assets.items():
+                for historical_bar in historical_bars:
+                    timestamp = historical_bar.timestamp
+                    volume = historical_bar.volume
+
+                    if timestamp not in optimizations:
+                        optimizations[timestamp] = {}
+                    if crypto_asset not in optimizations[timestamp]:
+                        optimizations[timestamp][crypto_asset] = {}
+
+                    if timestamp < market_starts[crypto_asset].get(neighbor_asset, week_start_date):
+                        # This is meant as a sanity check to make sure we don't route a price before the market starts
+                        # If we try to lookup a price before week_start_date - MARKET_PADDING_IN_WEEKS, we will get an error
+                        # Unless it is an untradeable asset, in which case we will give it a price of 0.
+                        optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
+                    else:
+                        optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
+        return optimizations
 
     def _process_aliases(self, aliases: str) -> Dict[str, Dict[Alias, RP2Decimal]]:
         alias_list: List[str] = aliases.split(";")
