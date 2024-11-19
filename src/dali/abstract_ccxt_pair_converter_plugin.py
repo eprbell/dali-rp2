@@ -896,48 +896,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         # Stage 5: Convert bars into optimizations
         optimizations.update(self._generate_optimizations(child_bars, market_starts, week_start_date))
 
-        # Sort the optimizations by timestamp
-        # while caching the graph snapshots, the partial optimizations will be layered on to the previous
-        # timestamp's optimizations
-        sorted_optimizations = dict(sorted(optimizations.items(), key=lambda x: x[0]))
-
-        # Copy over assets from previous timestamps so there are no holes in the graph
-        composite_optimizations: Dict[datetime, Dict[str, Dict[str, float]]] = {}
-        previous_timestamp: Optional[datetime] = None
-
-        for timestamp, optimization_dict in sorted_optimizations.items():
-            if previous_timestamp is None:
-                composite_optimizations[timestamp] = optimization_dict
-            else:
-                composite_optimizations[timestamp] = sorted_optimizations[previous_timestamp].copy()
-                composite_optimizations[timestamp].update(sorted_optimizations[timestamp])
-
-        previous_assets: Optional[Dict[str, Dict[str, float]]] = None
-        timestamps_to_delete: List[datetime] = []
-        # Next, we assign weights based on the rank of the volume
-        for timestamp, snapshot_assets in composite_optimizations.items():
-            for asset, neighbors in snapshot_assets.items():
-                ranked_neighbors: Dict[str, float] = dict(sorted(iter(neighbors.items()), key=lambda x: x[1], reverse=True))
-                weight: float = 1.0
-                for neighbor_name, neighbor_volume in ranked_neighbors.items():
-                    if neighbor_volume != -1.0:
-                        neighbors[neighbor_name] = weight
-                        weight += 1.0
-                        self._logger.debug("Optimization for %s to %s at %s is %s", asset, neighbor_name, timestamp, neighbors[neighbor_name])
-                    else:
-                        neighbors[neighbor_name] = -1.0
-
-            # mark duplicate successive snapshots
-            if snapshot_assets == previous_assets:
-                timestamps_to_delete.append(timestamp)
-
-            previous_assets = snapshot_assets
-
-        # delete duplicates
-        for timestamp in timestamps_to_delete:
-            del composite_optimizations[timestamp]
-
-        return composite_optimizations
+        return self._refine_and_finalize_optimizations(optimizations)
 
     def _gather_optimization_candidates(self, unoptimized_graph: MappedGraph[str], assets: Set[str]) -> Set[Vertex[str]]:
         optimization_candidates = set()
@@ -1018,6 +977,36 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     else:
                         optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
         return optimizations
+
+    def _refine_and_finalize_optimizations(self, optimizations: Dict[datetime, Dict[str, Dict[str, float]]]) -> Dict[datetime, Dict[str, Dict[str, float]]]:
+        sorted_optimizations = dict(sorted(optimizations.items(), key=lambda x: x[0]))
+        previous_assets: Optional[Dict[str, Dict[str, float]]] = None
+        timestamps_to_delete: List[datetime] = []
+
+        # Assign weights based on the rank of the volume for the market
+        for timestamp, snapshot_assets in sorted_optimizations.items():
+            for asset, neighbors in snapshot_assets.items():
+                ranked_neighbors: Dict[str, float] = dict(sorted(iter(neighbors.items()), key=lambda x: x[1], reverse=True))
+                weight: float = 1.0
+                for neighbor_name, neighbor_volume in ranked_neighbors.items():
+                    if neighbor_volume != -1.0:
+                        neighbors[neighbor_name] = weight
+                        weight += 1.0
+                        self._logger.debug("Optimization for %s to %s at %s is %s", asset, neighbor_name, timestamp, neighbors[neighbor_name])
+                    else:
+                        neighbors[neighbor_name] = -1.0
+
+            # mark duplicate successive snapshots
+            if snapshot_assets == previous_assets:
+                timestamps_to_delete.append(timestamp)
+
+            previous_assets = snapshot_assets
+
+        # delete duplicates
+        for timestamp in timestamps_to_delete:
+            del sorted_optimizations[timestamp]
+
+        return sorted_optimizations
 
     def _process_aliases(self, aliases: str) -> Dict[str, Dict[Alias, RP2Decimal]]:
         alias_list: List[str] = aliases.split(";")
