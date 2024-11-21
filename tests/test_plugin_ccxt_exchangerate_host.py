@@ -679,7 +679,7 @@ class TestCcxtPlugin:
 
     @pytest.mark.default_cassette("exchange_rate_host_symbol_call.yaml")
     @pytest.mark.vcr
-    def disabled_test_kraken_csv(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
+    def test_kraken_csv(self, mocker: Any, graph_optimized: MappedGraph[str], simple_tree: AVLTree[datetime, Dict[str, MappedGraph[str]]]) -> None:
         plugin: PairConverterPlugin = PairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, fiat_access_key="BOGUS_KEY")
 
         cache_path = os.path.join(CACHE_DIR, "Test-" + plugin.cache_key())
@@ -691,10 +691,9 @@ class TestCcxtPlugin:
         mocker.patch.object(kraken_csv, "_Kraken__CACHE_DIRECTORY", "output/kraken_test")
         if not os.path.exists("output/kraken_test"):
             os.makedirs("output/kraken_test")
-        with open("input/USD_OHLCVT_test.zip", "rb") as file:
-            mocker.patch.object(kraken_csv, "_google_file_to_bytes").return_value = file.read()
+        mocker.patch.object(kraken_csv, "_Kraken__UNIFIED_CSV_FILE", "input/USD_OHLCVT_test.zip")
 
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
+        mocker.patch.object(plugin, "_AbstractCcxtPairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
         exchange = kraken(
             {
                 "apiKey": "key",
@@ -709,7 +708,7 @@ class TestCcxtPlugin:
         )
         modified_markets = TEST_MARKETS
         modified_markets["BTCUSDT"] = [ALT_EXCHANGE]
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_markets", {TEST_EXCHANGE: modified_markets})
+        mocker.patch.object(plugin, "_AbstractCcxtPairConverterPlugin__exchange_markets", {TEST_EXCHANGE: modified_markets})
         mocker.patch.object(alt_exchange, "fetchOHLCV").return_value = [
             [
                 KRAKEN_TIMESTAMP.timestamp() * _MS_IN_SECOND,  # Match the timestamp to assure correct price look up
@@ -731,9 +730,9 @@ class TestCcxtPlugin:
                 float(USDTUSD_VOLUME),  # (V)olume (in terms of the base currency), float
             ],
         ]
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
+        mocker.patch.object(plugin, "_AbstractCcxtPairConverterPlugin__exchanges", {TEST_EXCHANGE: exchange, ALT_EXCHANGE: alt_exchange})
         mocker.patch.object(plugin, "_generate_unoptimized_graph").return_value = graph_optimized
-        mocker.patch.object(plugin, "_PairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
+        mocker.patch.object(plugin, "_AbstractCcxtPairConverterPlugin__exchange_2_graph_tree", {TEST_EXCHANGE: simple_tree})
 
         data = plugin.get_historic_bar_from_native_source(KRAKEN_TIMESTAMP, "BTC", "USD", TEST_EXCHANGE)
 
