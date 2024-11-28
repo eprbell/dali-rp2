@@ -141,25 +141,6 @@ thread_count = <em>&lt;thread_count&gt;</em>
 
 Note: the `thread_count` parameter is optional and denotes the number of parallel threads used to by the plugin to connect to the endpoint. The higher this number, the faster the execution, however if the number is too high the server may interrupt the connection with a rate-limit error.
 
-### Coinbase Pro Section (REST)
-This plugin is REST-based and requires setting up API Keys in your Coinbase Pro account settings (click on the API link).
-
-**IMPORTANT NOTE**:
-* when setting up API key/secret/passphrase, only use read permissions (DaLI does NOT need write permissions);
-* store your API key, secret and passphrase safely and NEVER share it with anyone!
-
-Initialize this plugin section as follows:
-<pre>
-[dali.plugin.input.rest.coinbase_pro <em>&lt;qualifiers&gt;</em>]
-account_holder = <em>&lt;account_holder&gt;</em>
-api_key = <em>&lt;api_key&gt;</em>
-api_secret = <em>&lt;api_secret&gt;</em>
-api_passphrase = <em>&lt;api_passphrase&gt;</em>
-thread_count = <em>&lt;thread_count&gt;</em>
-</pre>
-
-Note: the `thread_count` parameter is optional and denotes the number of parallel threads used to by the plugin to connect to the endpoint. The higher this number, the faster the execution, however if the number is too high the server may interrupt the connection with a rate-limit error.
-
 ### Kraken Section (REST)
 This plugin is REST-based and requires setting up API Keys in your Kraken account settings.
 
