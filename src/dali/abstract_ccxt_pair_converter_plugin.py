@@ -245,7 +245,7 @@ DEFAULT_FIAT_LIST: List[str] = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD",
 MARKET_PADDING_IN_WEEKS: int = 4
 
 DAYS_IN_WEEK: int = 7
-
+MANY_YEARS_IN_THE_FUTURE: relativedelta = relativedelta(years=100)
 
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
@@ -947,7 +947,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     else:
                         # This is a bogus market, either the exchange is misreporting it or it is not available from first transaction datetime
                         # By setting the start date far into the future this market will be deleted from the graph snapshots
-                        market_starts[child_name][neighbor.name] = datetime.now() + relativedelta(years=100)
+                        market_starts[child_name][neighbor.name] = datetime.now() + MANY_YEARS_IN_THE_FUTURE
         return child_bars, market_starts
 
     # We sort the bars first by timestamp, then by asset, then by the asset's neighbor and
