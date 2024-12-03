@@ -175,7 +175,7 @@ FAKE_TRANSACTION: InTransaction = InTransaction(
 )
 
 
-class TestCcxtPlugin:
+class TestCcxtExchangerateHostPlugin:
     @pytest.fixture
     def vertex_list(self) -> List[Vertex[str]]:
         beth: Vertex[str] = Vertex[str](name="BETH")
