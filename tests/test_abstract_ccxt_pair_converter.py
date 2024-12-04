@@ -20,12 +20,19 @@ from prezzemolo.vertex import Vertex
 from rp2.rp2_decimal import RP2Decimal
 
 from dali.abstract_ccxt_pair_converter_plugin import (
+    _BINANCE,
+    _COINBASE_PRO,
+    _ONE_HOUR,
+    _SIX_HOUR,
+    _TIME_GRANULARITY,
+    _TIME_GRANULARITY_DICT,
     MARKET_PADDING_IN_WEEKS,
     AbstractCcxtPairConverterPlugin,
 )
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.mapped_graph import MappedGraph
+from rp2.rp2_error import RP2ValueError
 
 TEST_EXCHANGE: str = "Kraken"
 TEST_MARKETS: Dict[str, List[str]] = {
@@ -193,3 +200,12 @@ class TestAbstractCcxtPairConverterPlugin:
         assert refined_optimizations[datetime(2023, 1, 4)]["A"]["C"] == 1.0
         assert refined_optimizations[datetime(2023, 1, 4)]["D"]["F"] == 1.0
         assert "E" not in refined_optimizations[datetime(2023, 1, 4)]["D"]
+
+    def test_initialize_retry_count(self) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+
+        assert plugin._initialize_retry_count(_BINANCE, _ONE_HOUR) == _TIME_GRANULARITY.index(_ONE_HOUR)
+        assert plugin._initialize_retry_count(_COINBASE_PRO, _SIX_HOUR) == _TIME_GRANULARITY_DICT[_COINBASE_PRO].index(_SIX_HOUR)
+        with pytest.raises(RP2ValueError):
+            assert plugin._initialize_retry_count(_BINANCE, _SIX_HOUR)
+            assert plugin._initialize_retry_count(_COINBASE_PRO, "invalid")
