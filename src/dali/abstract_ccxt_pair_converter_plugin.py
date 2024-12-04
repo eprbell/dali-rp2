@@ -513,16 +513,11 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
     def find_historical_bars(
         self, from_asset: str, to_asset: str, timestamp: datetime, exchange: str, all_bars: bool = False, timespan: str = _MINUTE
     ) -> Optional[List[HistoricalBar]]:
+        # Stage 1 Initialization
         result: List[HistoricalBar] = []
-        retry_count: int = 0
         self.__transaction_count += 1
-        if timespan in _TIME_GRANULARITY_SET:
-            if exchange in _NONSTANDARD_GRANULARITY_EXCHANGE_SET:
-                retry_count = _TIME_GRANULARITY_DICT[exchange].index(timespan)
-            else:
-                retry_count = _TIME_GRANULARITY.index(timespan)
-        else:
-            raise RP2ValueError("Internal error: Invalid time span passed to find_historical_bars.")
+        retry_count: int = self._initialize_retry_count(exchange, timespan)
+
         current_exchange: Any = self.__exchanges[exchange]
         ms_timestamp: int = int(timestamp.timestamp() * _MS_IN_SECOND)
         csv_pricing: Any = self.__csv_pricing_dict.get(exchange)
@@ -728,6 +723,23 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
 
         return result
 
+    def _initialize_retry_count(self, exchange: str, timespan: str) -> int:
+        if timespan not in _TIME_GRANULARITY_SET:
+            raise RP2ValueError(f"Internal error: Invalid time span '{timespan}' passed to find_historical_bars.")
+        
+        granularity = (
+            _TIME_GRANULARITY_DICT[exchange]
+            if exchange in _NONSTANDARD_GRANULARITY_EXCHANGE_SET
+            else _TIME_GRANULARITY
+        )
+
+        if timespan not in granularity:
+            raise RP2ValueError(
+                f"Internal error: Time span '{timespan}' is not valid for exchange '{exchange}'."
+            )
+
+        return granularity.index(timespan)
+    
     def _add_alternative_markets(self, graph: MappedGraph[str], current_markets: Dict[str, List[str]]) -> None:
         for base_asset, quote_asset in _ALT_MARKET_BY_BASE_DICT.items():
             alt_market = base_asset + quote_asset
