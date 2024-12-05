@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
 import pytest
 from prezzemolo.vertex import Vertex
 from rp2.rp2_decimal import RP2Decimal
+from rp2.rp2_error import RP2ValueError
 
 from dali.abstract_ccxt_pair_converter_plugin import (
     _BINANCE,
@@ -32,7 +33,6 @@ from dali.abstract_ccxt_pair_converter_plugin import (
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
 from dali.mapped_graph import MappedGraph
-from rp2.rp2_error import RP2ValueError
 
 TEST_EXCHANGE: str = "Kraken"
 TEST_MARKETS: Dict[str, List[str]] = {
@@ -81,10 +81,11 @@ class TestAbstractCcxtPairConverterPlugin:
 
     @pytest.fixture
     def historical_bars(self) -> Dict[str, HistoricalBar]:
+        now_time = datetime.now(timezone.utc)
         return {
             MARKET_START: HistoricalBar(
                 duration=timedelta(weeks=1),
-                timestamp=datetime(2023, 1, 1),
+                timestamp=now_time,
                 open=RP2Decimal("1.0"),
                 high=RP2Decimal("2.0"),
                 low=RP2Decimal("0.5"),
@@ -93,7 +94,7 @@ class TestAbstractCcxtPairConverterPlugin:
             ),
             ONE_WEEK_EARLIER: HistoricalBar(
                 duration=timedelta(weeks=1),
-                timestamp=datetime(2023, 1, 1) - timedelta(weeks=1),
+                timestamp=now_time - timedelta(weeks=1),
                 open=RP2Decimal("1.1"),
                 high=RP2Decimal("2.1"),
                 low=RP2Decimal("0.6"),
@@ -123,7 +124,7 @@ class TestAbstractCcxtPairConverterPlugin:
         plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
         unoptimized_assets: Set[str] = {"A", "B"}
         optimization_candidates: Set[Vertex[str]] = {vertex_list["A"], vertex_list["B"], vertex_list["C"]}
-        week_start_date = datetime(2023, 1, 1)
+        week_start_date = historical_bars[MARKET_START].timestamp
 
         mocker.patch.object(plugin, "_AbstractCcxtPairConverterPlugin__exchange_markets", {TEST_EXCHANGE: TEST_MARKETS})
 
@@ -155,7 +156,7 @@ class TestAbstractCcxtPairConverterPlugin:
 
     def test_generate_optimizations(self, historical_bars: Dict[str, HistoricalBar]) -> None:
         plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
-        week_start_date = datetime(2023, 1, 1)
+        week_start_date = historical_bars[MARKET_START].timestamp
 
         child_bars = {"A": {"B": [historical_bars[MARKET_START], historical_bars[ONE_WEEK_EARLIER]]}}
 
@@ -204,8 +205,36 @@ class TestAbstractCcxtPairConverterPlugin:
     def test_initialize_retry_count(self) -> None:
         plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
 
-        assert plugin._initialize_retry_count(_BINANCE, _ONE_HOUR) == _TIME_GRANULARITY.index(_ONE_HOUR)
-        assert plugin._initialize_retry_count(_COINBASE_PRO, _SIX_HOUR) == _TIME_GRANULARITY_DICT[_COINBASE_PRO].index(_SIX_HOUR)
+        assert plugin._initialize_retry_count(_BINANCE, _ONE_HOUR) == _TIME_GRANULARITY.index(_ONE_HOUR)  # pylint: disable=protected-access
+        assert plugin._initialize_retry_count(_COINBASE_PRO, _SIX_HOUR) == _TIME_GRANULARITY_DICT[_COINBASE_PRO].index(  # pylint: disable=protected-access
+            _SIX_HOUR
+        )
         with pytest.raises(RP2ValueError):
-            assert plugin._initialize_retry_count(_BINANCE, _SIX_HOUR)
-            assert plugin._initialize_retry_count(_COINBASE_PRO, "invalid")
+            # Binance does not support 6 hour granularity
+            assert plugin._initialize_retry_count(_BINANCE, _SIX_HOUR)  # pylint: disable=protected-access
+            assert plugin._initialize_retry_count(_COINBASE_PRO, "invalid")  # pylint: disable=protected-access
+
+    def test_find_historical_bars_guard_clause(self, mocker: Any, historical_bars: Dict[str, HistoricalBar]) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+
+        mocker.patch.object(plugin, "_get_bundle_from_cache", return_value=[historical_bars[MARKET_START]])
+
+        bars = plugin.find_historical_bars("A", "B", datetime(2023, 1, 1), TEST_EXCHANGE, True)
+
+        assert bars
+        assert len(bars) == 1
+        assert bars[0] == historical_bars[MARKET_START]
+
+    # To be enabled when _fetch_historical_bars is implemented
+    def disabled_test_find_historical_bars_add_to_cache(self, mocker: Any, historical_bars: Dict[str, HistoricalBar]) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+
+        mocker.patch.object(plugin, "_get_bundle_from_cache", return_value=historical_bars[ONE_WEEK_EARLIER])
+        mocker.patch.object(plugin, "_fetch_historical_bars", return_value=[historical_bars[MARKET_START]])  # function that calls the API
+
+        bars = plugin.find_historical_bars("A", "B", datetime(2023, 1, 1), TEST_EXCHANGE, True)
+
+        assert bars
+        assert len(bars) == 2
+        assert bars[0] == historical_bars[ONE_WEEK_EARLIER]
+        assert bars[1] == historical_bars[MARKET_START]
