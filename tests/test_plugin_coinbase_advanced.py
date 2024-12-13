@@ -22,7 +22,7 @@ from dali.abstract_pair_converter_plugin import AssetPairAndTimestamp
 from dali.cache import CACHE_DIR, load_from_cache
 from dali.configuration import Keyword
 from dali.historical_bar import HistoricalBar
-from dali.plugin.pair_converter.historic_crypto import PairConverterPlugin
+from dali.plugin.pair_converter.coinbase_advanced import PairConverterPlugin
 
 BAR_DURATION: timedelta = timedelta(seconds=60)
 BAR_TIMESTAMP: datetime = datetime(2020, 6, 1, 0, 0).replace(tzinfo=timezone.utc)
@@ -53,7 +53,7 @@ class TestHistoricCryptoPlugin:
         )
 
         # Read price without cache
-        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "Coinbase")
+        data = plugin.get_historic_bar_from_native_source(BAR_TIMESTAMP, "BTC", "USD", "Coinbase Advanced")
 
         assert data
         assert data.timestamp == BAR_TIMESTAMP
@@ -65,7 +65,7 @@ class TestHistoricCryptoPlugin:
         assert data.volume == BAR_VOLUME
 
         # Read price again, but populate plugin cache this time
-        value = plugin.get_conversion_rate(BAR_TIMESTAMP, "BTC", "USD", "Coinbase")
+        value = plugin.get_conversion_rate(BAR_TIMESTAMP, "BTC", "USD", "Coinbase Advanced")
         assert value
         assert value == BAR_HIGH
 
@@ -74,7 +74,7 @@ class TestHistoricCryptoPlugin:
 
         # Load plugin cache and verify
         cache = load_from_cache(plugin.cache_key())
-        key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD", "Coinbase")
+        key = AssetPairAndTimestamp(BAR_TIMESTAMP, "BTC", "USD", "Coinbase Advanced")
         assert len(cache) == 1, str(cache)
         assert key in cache
         data = cache[key]
@@ -94,5 +94,5 @@ class TestHistoricCryptoPlugin:
 
         mocker.patch.object(plugin, "get_historic_bar_from_native_source").return_value = None
 
-        data = plugin.get_historic_bar_from_native_source(timestamp, "EUR", "JPY", "Coinbase")
+        data = plugin.get_historic_bar_from_native_source(timestamp, "EUR", "JPY", "Coinbase Advanced")
         assert data is None

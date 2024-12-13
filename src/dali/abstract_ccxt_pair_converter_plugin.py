@@ -247,6 +247,7 @@ MARKET_PADDING_IN_WEEKS: int = 4
 DAYS_IN_WEEK: int = 7
 MANY_YEARS_IN_THE_FUTURE: relativedelta = relativedelta(years=100)
 
+
 class AssetPairAndHistoricalPrice(NamedTuple):
     from_asset: str
     to_asset: str
