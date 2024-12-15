@@ -51,7 +51,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             )
 
     def name(self) -> str:
-        return "dali_dali_coinbase"
+        return "coinbase_advanced"
 
     def cache_key(self) -> str:
         return self.name()
