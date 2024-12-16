@@ -28,8 +28,6 @@ interactions:
       - public, max-age=14400
       Connection:
       - keep-alive
-      Content-Encoding:
-      - gzip
       Content-Type:
       - application/json; charset=utf-8
       Date:
@@ -117,8 +115,6 @@ interactions:
       - public, max-age=14400
       Connection:
       - keep-alive
-      Content-Encoding:
-      - gzip
       Content-Type:
       - application/json; charset=utf-8
       Date:
@@ -200,8 +196,6 @@ interactions:
       - public, max-age=14400
       Connection:
       - keep-alive
-      Content-Encoding:
-      - gzip
       Content-Type:
       - application/json; charset=utf-8
       Date:
@@ -283,8 +277,6 @@ interactions:
       - public, max-age=14400
       Connection:
       - keep-alive
-      Content-Encoding:
-      - gzip
       Content-Type:
       - application/json; charset=utf-8
       Date:
