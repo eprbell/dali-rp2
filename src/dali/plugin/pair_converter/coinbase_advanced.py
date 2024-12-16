@@ -62,21 +62,19 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
     def get_historic_bar_from_native_source(self, timestamp: datetime, from_asset: str, to_asset: str, exchange: str) -> Optional[HistoricalBar]:
         result: Optional[HistoricalBar] = None
         utc_timestamp = timestamp.astimezone(timezone.utc)
-        start = utc_timestamp.replace(second=0)
-        end = start
+        start = utc_timestamp
         retry_count: int = 0
 
         while retry_count < len(TIME_GRANULARITY):
             try:
                 granularity = list(TIME_GRANULARITY.keys())[retry_count]
+                start_epoch = int(start.timestamp())
+                start_epoch = start_epoch - (start_epoch % TIME_GRANULARITY[granularity])
+                end_epoch = start_epoch
                 if self._authorized:
-                    candle = self.client.get_candles(f"{from_asset}-{to_asset}", str(int(start.timestamp())), str(int(end.timestamp())), granularity).to_dict()[
-                        "candles"
-                    ][0]
+                    candle = self.client.get_candles(f"{from_asset}-{to_asset}", str(start_epoch), str(end_epoch), granularity).to_dict()["candles"][0]
                 else:
-                    candle = self.client.get_public_candles(f"{from_asset}-{to_asset}", str(int(start.timestamp())), str(int(end.timestamp())), granularity).to_dict()[
-                        "candles"
-                    ][0]
+                    candle = self.client.get_public_candles(f"{from_asset}-{to_asset}", str(start_epoch), str(end_epoch), granularity).to_dict()["candles"][0]
                 candle_start = datetime.fromtimestamp(int(candle["start"]), timezone.utc)
                 result = HistoricalBar(
                     duration=timedelta(seconds=TIME_GRANULARITY[granularity]),
@@ -89,5 +87,8 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 )
             except ValueError:
                 retry_count += 1
+            if result:
+                break
+            retry_count += 1
 
         return result
