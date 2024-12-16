@@ -1,0 +1,338 @@
+interactions:
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2'
+      Content-Type:
+      - application/json
+      User-Agent:
+      - coinbase-advanced-py/1.8.2
+    method: GET
+    uri: https://api.coinbase.com/api/v3/brokerage/market/products/BTC-USD/candles?end=1591014840&granularity=ONE_MINUTE&start=1591014840
+  response:
+    body:
+      string: '{"candles":[{"start":"1591014840","low":"9558.02","high":"9566.16","open":"9566.16","close":"9560.73","volume":"7.44296873"}]}'
+    headers:
+      CF-Cache-Status:
+      - EXPIRED
+      CF-RAY:
+      - 8f2ae2ee98f58311-KIX
+      Cache-Control:
+      - public, max-age=14400
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 16 Dec 2024 01:26:39 GMT
+      Expires:
+      - Mon, 16 Dec 2024 05:26:39 GMT
+      Last-Modified:
+      - Mon, 16 Dec 2024 01:26:39 GMT
+      NEL:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=gFOjApe52Nb1ZcMn6MC1RZ%2BMM16pBPEHwFMnRzQmaB5o6vE7mJtYhpJeQ0%2FOUo6%2B%2FPflJeuaoE1zfwNr5sR1X%2BMhbWp3FSQFGJ%2BhhV3NxcqMZenGs67rdQ44nIL8eVrdWTw%3D"}],"group":"cf-nel","max_age":604800}'
+      Server:
+      - cloudflare
+      Set-Cookie:
+      - cb_dm=a5f8a8e0-4e50-4ff3-a11f-2993054f0328; Path=/; Domain=coinbase.com; Expires=Sat,
+        16 Dec 2034 01:26:39 GMT; HttpOnly; Secure
+      - __cf_bm=2AfBfhzj6tZmyiK2wEFpVcRJhlrRk7vNxAvTMvlRSq0-1734312399-1.0.1.1-wTWuO8FYyngwG1VQgzakTvSTNjOlR8jCbTNqLcn4bpTf__OKh3iLDGCV_VDkOREEwRpF3Qxg6K6UmGqW8qG.qw;
+        path=/; expires=Mon, 16-Dec-24 01:56:39 GMT; domain=.coinbase.com; HttpOnly;
+        Secure; SameSite=None
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-headers:
+      - Content-Type, Accept, Second-Factor-Proof-Token, Client-Id, Access-Token,
+        X-Cb-Project-Name, X-Cb-Is-Logged-In, X-Cb-Platform, X-Cb-Session-Uuid, X-Cb-Pagekey,
+        X-Cb-Ujs, Fingerprint-Tokens, X-Cb-Device-Id, X-Cb-Version-Name
+      access-control-allow-methods:
+      - GET,POST,DELETE,PUT
+      access-control-allow-private-network:
+      - 'true'
+      access-control-expose-headers:
+      - ''
+      access-control-max-age:
+      - '7200'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      trace-id:
+      - '650531074208257991'
+      - '650531074208257991'
+      vary:
+      - Origin, Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-dns-prefetch-control:
+      - 'off'
+      x-download-options:
+      - noopen
+      x-envoy-upstream-service-time:
+      - '26'
+      x-frame-options:
+      - SAMEORIGIN
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2'
+      Content-Type:
+      - application/json
+      Cookie:
+      - cb_dm=a5f8a8e0-4e50-4ff3-a11f-2993054f0328; __cf_bm=2AfBfhzj6tZmyiK2wEFpVcRJhlrRk7vNxAvTMvlRSq0-1734312399-1.0.1.1-wTWuO8FYyngwG1VQgzakTvSTNjOlR8jCbTNqLcn4bpTf__OKh3iLDGCV_VDkOREEwRpF3Qxg6K6UmGqW8qG.qw
+      User-Agent:
+      - coinbase-advanced-py/1.8.2
+    method: GET
+    uri: https://api.coinbase.com/api/v3/brokerage/market/products/BTC-USD/candles?end=1591014600&granularity=FIVE_MINUTE&start=1591014600
+  response:
+    body:
+      string: '{"candles":[{"start":"1591014600","low":"9558.02","high":"9590.45","open":"9574.85","close":"9560.73","volume":"33.9492526"}]}'
+    headers:
+      CF-Cache-Status:
+      - EXPIRED
+      CF-RAY:
+      - 8f2ae2f47c838379-KIX
+      Cache-Control:
+      - public, max-age=14400
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 16 Dec 2024 01:26:40 GMT
+      Expires:
+      - Mon, 16 Dec 2024 05:26:40 GMT
+      Last-Modified:
+      - Mon, 16 Dec 2024 01:26:40 GMT
+      NEL:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=tpoBYgw3gznUWOSZMLKKbHu6Ex2GF2MpCP7NdJdZCG%2FDDM6owC7pmUMMQteALdwFM8uhWN%2B9or8vFg0iZXQy6R1Vl8W6koEsaUPWymCBGtwry%2BowRDwqwZ1GqmKKlugkaUI%3D"}],"group":"cf-nel","max_age":604800}'
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-headers:
+      - Content-Type, Accept, Second-Factor-Proof-Token, Client-Id, Access-Token,
+        X-Cb-Project-Name, X-Cb-Is-Logged-In, X-Cb-Platform, X-Cb-Session-Uuid, X-Cb-Pagekey,
+        X-Cb-Ujs, Fingerprint-Tokens, X-Cb-Device-Id, X-Cb-Version-Name
+      access-control-allow-methods:
+      - GET,POST,DELETE,PUT
+      access-control-allow-private-network:
+      - 'true'
+      access-control-expose-headers:
+      - ''
+      access-control-max-age:
+      - '7200'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      trace-id:
+      - '7284784732694804126'
+      - '7284784732694804126'
+      vary:
+      - Origin, Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-dns-prefetch-control:
+      - 'off'
+      x-download-options:
+      - noopen
+      x-envoy-upstream-service-time:
+      - '36'
+      x-frame-options:
+      - SAMEORIGIN
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2'
+      Content-Type:
+      - application/json
+      Cookie:
+      - cb_dm=a5f8a8e0-4e50-4ff3-a11f-2993054f0328; __cf_bm=2AfBfhzj6tZmyiK2wEFpVcRJhlrRk7vNxAvTMvlRSq0-1734312399-1.0.1.1-wTWuO8FYyngwG1VQgzakTvSTNjOlR8jCbTNqLcn4bpTf__OKh3iLDGCV_VDkOREEwRpF3Qxg6K6UmGqW8qG.qw
+      User-Agent:
+      - coinbase-advanced-py/1.8.2
+    method: GET
+    uri: https://api.coinbase.com/api/v3/brokerage/market/products/BTC-USD/candles?end=1591014600&granularity=FIFTEEN_MINUTE&start=1591014600
+  response:
+    body:
+      string: '{"candles":[{"start":"1591014600","low":"9558.02","high":"9590.45","open":"9574.85","close":"9569.97","volume":"99.35339347"}]}'
+    headers:
+      CF-Cache-Status:
+      - EXPIRED
+      CF-RAY:
+      - 8f2ae2f869e0965a-KIX
+      Cache-Control:
+      - public, max-age=14400
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 16 Dec 2024 01:26:41 GMT
+      Expires:
+      - Mon, 16 Dec 2024 05:26:41 GMT
+      Last-Modified:
+      - Mon, 16 Dec 2024 01:26:41 GMT
+      NEL:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=pNBjoqUMS4TsZAlMS7U4AaQpKI3TcoQSv8bRYZ1XsvY9Xua4OH8AXP3n2pbhCHLqsgB8p9eWyzWluNg%2FgmaIUNQluA4Qe6DuNzSwfhoh%2BbRZgjykFPQqqNdgTTVlnQogFaw%3D"}],"group":"cf-nel","max_age":604800}'
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-headers:
+      - Content-Type, Accept, Second-Factor-Proof-Token, Client-Id, Access-Token,
+        X-Cb-Project-Name, X-Cb-Is-Logged-In, X-Cb-Platform, X-Cb-Session-Uuid, X-Cb-Pagekey,
+        X-Cb-Ujs, Fingerprint-Tokens, X-Cb-Device-Id, X-Cb-Version-Name
+      access-control-allow-methods:
+      - GET,POST,DELETE,PUT
+      access-control-allow-private-network:
+      - 'true'
+      access-control-expose-headers:
+      - ''
+      access-control-max-age:
+      - '7200'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      trace-id:
+      - '2922675039930763924'
+      - '2922675039930763924'
+      vary:
+      - Origin, Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-dns-prefetch-control:
+      - 'off'
+      x-download-options:
+      - noopen
+      x-envoy-upstream-service-time:
+      - '42'
+      x-frame-options:
+      - SAMEORIGIN
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{}'
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '2'
+      Content-Type:
+      - application/json
+      Cookie:
+      - cb_dm=a5f8a8e0-4e50-4ff3-a11f-2993054f0328; __cf_bm=2AfBfhzj6tZmyiK2wEFpVcRJhlrRk7vNxAvTMvlRSq0-1734312399-1.0.1.1-wTWuO8FYyngwG1VQgzakTvSTNjOlR8jCbTNqLcn4bpTf__OKh3iLDGCV_VDkOREEwRpF3Qxg6K6UmGqW8qG.qw
+      User-Agent:
+      - coinbase-advanced-py/1.8.2
+    method: GET
+    uri: https://api.coinbase.com/api/v3/brokerage/market/products/BTC-USD/candles?end=1590969600&granularity=ONE_DAY&start=1590969600
+  response:
+    body:
+      string: '{"candles":[{"start":"1590969600","low":"9417.42","high":"10428","open":"9445.83","close":"10208.96","volume":"21676.60828748"}]}'
+    headers:
+      CF-Cache-Status:
+      - EXPIRED
+      CF-RAY:
+      - 8f2ae2ffacefd3d9-KIX
+      Cache-Control:
+      - public, max-age=14400
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 16 Dec 2024 01:26:42 GMT
+      Expires:
+      - Mon, 16 Dec 2024 05:26:42 GMT
+      Last-Modified:
+      - Mon, 16 Dec 2024 01:26:42 GMT
+      NEL:
+      - '{"success_fraction":0.01,"report_to":"cf-nel","max_age":604800}'
+      Report-To:
+      - '{"endpoints":[{"url":"https:\/\/a.nel.cloudflare.com\/report\/v4?s=3XVnHJ5TQ8kMiYfjvQ%2Bb%2BWQyDiL2GkMa2HKCA%2Fg3C8Fc6y%2FeStA0c6S4GiPgA%2BSdUNlDYbcaZ%2F6QI5%2F0l72jWf9MxNy%2BsAqjDRvShnSZV%2F7BXmpp%2FTyrmx%2FHVcbPDpsvb8I%3D"}],"group":"cf-nel","max_age":604800}'
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      access-control-allow-headers:
+      - Content-Type, Accept, Second-Factor-Proof-Token, Client-Id, Access-Token,
+        X-Cb-Project-Name, X-Cb-Is-Logged-In, X-Cb-Platform, X-Cb-Session-Uuid, X-Cb-Pagekey,
+        X-Cb-Ujs, Fingerprint-Tokens, X-Cb-Device-Id, X-Cb-Version-Name
+      access-control-allow-methods:
+      - GET,POST,DELETE,PUT
+      access-control-allow-private-network:
+      - 'true'
+      access-control-expose-headers:
+      - ''
+      access-control-max-age:
+      - '7200'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      trace-id:
+      - '8313227568894027626'
+      - '8313227568894027626'
+      vary:
+      - Origin, Accept-Encoding
+      x-content-type-options:
+      - nosniff
+      x-dns-prefetch-control:
+      - 'off'
+      x-download-options:
+      - noopen
+      x-envoy-upstream-service-time:
+      - '29'
+      x-frame-options:
+      - SAMEORIGIN
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1
