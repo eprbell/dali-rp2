@@ -16,14 +16,11 @@ from datetime import datetime
 from inspect import Parameter, signature
 from typing import Callable, Dict, List, Mapping, NamedTuple, Optional, Type, Union
 
-from backports.datetime_fromisoformat import MonkeyPatch
 from dateutil.parser import parse
 from prezzemolo.utility import to_string
 from rp2.rp2_error import RP2RuntimeError
 
 from dali.configuration import Keyword, is_internal_field, is_unknown
-
-MonkeyPatch.patch_fromisoformat()
 
 
 class StringAndDatetime(NamedTuple):
