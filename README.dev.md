@@ -279,7 +279,7 @@ All pair converter plugins are subclasses of [AbstractPairConverterPlugin](src/d
 * implement the `cache_key()` method;
 * implement the `get_historic_bar_from_native_source()` method.
 
-For an example of pair converter look at the [Historic-Crypto](src/dali/plugin/pair_converter/historic_crypto.py) plugin.
+For an example of pair converter look at the [Coinbase-advanced](src/dali/plugin/pair_converter/coinbase_advanced.py) plugin.
 
 ### Country Plugin Development
 Country plugins are reused from RP2 and their DaLI counterpart has trivial implementation.

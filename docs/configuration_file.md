@@ -623,17 +623,20 @@ Be aware that:
 * All locked plugins make use of the default forex exchange API, Frankfurter, which provides daily rates from the European Central Bank. Rates for bank holidays and weekends are taken from the previous trading day, so if a rate is requested for Saturday, the Friday rate will be used.
 
 
-### Historic Crypto
-This plugin is based on the Historic_Crypto Python library.
+### Coinbase Advanced
+This plugin is based on the coinbase_advanced Python library.
 
 Initialize this plugin section as follows:
 <pre>
 [dali.plugin.pair_converter.historic_crypto</em>]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
+api_key = <em>&lt;api_key&gt;</em>
+api_secret = <em>&lt;api_secret&gt;</em>
 </pre>
 
 Where:
 * `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLI downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
+* `<api_key>` and `<api_secret>` can be obtained from your Coinbase account. They are not required, but will allow you many more calls to the API and so will speed up the process of retrieving prices. Without an api key and secret, your calls will be throttled.
 
 ## Builtin Sections
 Builtin sections are used as global configuration of DaLI's behavior.
