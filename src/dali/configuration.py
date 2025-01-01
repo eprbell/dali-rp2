@@ -56,6 +56,7 @@ class Keyword(Enum):
     IN_HEADER = "in_header"
     INTRA_HEADER = "intra_header"
     IS_SPOT_PRICE_FROM_WEB = "is_spot_price_from_web"
+    LOST = "lost"
     MINING = "mining"
     MOVE = "move"
     NATIVE_FIAT = "native_fiat"
@@ -137,8 +138,9 @@ DIRECTION_2_TRANSACTION_TYPE_SET: Dict[str, Set[str]] = {
     },
     Keyword.OUT.value: {
         Keyword.DONATE.value,
-        Keyword.GIFT.value,
         Keyword.FEE.value,
+        Keyword.GIFT.value,
+        Keyword.LOST.value,
         Keyword.SELL.value,
     },
     Keyword.INTRA.value: {
