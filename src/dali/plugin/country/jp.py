@@ -21,3 +21,8 @@ from dali.dali_main import dali_main
 # JP-specific entry point
 def dali_entry() -> None:
     dali_main(JP())
+
+# This traditional entry point is used for debugging purposes only, dali_entry()
+# is normally called through the use of an installed console script in setup.py.
+if __name__ == '__main__':
+    dali_entry()
