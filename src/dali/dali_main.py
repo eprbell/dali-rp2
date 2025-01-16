@@ -54,7 +54,7 @@ from dali.plugin.pair_converter.coinbase_advanced import (
 from dali.transaction_manifest import TransactionManifest
 from dali.transaction_resolver import resolve_transactions
 
-_VERSION: str = "0.6.11"
+_VERSION: str = "0.6.12"
 
 
 class _InputPluginHelperArgs(NamedTuple):

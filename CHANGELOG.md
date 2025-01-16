@@ -14,6 +14,11 @@
 
 # RP2 Change Log
 
+## 0.6.12
+* Use latest version of backports-datetime-fromisoformat to avoid installation bug (#273)
+* Code refactoring and removal of obsolete plugins (#218, #266, #269)
+* Minor fixes (#254, #262, #267)
+
 ## 0.6.11
 * Add support for generic country
 * Add support for Ireland
