@@ -41,6 +41,7 @@ _DEPOSIT = "Deposit"
 class InputPlugin(AbstractInputPlugin):
     __NEXO: str = "Nexo"
 
+    __TRANSACTION_ID_INDEX: int = 0
     __TRANSACTION_TYPE_INDEX = 1
     __CURRENCY_INDEX: int = 2
     __AMOUNT_INDEX: int = 3
@@ -76,6 +77,7 @@ class InputPlugin(AbstractInputPlugin):
                 raw_data: str = self.__DELIMITER.join(line)
                 self.__logger.debug("Transaction: %s", raw_data)
 
+                transaction_id: str = line[self.__TRANSACTION_ID_INDEX].strip()
                 transaction_type: str = line[self.__TRANSACTION_TYPE_INDEX].strip()
                 currency: str = line[self.__CURRENCY_INDEX].strip()
                 amount = line[self.__AMOUNT_INDEX].strip()
@@ -83,9 +85,9 @@ class InputPlugin(AbstractInputPlugin):
                 timestamp_with_timezone = f"{line[self.__TIMESTAMP_INDEX].strip()} -00:00"
 
                 common_params = {
-                    # although there is a transaction id in the CSV, it is not a transaction hash shared across exchanges, so it is uselsss
+                    # this is not as useful as a network hash, but when one does not exist it still provides auditability
                     # https://github.com/eprbell/dali-rp2/pull/60#issuecomment-1201481064
-                    "unique_id": Keyword.UNKNOWN.value,
+                    "unique_id": transaction_id,
                     "plugin": self.__NEXO,
                     "raw_data": raw_data,
                     "timestamp": timestamp_with_timezone,
