@@ -573,7 +573,8 @@ class InputPlugin(AbstractInputPlugin):
                             asset=currency,
                             exchange=self.__COINBASE,
                             holder=self.account_holder,
-                            transaction_type="Gift",
+                            # could be a gift, payment to a 3rd party, etc but rp2 expects a type so we have to guess
+                            transaction_type=Keyword.SELL.value,
                             spot_price=str(native_amount / amount),
                             crypto_out_no_fee=str(-amount),
                             crypto_fee="0",
