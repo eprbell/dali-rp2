@@ -48,8 +48,8 @@ from dali.out_transaction import OutTransaction
 from dali.plugin.pair_converter.ccxt import (
     PairConverterPlugin as CcxtPairConverterPlugin,
 )
-from dali.plugin.pair_converter.historic_crypto import (
-    PairConverterPlugin as HistoricCryptoPairConverterPlugin,
+from dali.plugin.pair_converter.coinbase_advanced import (
+    PairConverterPlugin as CoinbaseAdvancedPairConverterPlugin,
 )
 from dali.transaction_manifest import TransactionManifest
 from dali.transaction_resolver import resolve_transactions
@@ -160,7 +160,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
             sys.exit(1)
 
         if not pair_converter_list:
-            pair_converter_list.append(HistoricCryptoPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
+            pair_converter_list.append(CoinbaseAdvancedPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
             pair_converter_list.append(CcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value))
             LOGGER.info("No pair converter plugins found in configuration file: using default pair converters.")
 
