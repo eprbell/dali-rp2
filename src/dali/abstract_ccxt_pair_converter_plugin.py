@@ -157,6 +157,7 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "SGBUSD": _KRAKEN,
     "SOLOUSDT": _GATE,  # To be replaced with Binance or Huobi once a CSV plugin is available
     "SWEATUSDT": _GATE,
+    "TAOUSDT": _BINANCE,
     "USDTUSD": _KRAKEN,
     "XYMUSDT": _GATE,
 }
@@ -182,13 +183,14 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "SGB": "USD",
     "SOLO": "USDT",
     "SWEAT": "USDT",
+    "TAO": "USDT",
     "USDT": "USD",
     "XYM": "USDT",
 }
 
 # Sometimes an indirect route (eg. BTC -> USDT -> USD) exists before a native one (eg. BTC -> USD)
 # We need to force routing in these cases.
-_FORCE_ROUTING: Set[str] = {"OPUSD"}
+_FORCE_ROUTING: Set[str] = {"OPUSD", "TAOUSD"}
 
 # Priority for quote asset. If asset is not listed it will be filtered out.
 # In principle this should be fiat in order of trade volume and then stable coins in order of trade volume
