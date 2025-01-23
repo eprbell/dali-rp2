@@ -246,6 +246,9 @@ DEFAULT_FIAT_LIST: List[str] = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD",
 # How much padding in weeks should we add to the graph to catch airdropped or new assets that don't yet have a market
 MARKET_PADDING_IN_WEEKS: int = 4
 
+DELETABLE_VOLUME: float = -1.0
+PADDING_VOLUME: float = -2.0
+
 DAYS_IN_WEEK: int = 7
 MANY_YEARS_IN_THE_FUTURE: relativedelta = relativedelta(years=100)
 
@@ -950,7 +953,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                             high=bar_check[0].high,
                             low=bar_check[0].low,
                             close=bar_check[0].close,
-                            volume=bar_check[0].volume,
+                            volume=RP2Decimal(str(PADDING_VOLUME)),
                         )
                         bar_check = [no_market_padding] + bar_check
                         child_bars[child_name][neighbor.name] = bar_check
@@ -986,7 +989,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                         # This is meant as a sanity check to make sure we don't route a price before the market starts
                         # If we try to lookup a price before week_start_date - MARKET_PADDING_IN_WEEKS, we will get an error
                         # Unless it is an untradeable asset, in which case we will give it a price of 0.
-                        optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
+                        optimizations[timestamp][crypto_asset][neighbor_asset] = DELETABLE_VOLUME
                     else:
                         optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
         return optimizations
