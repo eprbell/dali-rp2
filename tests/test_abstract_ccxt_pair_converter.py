@@ -225,6 +225,34 @@ class TestAbstractCcxtPairConverterPlugin:
         assert len(bars) == 1
         assert bars[0] == historical_bars[MARKET_START]
 
+    def test_remove_unnecessary_alternative_market_optimization(self, mocker: Any) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        mocker.patch.object(plugin, "_get_alt_market_by_base", return_value={"A": "B"})
+
+        optimizations = {
+            datetime(2023, 1, 1): {"A": {"B": 100.0}},
+            datetime(2023, 1, 4): {"A": {"B": -2.0, "C": -2.0, "D": -2.0}},
+            datetime(2023, 1, 7): {"A": {"B": 100.0}},
+            datetime(2023, 1, 10): {"A": {"B": 100.0, "C": 150.0, "D": 200.0}},
+            datetime(2023, 1, 13): {"A": {"B": 100.0}},
+        }
+
+        refined_optimizations = plugin._refine_and_finalize_optimizations(optimizations)  # pylint: disable=protected-access
+
+        assert datetime(2023, 1, 1) in refined_optimizations
+        assert datetime(2023, 1, 4) not in refined_optimizations  # Delete padding when viable alternative market exists
+        assert datetime(2023, 1, 7) in refined_optimizations
+        assert datetime(2023, 1, 10) in refined_optimizations  # Legitimate market should be kept
+        assert datetime(2023, 1, 13) not in refined_optimizations  # Altenative market should be removed once it is no longer needed
+
+        assert refined_optimizations[datetime(2023, 1, 1)]["A"]["B"] == 1.0
+
+        assert refined_optimizations[datetime(2023, 1, 7)]["A"]["B"] == 1.0
+
+        assert refined_optimizations[datetime(2023, 1, 10)]["A"]["B"] == 3.0
+        assert refined_optimizations[datetime(2023, 1, 10)]["A"]["C"] == 2.0
+        assert refined_optimizations[datetime(2023, 1, 10)]["A"]["D"] == 1.0
+
     # To be enabled when _fetch_historical_bars is implemented
     def disabled_test_find_historical_bars_add_to_cache(self, mocker: Any, historical_bars: Dict[str, HistoricalBar]) -> None:
         plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
