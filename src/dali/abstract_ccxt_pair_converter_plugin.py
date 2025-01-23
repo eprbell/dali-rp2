@@ -999,18 +999,16 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         previous_assets: Optional[Dict[str, Dict[str, float]]] = None
         timestamps_to_delete: List[datetime] = []
 
+        # Patching the optimization to delete alternative markets once the main market is available
+        timestamp_assets_to_delete: Dict[datetime, List[str]] = {}
+        already_optimized: Dict[str, List[str]] = {}
+        deletable_market: Dict[str, str] = {}
+        alt_markets = self._get_alt_market_by_base()
+
         # Assign weights based on the rank of the volume for the market
         for timestamp, snapshot_assets in sorted_optimizations.items():
-            for asset, neighbors in snapshot_assets.items():
-                ranked_neighbors: Dict[str, float] = dict(sorted(iter(neighbors.items()), key=lambda x: x[1], reverse=True))
-                weight: float = 1.0
-                for neighbor_name, neighbor_volume in ranked_neighbors.items():
-                    if neighbor_volume != -1.0:
-                        neighbors[neighbor_name] = weight
-                        weight += 1.0
-                        self._logger.debug("Optimization for %s to %s at %s is %s", asset, neighbor_name, timestamp, neighbors[neighbor_name])
-                    else:
-                        neighbors[neighbor_name] = -1.0
+            self._process_alternative_markets(timestamp, snapshot_assets, alt_markets, already_optimized, deletable_market, timestamp_assets_to_delete)
+            self._assign_weights(timestamp, snapshot_assets)
 
             # mark duplicate successive snapshots
             if snapshot_assets == previous_assets:
@@ -1022,7 +1020,62 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         for timestamp in timestamps_to_delete:
             del sorted_optimizations[timestamp]
 
+        # delete alternative markets
+        for timestamp, assets_to_delete in timestamp_assets_to_delete.items():
+            for asset in assets_to_delete:
+                del sorted_optimizations[timestamp][asset]
+                # If deleting the alternative market empties the snapshot, delete the snapshot
+                if not sorted_optimizations[timestamp]:
+                    del sorted_optimizations[timestamp]
+
         return sorted_optimizations
+
+    def _assign_weights(self, timestamp: datetime, snapshot_assets: Dict[str, Dict[str, float]]) -> None:
+        for asset, neighbors in snapshot_assets.items():
+            ranked_neighbors: Dict[str, float] = dict(sorted(neighbors.items(), key=lambda x: x[1], reverse=True))
+            weight: float = 1.0
+            for neighbor_name, neighbor_volume in ranked_neighbors.items():
+                if neighbor_volume != -1.0:
+                    neighbors[neighbor_name] = weight
+                    weight += 1.0
+                    self._logger.debug("Optimization for %s to %s at %s is %s", asset, neighbor_name, timestamp, neighbors[neighbor_name])
+                else:
+                    neighbors[neighbor_name] = -1.0
+
+    def _process_alternative_markets(
+        self,
+        timestamp: datetime,
+        snapshot_assets: Dict[str, Dict[str, float]],
+        alt_markets: Dict[str, str],
+        already_optimized: Dict[str, List[str]],
+        deletable_market: Dict[str, str],
+        timestamp_assets_to_delete: Dict[datetime, List[str]],
+    ) -> None:
+        for asset, neighbors in snapshot_assets.items():
+            if asset in alt_markets:
+                if asset not in already_optimized:
+                    already_optimized[asset] = list(neighbors.keys())
+                else:
+                    current_neighbors = list(neighbors.keys())
+                    alternative_market = alt_markets[asset]
+
+                    if already_optimized[asset] != current_neighbors and alternative_market in already_optimized[asset]:
+                        # If all the neighbors are padding, delete the asset if an alternative market exists
+                        if all(volume == PADDING_VOLUME for _, volume in neighbors.items()):
+                            self._logger.debug("Deleting Padding %s with %s", asset, neighbors.keys())
+                            timestamp_assets_to_delete.setdefault(timestamp, []).append(asset)
+                        else:
+                            deletable_market[asset] = alternative_market
+                    elif asset in deletable_market and deletable_market[asset] == current_neighbors[0]:
+                        self._logger.debug("Deleting alternative market for %s at %s", asset, timestamp)
+                        # Note this deletes the asset from the snapshot and all its neighbors not just the alternative market
+                        # This will work in most cases, but if the asset has multiple alternative markets, it will delete all of them
+                        # Currently there are no assets with multiple alternative markets
+                        timestamp_assets_to_delete.setdefault(timestamp, []).append(asset)
+
+    # isolated for testing
+    def _get_alt_market_by_base(self) -> Dict[str, str]:
+        return _ALT_MARKET_BY_BASE_DICT
 
     def _process_aliases(self, aliases: str) -> Dict[str, Dict[Alias, RP2Decimal]]:
         alias_list: List[str] = aliases.split(";")
