@@ -26,31 +26,69 @@ class TestBitbank:
         plugin = InputPlugin(
             account_holder="tester",
             withdrawals_csv_file="input/test_bitbank_withdrawals.csv",
-            withdrawals_code="XLM",
             deposits_csv_file="input/test_bitbank_deposits.csv",
-            deposits_code="JPY",
+            fiat_deposits_csv_file="input/test_bitbank_fiat_deposits.csv",
             native_fiat="USD",
         )
 
         result = plugin.load(US())
 
         # 1 XLM withdrawal for 900 XLM
+        # 1 ETH withdrawal for 0.125 ETH
+        # 1 XRP deposit for 54.54 XRP
+        # 1 BTC deposit for 0.00001 BTC
         # 1 JPY deposit for 6900 JPY
-        assert len(result) == 2
+        assert len(result) == 5
 
-        xlm_transaction: IntraTransaction = result[0]  # type: ignore
-        jpy_transaction: InTransaction = result[1]  # type: ignore
+        xlm_withdrawal: IntraTransaction = result[0]  # type: ignore
+        eth_withdrawal: IntraTransaction = result[1]  # type: ignore
+        xrp_deposit: IntraTransaction = result[2]  # type: ignore
+        btc_deposit: IntraTransaction = result[3]  # type: ignore
+        jpy_transaction: InTransaction = result[4]  # type: ignore
 
-        assert xlm_transaction.asset == "XLM"
-        assert xlm_transaction.timestamp == "2022-04-20 07:20:00+0000"
-        assert xlm_transaction.unique_id == "TXID12345"
-        assert xlm_transaction.spot_price == Keyword.UNKNOWN.value
-        assert xlm_transaction.crypto_received == Keyword.UNKNOWN.value
-        assert RP2Decimal(xlm_transaction.crypto_sent) == RP2Decimal("900.01")
-        assert xlm_transaction.from_exchange == "Bitbank.cc"
-        assert xlm_transaction.from_holder == "tester"
-        assert xlm_transaction.to_exchange == Keyword.UNKNOWN.value
-        assert xlm_transaction.to_holder == Keyword.UNKNOWN.value
+        assert xlm_withdrawal.asset == "XLM"
+        assert xlm_withdrawal.timestamp == "2022-04-20 07:20:00+0000"
+        assert xlm_withdrawal.unique_id == "TXID12345"
+        assert xlm_withdrawal.spot_price == Keyword.UNKNOWN.value
+        assert xlm_withdrawal.crypto_received == Keyword.UNKNOWN.value
+        assert RP2Decimal(xlm_withdrawal.crypto_sent) == RP2Decimal("900.01")
+        assert xlm_withdrawal.from_exchange == "Bitbank.cc"
+        assert xlm_withdrawal.from_holder == "tester"
+        assert xlm_withdrawal.to_exchange == Keyword.UNKNOWN.value
+        assert xlm_withdrawal.to_holder == Keyword.UNKNOWN.value
+
+        assert eth_withdrawal.asset == "ETH"
+        assert eth_withdrawal.timestamp == "2022-04-25 07:21:00+0000"
+        assert eth_withdrawal.unique_id == "TXID12346"
+        assert eth_withdrawal.spot_price == Keyword.UNKNOWN.value
+        assert eth_withdrawal.crypto_received == Keyword.UNKNOWN.value
+        assert RP2Decimal(eth_withdrawal.crypto_sent) == RP2Decimal("0.1251")
+        assert eth_withdrawal.from_exchange == "Bitbank.cc"
+        assert eth_withdrawal.from_holder == "tester"
+        assert eth_withdrawal.to_exchange == Keyword.UNKNOWN.value
+        assert eth_withdrawal.to_holder == Keyword.UNKNOWN.value
+
+        assert xrp_deposit.asset == "XRP"
+        assert xrp_deposit.timestamp == "2022-11-12 02:57:01+0000"
+        assert xrp_deposit.unique_id == "TXID12348"
+        assert xrp_deposit.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(xrp_deposit.crypto_received) == RP2Decimal("54.54")
+        assert xrp_deposit.crypto_sent == Keyword.UNKNOWN.value
+        assert xrp_deposit.from_exchange == Keyword.UNKNOWN.value
+        assert xrp_deposit.from_holder == Keyword.UNKNOWN.value
+        assert xrp_deposit.to_exchange == "Bitbank.cc"
+        assert xrp_deposit.to_holder == "tester"
+
+        assert btc_deposit.asset == "BTC"
+        assert btc_deposit.timestamp == "2022-10-13 01:57:01+0000"
+        assert btc_deposit.unique_id == "TXID12349"
+        assert btc_deposit.spot_price == Keyword.UNKNOWN.value
+        assert RP2Decimal(btc_deposit.crypto_received) == RP2Decimal("0.00001")
+        assert btc_deposit.crypto_sent == Keyword.UNKNOWN.value
+        assert btc_deposit.from_exchange == Keyword.UNKNOWN.value
+        assert btc_deposit.from_holder == Keyword.UNKNOWN.value
+        assert btc_deposit.to_exchange == "Bitbank.cc"
+        assert btc_deposit.to_holder == "tester"
 
         assert jpy_transaction.asset == "JPY"
         assert jpy_transaction.timestamp == "2022-04-19 22:19:00+0000"
