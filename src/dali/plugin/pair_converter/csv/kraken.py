@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # This plugin facilitates the downloading of the unified CSV located at
-# https://drive.google.com/file/d/16YKyFkYlvawCHv3W7WuTFzM8RYgMRWMt/view?usp=sharing
+# https://drive.google.com/file/d/1ptNqWYidLkhb2VAKuLCxmp2OXEfGO-AP/view?usp=sharing
 # This link will have to be updated quarterly when Kraken releases a new file.
 # Note that you can manually download the unified file as Kraken_OHLCVT.zip
 # to the .dali_cache/kraken/csv/ and dali-rp2 will use that file.
