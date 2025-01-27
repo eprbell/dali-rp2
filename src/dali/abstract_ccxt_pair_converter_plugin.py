@@ -1060,7 +1060,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     alternative_market = alt_markets[asset]
 
                     if already_optimized[asset] != current_neighbors and alternative_market in already_optimized[asset]:
-                        # If all the neighbors are padding, delete the asset if an alternative market exists
+                        # If all the neighbors are padding, delete the asset if an alternative market exists.
                         if all(volume == PADDING_VOLUME for _, volume in neighbors.items()):
                             self._logger.debug("Deleting Padding %s with %s", asset, neighbors.keys())
                             timestamp_assets_to_delete.setdefault(timestamp, []).append(asset)
@@ -1068,9 +1068,9 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                             deletable_market[asset] = alternative_market
                     elif asset in deletable_market and deletable_market[asset] == current_neighbors[0]:
                         self._logger.debug("Deleting alternative market for %s at %s", asset, timestamp)
-                        # Note this deletes the asset from the snapshot and all its neighbors not just the alternative market
-                        # This will work in most cases, but if the asset has multiple alternative markets, it will delete all of them
-                        # Currently there are no assets with multiple alternative markets
+                        # Note this deletes the asset from the snapshot and all its neighbors not just the alternative market.
+                        # This will work in most cases, but if the asset has multiple alternative markets, it will delete all of them.
+                        # Currently there are no assets with multiple alternative markets.
                         timestamp_assets_to_delete.setdefault(timestamp, []).append(asset)
 
     # isolated for testing
