@@ -157,6 +157,7 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "SGBUSD": _KRAKEN,
     "SOLOUSDT": _GATE,  # To be replaced with Binance or Huobi once a CSV plugin is available
     "SWEATUSDT": _GATE,
+    "TAOUSDT": _BINANCE,
     "USDTUSD": _KRAKEN,
     "XYMUSDT": _GATE,
 }
@@ -182,13 +183,14 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "SGB": "USD",
     "SOLO": "USDT",
     "SWEAT": "USDT",
+    "TAO": "USDT",
     "USDT": "USD",
     "XYM": "USDT",
 }
 
 # Sometimes an indirect route (eg. BTC -> USDT -> USD) exists before a native one (eg. BTC -> USD)
 # We need to force routing in these cases.
-_FORCE_ROUTING: Set[str] = {"OPUSD"}
+_FORCE_ROUTING: Set[str] = {"OPUSD", "TAOUSD"}
 
 # Priority for quote asset. If asset is not listed it will be filtered out.
 # In principle this should be fiat in order of trade volume and then stable coins in order of trade volume
@@ -243,6 +245,9 @@ DEFAULT_FIAT_LIST: List[str] = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "NZD",
 
 # How much padding in weeks should we add to the graph to catch airdropped or new assets that don't yet have a market
 MARKET_PADDING_IN_WEEKS: int = 4
+
+DELETABLE_VOLUME: float = -1.0
+PADDING_VOLUME: float = -2.0
 
 DAYS_IN_WEEK: int = 7
 MANY_YEARS_IN_THE_FUTURE: relativedelta = relativedelta(years=100)
@@ -948,7 +953,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                             high=bar_check[0].high,
                             low=bar_check[0].low,
                             close=bar_check[0].close,
-                            volume=bar_check[0].volume,
+                            volume=RP2Decimal(str(PADDING_VOLUME)),
                         )
                         bar_check = [no_market_padding] + bar_check
                         child_bars[child_name][neighbor.name] = bar_check
@@ -984,7 +989,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                         # This is meant as a sanity check to make sure we don't route a price before the market starts
                         # If we try to lookup a price before week_start_date - MARKET_PADDING_IN_WEEKS, we will get an error
                         # Unless it is an untradeable asset, in which case we will give it a price of 0.
-                        optimizations[timestamp][crypto_asset][neighbor_asset] = -1.0
+                        optimizations[timestamp][crypto_asset][neighbor_asset] = DELETABLE_VOLUME
                     else:
                         optimizations[timestamp][crypto_asset][neighbor_asset] = float(volume)
         return optimizations
@@ -994,18 +999,16 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         previous_assets: Optional[Dict[str, Dict[str, float]]] = None
         timestamps_to_delete: List[datetime] = []
 
+        # Patching the optimization to delete alternative markets once the main market is available
+        timestamp_assets_to_delete: Dict[datetime, List[str]] = {}
+        already_optimized: Dict[str, List[str]] = {}
+        deletable_market: Dict[str, str] = {}
+        alt_markets = self._get_alt_market_by_base()
+
         # Assign weights based on the rank of the volume for the market
         for timestamp, snapshot_assets in sorted_optimizations.items():
-            for asset, neighbors in snapshot_assets.items():
-                ranked_neighbors: Dict[str, float] = dict(sorted(iter(neighbors.items()), key=lambda x: x[1], reverse=True))
-                weight: float = 1.0
-                for neighbor_name, neighbor_volume in ranked_neighbors.items():
-                    if neighbor_volume != -1.0:
-                        neighbors[neighbor_name] = weight
-                        weight += 1.0
-                        self._logger.debug("Optimization for %s to %s at %s is %s", asset, neighbor_name, timestamp, neighbors[neighbor_name])
-                    else:
-                        neighbors[neighbor_name] = -1.0
+            self._process_alternative_markets(timestamp, snapshot_assets, alt_markets, already_optimized, deletable_market, timestamp_assets_to_delete)
+            self._assign_weights(timestamp, snapshot_assets)
 
             # mark duplicate successive snapshots
             if snapshot_assets == previous_assets:
@@ -1017,7 +1020,62 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         for timestamp in timestamps_to_delete:
             del sorted_optimizations[timestamp]
 
+        # delete alternative markets
+        for timestamp, assets_to_delete in timestamp_assets_to_delete.items():
+            for asset in assets_to_delete:
+                del sorted_optimizations[timestamp][asset]
+                # If deleting the alternative market empties the snapshot, delete the snapshot
+                if not sorted_optimizations[timestamp]:
+                    del sorted_optimizations[timestamp]
+
         return sorted_optimizations
+
+    def _assign_weights(self, timestamp: datetime, snapshot_assets: Dict[str, Dict[str, float]]) -> None:
+        for asset, neighbors in snapshot_assets.items():
+            ranked_neighbors: Dict[str, float] = dict(sorted(neighbors.items(), key=lambda x: x[1], reverse=True))
+            weight: float = 1.0
+            for neighbor_name, neighbor_volume in ranked_neighbors.items():
+                if neighbor_volume != -1.0:
+                    neighbors[neighbor_name] = weight
+                    weight += 1.0
+                    self._logger.debug("Optimization for %s to %s at %s is %s", asset, neighbor_name, timestamp, neighbors[neighbor_name])
+                else:
+                    neighbors[neighbor_name] = -1.0
+
+    def _process_alternative_markets(
+        self,
+        timestamp: datetime,
+        snapshot_assets: Dict[str, Dict[str, float]],
+        alt_markets: Dict[str, str],
+        already_optimized: Dict[str, List[str]],
+        deletable_market: Dict[str, str],
+        timestamp_assets_to_delete: Dict[datetime, List[str]],
+    ) -> None:
+        for asset, neighbors in snapshot_assets.items():
+            if asset in alt_markets:
+                if asset not in already_optimized:
+                    already_optimized[asset] = list(neighbors.keys())
+                else:
+                    current_neighbors = list(neighbors.keys())
+                    alternative_market = alt_markets[asset]
+
+                    if already_optimized[asset] != current_neighbors and alternative_market in already_optimized[asset]:
+                        # If all the neighbors are padding, delete the asset if an alternative market exists.
+                        if all(volume == PADDING_VOLUME for _, volume in neighbors.items()):
+                            self._logger.debug("Deleting Padding %s with %s", asset, neighbors.keys())
+                            timestamp_assets_to_delete.setdefault(timestamp, []).append(asset)
+                        else:
+                            deletable_market[asset] = alternative_market
+                    elif asset in deletable_market and deletable_market[asset] == current_neighbors[0]:
+                        self._logger.debug("Deleting alternative market for %s at %s", asset, timestamp)
+                        # Note this deletes the asset from the snapshot and all its neighbors not just the alternative market.
+                        # This will work in most cases, but if the asset has multiple alternative markets, it will delete all of them.
+                        # Currently there are no assets with multiple alternative markets.
+                        timestamp_assets_to_delete.setdefault(timestamp, []).append(asset)
+
+    # isolated for testing
+    def _get_alt_market_by_base(self) -> Dict[str, str]:
+        return _ALT_MARKET_BY_BASE_DICT
 
     def _process_aliases(self, aliases: str) -> Dict[str, Dict[Alias, RP2Decimal]]:
         alias_list: List[str] = aliases.split(";")
