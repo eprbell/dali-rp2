@@ -55,7 +55,7 @@ class InputPlugin(AbstractInputPlugin):
 
     # Keywords
     __DEPOSIT: str = "DEPOSIT"
-    __WITHDRAWAL: str = "WITHDRAWAL"
+    __WITHDRAWAL: str = "WITHDRAW"
 
     def __init__(
         self,
