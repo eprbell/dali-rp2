@@ -25,3 +25,5 @@ __pycache__/
 src/*.egg-info/
 .venv/
 .vscode/
+_ReSharper.Caches/
+TestResults/
