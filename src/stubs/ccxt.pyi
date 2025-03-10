@@ -92,7 +92,7 @@ class liquid(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
-class okex(Exchange):
+class okx(Exchange):
     def __init__(self, config: Dict[str, Union[str, bool]]) -> None: ...
     options: Dict[str, str]
 
