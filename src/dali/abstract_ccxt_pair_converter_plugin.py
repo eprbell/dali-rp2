@@ -44,7 +44,7 @@ from ccxt import (
     gateio,
     huobi,
     kraken,
-    okex,
+    okx,
     upbit,
 )
 from dateutil.relativedelta import relativedelta
@@ -103,7 +103,7 @@ _COINBASE_PRO: str = "Coinbase Pro"
 _GATE: str = "Gate"
 _HUOBI: str = "Huobi"
 _KRAKEN: str = "Kraken"
-_OKEX: str = "Okex"
+_OKX: str = "okx"
 _PIONEX: str = "Pionex"  # Not currently supported by CCXT
 _UPBIT: str = "Upbit"
 _FIAT_EXCHANGE: str = "Exchangerate.host"
@@ -115,7 +115,7 @@ _EXCHANGE_DICT: Dict[str, Any] = {
     _GATE: gateio,
     _HUOBI: huobi,
     _KRAKEN: kraken,
-    _OKEX: okex,
+    _OKX: okx,
     _UPBIT: upbit,
 }
 _COINBASE_PRO_GRANULARITY_LIST: List[str] = [_MINUTE, _FIVE_MINUTE, _FIFTEEN_MINUTE, _ONE_HOUR, _SIX_HOUR, _ONE_DAY, _ONE_WEEK]
@@ -137,7 +137,7 @@ _CSV_PRICING_DICT: Dict[str, Any] = {_KRAKEN: KrakenCsvPricing}
 
 # Alternative Markets and exchanges for stablecoins or untradeable assets
 _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
-    "ASTUSDT": _OKEX,
+    "ASTUSDT": _OKX,
     "ARKKRW": _UPBIT,
     "ATDUSDT": _GATE,
     "BETHETH": _BINANCE,
