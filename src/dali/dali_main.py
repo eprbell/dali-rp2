@@ -421,7 +421,7 @@ def _validate_plugin_configuration(ini_config: ConfigParser, plugin_name: str, c
             if ini_config[plugin_name].get(parameter) is not None:
                 annotation = annotation.__args__[0]
             else:
-                result[parameter] = None
+                #result[parameter] = None
                 continue
         if annotation is str:
             result[parameter] = ini_config[plugin_name][parameter]
