@@ -136,7 +136,7 @@ class CryptoComAppTransaction:
         self.transaction_hash = transaction_hash
         self.notes = notes
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f"CryptoComAppTransaction(timestamp={self.timestamp}, "
             f"description={self.description}, currency={self.currency}, "
@@ -171,10 +171,15 @@ class InputPlugin(AbstractInputPlugin):
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__in_csv_file: Optional[str] = in_csv_file
         self.__logger: logging.Logger = create_logger(self.__CRYPTO_COM_APP)
-        self.__remove_reverted: bool = remove_reverted_transactions
+        self.__remove_reverted: bool = False if remove_reverted_transactions is None else remove_reverted_transactions
 
     def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         csv_transactions: List[CryptoComAppTransaction] = []
+
+        if not self.__in_csv_file:
+            self.__logger.error("No input CSV file specified.")
+            raise ValueError("Input CSV file is not specified.")
+
         with open(self.__in_csv_file, encoding="utf-8") as transaction_csv_file:
             lines = reader(transaction_csv_file)
 
@@ -247,6 +252,9 @@ class InputPlugin(AbstractInputPlugin):
         """
         self.__logger.debug("Processing exchange transaction %s", transaction)
 
+        if not transaction.to_currency or not transaction.to_amount or not transaction.abs_float_to_amount:
+            self.__logger.warning("Exchange transaction missing 'to_currency' or 'to_amount', skipping: %s", transaction)
+            return []
         exchange_transactions_out: List[AbstractTransaction] = []
 
         try:
@@ -361,7 +369,7 @@ class InputPlugin(AbstractInputPlugin):
         """
 
         self.__logger.debug("Processing in transaction %s", transaction)
-        if transaction.to_currency:
+        if transaction.to_currency and transaction.to_amount:
             # If there is a to_currency, we assume is a purchase from usd to the currency
             in_currency = transaction.to_currency
             crypto_in = transaction.to_amount
@@ -398,7 +406,7 @@ class InputPlugin(AbstractInputPlugin):
             notes=transaction.notes,
         )
 
-    def format_time(self, time: str):
+    def format_time(self, time: str) -> str:
         """
         Convert time from "MM/DD/YYYY HH:MM" format to ISO 8601 format with UTC timezone.
         """

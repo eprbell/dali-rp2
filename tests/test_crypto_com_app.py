@@ -23,7 +23,7 @@ class TestCryptoComApp:
         result = plugin.load(US())
         assert len(result) == 35
 
-    def test_handle_exchange_transaction(self):
+    def test_handle_exchange_transaction(self) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             in_csv_file="input/test_crypto_com_app.csv",
@@ -56,6 +56,8 @@ class TestCryptoComApp:
         assert out_transaction.timestamp == "2022-06-15 21:58:00+0000"
         assert out_transaction.transaction_type.lower() == Keyword.SELL.value.lower()
         assert out_transaction.spot_price == "0.11888081892640755"
+        assert out_transaction.crypto_out_no_fee is not None
+        assert out_transaction.crypto_out_with_fee is not None
         assert RP2Decimal(out_transaction.crypto_out_no_fee) == RP2Decimal("259.8504164")
         assert RP2Decimal(out_transaction.crypto_out_with_fee) == RP2Decimal("259.8504164")
         assert out_transaction.crypto_fee == "0"
@@ -71,7 +73,7 @@ class TestCryptoComApp:
         assert in_transaction.fiat_in_no_fee == "30.8912303"
         assert in_transaction.crypto_fee == "0"
 
-    def test_handle_intra_transaction(self):
+    def test_handle_intra_transaction(self) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             in_csv_file="input/test_crypto_com_app.csv",
@@ -79,7 +81,8 @@ class TestCryptoComApp:
         )
 
         transaction = CryptoComAppTransaction(
-            raw_data="11/21/2022 22:08,Withdraw ETH (ERC20),ETH,-0.3877,USD,421.5213882,USD,421.5213882,crypto_withdrawal,0x1646a7c9f57f5f543c498f5ebff14dab16f9c9b09dbfb50405622564b8c62762",
+            raw_data="11/21/2022 22:08,Withdraw ETH (ERC20),ETH,-0.3877,USD,421.5213882,USD,421.5213882,"
+            "crypto_withdrawal,0x1646a7c9f57f5f543c498f5ebff14dab16f9c9b09dbfb50405622564b8c62762",
             time=plugin.format_time("11/21/2022 22:08"),
             description="Withdraw ETH (ERC20)",
             currency="ETH",
@@ -103,7 +106,7 @@ class TestCryptoComApp:
         assert RP2Decimal(result.crypto_sent) == RP2Decimal("0.3877")
         assert RP2Decimal(result.crypto_received) == RP2Decimal("0.3877")
 
-    def test_handle_in_transaction(self):
+    def test_handle_in_transaction(self) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             in_csv_file="input/test_crypto_com_app.csv",
@@ -134,7 +137,7 @@ class TestCryptoComApp:
         assert result.fiat_in_no_fee == "25.0"
         assert result.crypto_fee == "0"
 
-    def test_handle_out_transaction(self):
+    def test_handle_out_transaction(self) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             in_csv_file="input/test_crypto_com_app.csv",
@@ -165,7 +168,7 @@ class TestCryptoComApp:
         assert result.crypto_fee == "0"
         assert result.crypto_out_with_fee == "0.0259378"
 
-    def test_remove_ignored_transactions(self):
+    def test_remove_ignored_transactions(self) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             in_csv_file="input/test_crypto_com_app.csv",
@@ -201,7 +204,7 @@ class TestCryptoComApp:
         assert len(result) == 1
         assert result[0].transaction_kind == "referral_gift"
 
-    def test_revert_reverted_transactions(self):
+    def test_revert_reverted_transactions(self) -> None:
         plugin = InputPlugin(
             account_holder="tester",
             in_csv_file="input/test_crypto_com_app.csv",
@@ -236,7 +239,7 @@ class TestCryptoComApp:
         result = plugin.remove_reverted_csv_transactions(transactions)
         assert len(result) == 0
 
-    def test_date_conversion(self):
+    def test_date_conversion(self) -> None:
         # Test the date conversion from string to datetime
         in_date_str = "2/29/2024 6:42"
         expected_date = "2024-02-29T06:42:00+00:00"
