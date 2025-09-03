@@ -684,11 +684,17 @@ class AbstractCcxtInputPlugin(AbstractInputPlugin):
 
     def _process_transfer(self, transaction: Any) -> ProcessOperationResult:
         self.__logger.debug("Transfer: %s", json.dumps(transaction))
+        # Fix the `UnboundLocalError`:
+        # The variable `intra_transaction_list` was only being initialized inside the `else` block,
+        # but was being referenced in the return statement at the end of the function. 
+        # When a failed transfer was encountered, the code would skip to the return statement without initializing this variable.
+        # The fix moves the initialization of `intra_transaction_list` outside the conditional block, 
+        # ensuring it's always defined regardless of the transaction status:
+        intra_transaction_list: List[IntraTransaction] = []
+        
         if transaction[_STATUS] == "failed":
             self.__logger.info("Skipping failed transfer %s", json.dumps(transaction))
         else:
-            intra_transaction_list: List[IntraTransaction] = []
-
             # This is a CCXT list must convert to string from float
             amount: RP2Decimal = RP2Decimal(str(transaction[_AMOUNT]))
 
