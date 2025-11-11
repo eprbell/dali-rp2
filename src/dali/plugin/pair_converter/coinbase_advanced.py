@@ -34,6 +34,8 @@ TIME_GRANULARITY: Dict[str, int] = {
     "ONE_DAY": 86400,
 }
 
+MISSING_STABLECOIN_PRODUCTS = ['USDC-USD']
+
 
 class PairConverterPlugin(AbstractPairConverterPlugin):
     def __init__(self, historical_price_type: str, api_key: Optional[str] = None, api_secret: Optional[str] = None) -> None:
@@ -65,6 +67,17 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
         start = utc_timestamp.replace(second=0)
         end = start
         retry_count: int = 0
+        
+        if f"{from_asset}-{to_asset}" in MISSING_STABLECOIN_PRODUCTS:
+            return HistoricalBar(
+                duration=timedelta(seconds=next(iter(TIME_GRANULARITY.values()))),
+                timestamp=start,
+                open=RP2Decimal(1),
+                high=RP2Decimal(1),
+                low=RP2Decimal(1),
+                close=RP2Decimal(1),
+                volume=RP2Decimal(0),
+            )
 
         while retry_count < len(TIME_GRANULARITY):
             try:
