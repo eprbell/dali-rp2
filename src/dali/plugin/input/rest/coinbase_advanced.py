@@ -25,15 +25,12 @@ import logging
 import os
 import pickle
 import time
-from multiprocessing.pool import ThreadPool
 from typing import Any, Dict, List, NamedTuple, Optional, cast
 
 import requests
 import requests.exceptions
 from requests import PreparedRequest
 from requests.auth import AuthBase
-from requests.models import Response
-from requests.sessions import Session
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -152,10 +149,10 @@ class _CoinbaseAuth(AuthBase):
         if not method or method.lower() != "get":
             raise NotImplementedError("non-get request methods have not been implemented.")
         return self.__client.get(endpoint, **params, data=data, timeout=timeout)
-    
+
     def _reauthenticate(self):
         self.__client = RESTClient(api_key=self.__api_key, api_secret=self.__api_secret)
-        
+
 
 class InputPlugin(AbstractInputPlugin):
     __API_URL: str = "https://api.coinbase.com"
@@ -184,7 +181,7 @@ class InputPlugin(AbstractInputPlugin):
         self.__logger: logging.Logger = create_logger(f"{self.__COINBASE}/{self.account_holder}")
         self.__logger.setLevel(logging.DEBUG)
         self.__cache_key: str = f"{self.__COINBASE.lower()}-{account_holder}"
-        self.__pickle_api_cache_enabled = pickle_api_cache_enabled != None and pickle_api_cache_enabled != "0" and pickle_api_cache_enabled.lower() != "false" 
+        self.__pickle_api_cache_enabled = pickle_api_cache_enabled is not None and pickle_api_cache_enabled != "0" and pickle_api_cache_enabled.lower() != "false" 
 
     def cache_key(self) -> Optional[str]:
         return self.__cache_key
@@ -207,7 +204,7 @@ class InputPlugin(AbstractInputPlugin):
             if self.__pickle_api_cache_enabled:
                 with open("accounts.pkl", "wb") as file:
                     pickle.dump(accounts, file)
-            
+        
         for account in accounts:
             process_account_result_list.append(self._process_account(account))
             time.sleep(1) # backoff due to Coinbase rejecting authorization if too quick
@@ -239,10 +236,10 @@ class InputPlugin(AbstractInputPlugin):
         )
 
         return result
-        
+
     def __transaction_details_or_default(self, transaction: Dict, sub_value: str):
         return transaction[_DETAILS][sub_value] if _DETAILS in transaction.keys() and sub_value in transaction[_DETAILS].keys() else ''
-    
+
     def __transaction_description_or_default(self, transaction: Dict):
         return transaction[_DESCRIPTION] if _DESCRIPTION in transaction.keys() else ''
 
@@ -576,7 +573,8 @@ class InputPlugin(AbstractInputPlugin):
             fiat_out_with_fee = str(abs(native_amount))
         # Parse for notes
         crypto_address: str = transaction[_TO][_ADDRESS] if _TO in transaction and _ADDRESS in transaction[_TO] else Keyword.UNKNOWN.value
-        network_name: str = transaction['network']['network_name'] if 'network' in transaction and 'network_name' in transaction['network'] else Keyword.UNKNOWN.value
+        network_name: str = transaction['network']['network_name'] \
+            if 'network' in transaction and 'network_name' in transaction['network'] else Keyword.UNKNOWN.value
         
         out_transaction_list.append(
             OutTransaction(
@@ -771,7 +769,7 @@ class InputPlugin(AbstractInputPlugin):
                             # a gift or other type: if so the user needs to explicitly recast it with a transaction hint
                             self._process_gain(transaction, currency, Keyword.INCOME, in_transaction_list, f"From: {transaction[_FROM][_EMAIL]}")
                             return
-                        elif (
+                        if (
                             self.__transaction_details_or_default(transaction, _SUBTITLE).startswith("From Coinbase")
                             or self.__transaction_details_or_default(transaction, _SUBTITLE).endswith("Coinbase Earn")
                             
@@ -920,16 +918,13 @@ class InputPlugin(AbstractInputPlugin):
         transaction: Any,
         raw_data: str,
         transaction_type: str,
-        native_currency: str,
         product_id: str,
         in_transaction_list: List[InTransaction],
         out_transaction_list: List[OutTransaction],
     ) -> None:
 
-        stable_fee = 0 # verify no fiat-stable fees with more data to reduce cost-basis calculations
         crypto_spot = RP2Decimal(transaction[transaction_type][_FILL_PRICE])
         crypto_fee_in_fiat = RP2Decimal(transaction[transaction_type][_COMMISSION])
-        crypto_fee_in_crypto = RP2Decimal(crypto_fee_in_fiat / crypto_spot) 
         non_fiat_currencies = product_id.split('-')
         if len(non_fiat_currencies) != 2:
             raise RP2RuntimeError(f"Internal error: expected two currencies in product id '{product_id}', found '{str(non_fiat_currencies)}'.")
@@ -940,7 +935,6 @@ class InputPlugin(AbstractInputPlugin):
         native_amount = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
         stable_amount = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         stable_spot = RP2Decimal(abs(native_amount / stable_amount))
-        crypto_amount = RP2Decimal(abs(native_amount / crypto_spot))
         
         in_transaction: InTransaction = None
         out_transaction: OutTransaction = None
@@ -1014,7 +1008,7 @@ class InputPlugin(AbstractInputPlugin):
 
             if currency in _STABLECOIN_INTERMEDIARIES and not \
                 (product_id.startswith(native_currency) or product_id.endswith(native_currency)): 
-                self._process_advanced_trade_stablecoin_multi_fill(transaction, raw_data, transaction_type, native_currency, product_id, in_transaction_list, out_transaction_list)
+                self._process_advanced_trade_stablecoin_multi_fill(transaction, raw_data, transaction_type, product_id, in_transaction_list, out_transaction_list)
                 return
 
             fiat_in_no_fee: Optional[str] = None
@@ -1045,7 +1039,7 @@ class InputPlugin(AbstractInputPlugin):
         elif native_amount < ZERO:
             if currency in _STABLECOIN_INTERMEDIARIES and not \
                 (product_id.startswith(native_currency) or product_id.endswith(native_currency)): 
-                self._process_advanced_trade_stablecoin_multi_fill(transaction, raw_data, transaction_type, native_currency, product_id, in_transaction_list, out_transaction_list)
+                self._process_advanced_trade_stablecoin_multi_fill(transaction, raw_data, transaction_type, product_id, in_transaction_list, out_transaction_list)
                 return
             
             fiat_fee = RP2Decimal(transaction[transaction_type][_COMMISSION])
@@ -1162,22 +1156,12 @@ class InputPlugin(AbstractInputPlugin):
         trn = self.__send_request_with_pagination(f"/v2/accounts/{account_id}/transactions")
         return trn
 
-    def __get_buys(self, account_id: str) -> Any:
-        buy = self.__send_request_with_pagination(f"/v2/accounts/{account_id}/transactions", params=dict(type="buy"))
-        return buy
-
-    def __get_sells(self, account_id: str) -> Any:
-        sell = self.__send_request_with_pagination(f"/v2/accounts/{account_id}/transactions", params=dict(type="sell"))
-        return sell
-
     def __send_request(self, method: str, endpoint: str, params: Any = None, data: Any = None) -> Any:  # pylint: disable=unused-private-member
-        full_url: str = f"{self.__api_url}{endpoint}"
-        
         NUM_RETRIES = 1
         current_num_retries = 0
         while current_num_retries <= NUM_RETRIES:
             try:
-                response: dict = self.__auth._request(method, endpoint, params=params, data=data, auth=self.__auth, timeout=self.__TIMEOUT)
+                response: dict = self.__auth._request(method, endpoint, params=params, data=data, timeout=self.__TIMEOUT)
                 return response
             except requests.exceptions.HTTPError as e:
                 self._validate_response(e, method, endpoint)
@@ -1220,7 +1204,7 @@ class InputPlugin(AbstractInputPlugin):
 
     def _validate_response(self, exception: requests.exceptions.HTTPError, method: str, endpoint: str) -> None:
         message: str = ""
-        self.__logger.info("Error %s", str(exception))
+        self.__logger.info("Error '%s'; method: '%s'; endpoint: '%s'", str(exception), method, endpoint)
         if exception.response.status_code == 401:
             return # allow reauthentication and retry
         raise exception
