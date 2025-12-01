@@ -18,6 +18,8 @@
 # Endpoint: https://api.coinbase.com
 # Coinbase Python Client: https://github.com/coinbase/coinbase-advanced-py
 
+# pylint: disable=too-many-lines
+
 import hashlib
 import hmac
 import json
@@ -155,8 +157,6 @@ class _CoinbaseAuth(AuthBase):
 
 
 class InputPlugin(AbstractInputPlugin):
-    __API_URL: str = "https://api.coinbase.com"
-
     # Coinbase returns very low precision fiat data (only 2 decimal digits): if the value is less than 1c Coinbase
     # rounds it to zero, which causes various computation problems (spot_price, etc.). As a workaround, when this
     # condition is detected the plugin sets affected fields to UNKNOWN or None (depending on their nature), so that
@@ -541,7 +541,6 @@ class InputPlugin(AbstractInputPlugin):
     def _process_stablecoin_send(self, transaction: Any, raw_data: str, currency: str, out_transaction_list: List[OutTransaction]) -> None:
         amount: RP2Decimal = RP2Decimal(transaction[_AMOUNT][_AMOUNT])
         native_amount: RP2Decimal = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT])
-        transaction_type: str = transaction[_TYPE]
         spot_price: RP2Decimal = RP2Decimal(native_amount / amount)
         
         # Parse transaction fees
@@ -564,13 +563,11 @@ class InputPlugin(AbstractInputPlugin):
         crypto_out_no_fee: str = None
         crypto_out_with_fee: str = None
         fiat_out_no_fee: str = None
-        fiat_out_with_fee: str = None
         if transaction_fee_crypto != transaction_fee_fallback:
             crypto_out_no_fee = str(RP2Decimal(abs(amount)) - RP2Decimal(transaction_fee_crypto))
             crypto_out_with_fee = str(abs(amount))
         if transaction_fee_fiat != transaction_fee_fallback:
             fiat_out_no_fee = str(RP2Decimal(abs(native_amount)) - RP2Decimal(transaction_fee_fiat))
-            fiat_out_with_fee = str(abs(native_amount))
         # Parse for notes
         crypto_address: str = transaction[_TO][_ADDRESS] if _TO in transaction and _ADDRESS in transaction[_TO] else Keyword.UNKNOWN.value
         network_name: str = transaction['network']['network_name'] \
@@ -608,7 +605,7 @@ class InputPlugin(AbstractInputPlugin):
         crypto_amount = RP2Decimal(transaction[_AMOUNT][_AMOUNT]) if _AMOUNT in transaction and _AMOUNT in transaction[_AMOUNT] else fallback_amount
         native_amount = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT]) if _NATIVE_AMOUNT in transaction and _AMOUNT in transaction[_NATIVE_AMOUNT] else fallback_amount
         spot_price = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT]) / RP2Decimal(transaction[_AMOUNT][_AMOUNT]) \
-            if type(crypto_amount) != type(fallback_amount) and type(native_amount) != type(fallback_amount) \
+            if not isinstance(crypto_amount, type(fallback_amount)) and not ininstance(native_amount, type(fallback_amount)) \
             else Keyword.UNKNOWN.value
         fiat_fee = RP2Decimal("0") # not provided by Coinbase, conservatively assume 0; use transaction hints otherwise
         self.__logger.debug("Asset delisting: %s", json.dumps(transaction))
@@ -835,7 +832,7 @@ class InputPlugin(AbstractInputPlugin):
                 if _UNIT_PRICE in buy:
                     spot_price = RP2Decimal(buy[_UNIT_PRICE][_AMOUNT])
                     spot_price_string = str(spot_price)
-                elif transaction[_AMOUNT][_CURRENCY] == 'USDC': #todo: determine regional stable coins
+                elif transaction[_AMOUNT][_CURRENCY] == 'USDC': #todo: determine regional stable coins # pylint: disable=fixme
                     spot_price = RP2Decimal(1)
                     spot_price_string = str(spot_price)
                 else:
@@ -923,8 +920,6 @@ class InputPlugin(AbstractInputPlugin):
         out_transaction_list: List[OutTransaction],
     ) -> None:
 
-        crypto_spot = RP2Decimal(transaction[transaction_type][_FILL_PRICE])
-        crypto_fee_in_fiat = RP2Decimal(transaction[transaction_type][_COMMISSION])
         non_fiat_currencies = product_id.split('-')
         if len(non_fiat_currencies) != 2:
             raise RP2RuntimeError(f"Internal error: expected two currencies in product id '{product_id}', found '{str(non_fiat_currencies)}'.")
@@ -1157,7 +1152,7 @@ class InputPlugin(AbstractInputPlugin):
         return trn
 
     def __send_request(self, method: str, endpoint: str, params: Any = None, data: Any = None) -> Any:  # pylint: disable=unused-private-member
-        NUM_RETRIES = 1
+        NUM_RETRIES = 1 # pylint: disable=C0103
         current_num_retries = 0
         while current_num_retries <= NUM_RETRIES:
             try:
@@ -1170,7 +1165,7 @@ class InputPlugin(AbstractInputPlugin):
                 if current_num_retries > NUM_RETRIES:
                     raise e
         # Defensive programming: we shouldn't reach here.
-        import sys
+        import sys # pylint: disable=C0415
         line_num = sys._getframe().f_lineno
         raise RP2RuntimeError(f"Programming error at line {line_num}")
 
@@ -1192,7 +1187,7 @@ class InputPlugin(AbstractInputPlugin):
                     self._validate_response(e, "get", endpoint)
                     self.__auth._reauthenticate()
                     current_num_retries += 1
-                    if current_num_retries > NUM_RETRIES:
+                    if current_num_retries > NUM_RETRIES: # pylint: disable=C0103
                         raise e
 
             if "pagination" not in response or "next_uri" not in response["pagination"] or not response["pagination"]["next_uri"]:
@@ -1203,7 +1198,6 @@ class InputPlugin(AbstractInputPlugin):
                 return
 
     def _validate_response(self, exception: requests.exceptions.HTTPError, method: str, endpoint: str) -> None:
-        message: str = ""
         self.__logger.info("Error '%s'; method: '%s'; endpoint: '%s'", str(exception), method, endpoint)
         if exception.response.status_code == 401:
             return # allow reauthentication and retry
