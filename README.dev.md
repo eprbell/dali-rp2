@@ -53,7 +53,7 @@ DaLI is released under the terms of Apache License Version 2.0. For more informa
 The latest DaLI source can be downloaded at: <https://github.com/eprbell/dali-rp2>.
 
 ## Setup
-DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.8.0 or greater. Virtualenv is recommended for DaLI development.
+DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.10.0 or greater. Virtualenv is recommended for DaLI development.
 
 ### Setup on Ubuntu Linux
 First make sure Python, pip and virtualenv are installed. If not, open a terminal window and enter the following commands:
@@ -84,7 +84,7 @@ virtualenv -p python3 .venv
 .venv/bin/pip3 install -e '.[dev]'
 ```
 ### Setup on Windows 10
-First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
+First make sure [Python](https://python.org) 3.10 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
 
 Then make sure [Microsoft Visual C++](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 14.0 or greater is installed (in the Visual Studio Installer window be sure to click on "Desktop development with C++"), which is needed for multidict.
 
@@ -103,7 +103,7 @@ python -m pip install -e ".[dev]"
 
 If `activate.ps1` cannot be loaded because running scripts is disabled on the system, run `activate.bat` instead or change the PowerShell execution policy `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`.
 ### Setup on Other Unix-like Systems
-* install python 3.8 or greater
+* install python 3.10 or greater
 * install pip3
 * install virtualenv
 
@@ -187,6 +187,7 @@ While every commit and push are automatically tested as described, sometimes it'
 * security check: `bandit -r src`
 * reformat code: `black src tests`
 * sort imports: `isort .`
+* update local pre-commit repos: `pre-commit autoupdate; pre-commit install`
 * run pre-commit tests without committing: `pre-commit run --all-files`
 
 Logs are stored in the `log` directory. To generate debug logs on Linux or Mac, prepend the command line with `LOG_LEVEL=DEBUG`, e.g.:
