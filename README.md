@@ -68,7 +68,7 @@ DaLI is released under the terms of Apache License Version 2.0. For more informa
 The latest version of DaLI can be downloaded at: <https://pypi.org/project/dali-rp2/>
 
 ## Installation
-DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.8.0 or greater.
+DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.10.0 or greater.
 
 ### Installation on Ubuntu Linux
 Open a terminal window and enter the following commands:
@@ -99,7 +99,7 @@ pip install dali-rp2
 ```
 
 ### Installation on Windows 10
-First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
+First make sure [Python](https://python.org) 3.10 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
 
 Then make sure [Microsoft Visual C++](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 14.0 or greater is installed (in the Visual Studio Installer window be sure to click on "Desktop development with C++"), which is needed for multidict.
 
@@ -110,7 +110,7 @@ pip install dali-rp2
 ```
 
 ### Installation on Other Unix-like Systems
-* install python 3.8 or greater
+* install python 3.10 or greater
 * install pip3
 
 Then install DaLI:
