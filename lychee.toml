@@ -1,5 +1,8 @@
 # Ignore these domains because they block CI/CD bots
 exclude = [
   "https://www.reddit.com/.*",
-  "https://www.cointracker.io/.*"
+  "https://www.cointracker.io/.*",
+  "https://dev.binance.vision/.*",
+  "https://support.kraken.com/.*",
+  "https://www.pionex.com/.*"
 ]
