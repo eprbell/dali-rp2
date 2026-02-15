@@ -118,7 +118,7 @@ class AbstractTransaction:
         self.__raw_data: str = self._validate_string_field(Keyword.RAW_DATA.value, raw_data, raw_data, disallow_empty=True, disallow_unknown=True)
         self.__timestamp: str
         self.__timestamp_value: datetime
-        (self.__timestamp, self.__timestamp_value) = self._validate_timestamp_field(Keyword.TIMESTAMP.value, timestamp, raw_data)
+        self.__timestamp, self.__timestamp_value = self._validate_timestamp_field(Keyword.TIMESTAMP.value, timestamp, raw_data)
         self.__asset: str = self._validate_string_field(Keyword.ASSET.value, asset, raw_data, disallow_empty=True, disallow_unknown=True)
         self.__notes: Optional[str] = self._validate_optional_string_field(Keyword.NOTES.value, notes, raw_data, disallow_empty=False, disallow_unknown=True)
         if is_spot_price_from_web and not isinstance(is_spot_price_from_web, bool):
