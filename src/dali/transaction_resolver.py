@@ -346,7 +346,7 @@ def _apply_transaction_hint(
     direction: str
     transaction_type: str
     notes: str
-    (direction, transaction_type, notes) = global_configuration[Keyword.TRANSACTION_HINTS.value][transaction.unique_id]
+    direction, transaction_type, notes = global_configuration[Keyword.TRANSACTION_HINTS.value][transaction.unique_id]
     transaction_type = transaction_type.capitalize()
     notes = f"{notes}; {transaction.notes if transaction.notes else ''}"
     if direction == Keyword.IN.value:

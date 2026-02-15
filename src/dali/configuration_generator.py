@@ -80,9 +80,9 @@ def generate_configuration_file(
         exchanges.remove(Keyword.UNKNOWN.value)
 
     ini_object["general"] = {
-        _ASSETS: ", ".join(assets),
-        _HOLDERS: ", ".join(holders),
-        _EXCHANGES: ", ".join(exchanges),
+        _ASSETS: ", ".join(sorted(assets)),
+        _HOLDERS: ", ".join(sorted(holders)),
+        _EXCHANGES: ", ".join(sorted(exchanges)),
     }
 
     for section_name in [Keyword.IN_HEADER, Keyword.OUT_HEADER, Keyword.INTRA_HEADER]:

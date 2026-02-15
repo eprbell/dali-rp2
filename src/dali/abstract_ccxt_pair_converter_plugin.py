@@ -626,12 +626,10 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
                     request_count += 1
                     if request_count > 9:
                         if exchange == _BINANCE:
-                            self._logger.info(
-                                """
+                            self._logger.info("""
                                 Binance server unavailable. Try a non-Binance locked exchange pair converter.
                                 Saving to cache and exiting.
-                                """
-                            )
+                                """)
                         else:
                             self._logger.info("Maximum number of retries reached. Saving to cache and exiting.")
                         self.save_historical_price_cache()

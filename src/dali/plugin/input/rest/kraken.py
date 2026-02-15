@@ -207,7 +207,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         if not self.base_id_to_base:
             self._initialize_markets()
 
-        (trade_history, ledger) = self._gather_api_data()
+        trade_history, ledger = self._gather_api_data()
         return self._compute_transaction_set(trade_history, ledger)
 
     def _compute_transaction_set(self, trade_history: Dict[str, Dict[str, str]], ledger: Dict[str, Dict[str, str]]) -> List[AbstractTransaction]:
