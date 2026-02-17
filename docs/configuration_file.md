@@ -643,12 +643,20 @@ Builtin sections are used as global configuration of DaLI's behavior.
 The transaction_hints section is optional and is used to force a transaction to be generated as in, out or intra. This is useful because DaLI doesn't know the user's intentions and in certain cases it needs hints from the user. For example an out transaction could be represented either as a partial intra transaction (as described above) or as a normal out transaction (perhaps a gift to another person): only the user knows the correct meaning of the transaction. In such cases a transaction_hint line can be used to clear the ambiguity.
 
 The format of this section is as follows:
-<pre>
+
+```
 [transaction_hints]
-<em>&lt;unique_id_1&gt;</em> = <em>&lt;direction&gt;</em>:<em>&lt;transaction_type&gt;</em>:<em>&lt;notes&gt;</em>
+<unique_id_1>_ = <direction>:<transaction_type>:<notes>
 ...
-<em>&lt;unique_id_n&gt;</em> = <em>&lt;direction&gt;</em>:<em>&lt;transaction_type&gt;</em>:<em>&lt;notes&gt;</em>
-</pre>
+_<unique_id_n>_ = _<direction>_:_<transaction_type>_:_<notes>_
+```
+
+For instance:
+
+```
+[transaction_hints]
+451364dc-e1a1-5eb7-bc11-ea9f485d0159 = in:airdrop:BCH fork airdrop
+```
 
 Where:
 * *`unique_id`* is the unique_id of the transaction that needs to be recast;
