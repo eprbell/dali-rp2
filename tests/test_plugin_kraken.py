@@ -28,7 +28,7 @@ from dali.plugin.input.rest.kraken import _BASE, _BASE_ID, _ID, _QUOTE, InputPlu
 
 
 @pytest.fixture(name="private_post_ledgers_return")
-def private_post_ledgers_return_fixture() -> Dict[str, Any]:  # type: ignore
+def private_post_ledgers_return_fixture() -> Dict[str, Any]:
     return {
         "error": [],
         "result": {
@@ -84,7 +84,7 @@ def private_post_ledgers_return_fixture() -> Dict[str, Any]:  # type: ignore
 
 
 @pytest.fixture(name="private_post_tradeshistory_return")
-def private_post_tradeshistory_return_fixture() -> Dict[str, Any]:  # type: ignore
+def private_post_tradeshistory_return_fixture() -> Dict[str, Any]:
     return {
         "error": [],
         "result": {

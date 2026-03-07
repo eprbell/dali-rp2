@@ -21,6 +21,7 @@ Privacy-focused, free, extensible data loader for RP2 (the crypto tax calculator
 [![Unix Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/unix_unit_tests.yml)
 [![Windows Unit Tests / Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/windows_unit_tests.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/windows_unit_tests.yml)
 [![CodeQL/Main Branch](https://github.com/eprbell/dali-rp2/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/eprbell/dali-rp2/actions/workflows/codeql-analysis.yml)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/eprbell/dali-rp2)
 <!-- markdown-link-check-disable -->
 [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social)](https://twitter.com/intent/tweet?text=I%20use%20RP2,%20the%20privacy-focused,%20open%20source,%20free,%20non-commercial%20crypto%20tax%20calculator&url=https://github.com/eprbell/rp2/?anything)
 <!-- markdown-link-check-enable -->
@@ -68,7 +69,7 @@ DaLI is released under the terms of Apache License Version 2.0. For more informa
 The latest version of DaLI can be downloaded at: <https://pypi.org/project/dali-rp2/>
 
 ## Installation
-DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.8.0 or greater.
+DaLI has been tested on Ubuntu Linux, macOS and Windows 10 but it should work on all systems that have Python version 3.10.0 or greater.
 
 ### Installation on Ubuntu Linux
 Open a terminal window and enter the following commands:
@@ -99,7 +100,7 @@ pip install dali-rp2
 ```
 
 ### Installation on Windows 10
-First make sure [Python](https://python.org) 3.8 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
+First make sure [Python](https://python.org) 3.10 or greater is installed (in the Python installer window be sure to click on "Add Python to PATH").
 
 Then make sure [Microsoft Visual C++](https://visualstudio.microsoft.com/visual-cpp-build-tools/) 14.0 or greater is installed (in the Visual Studio Installer window be sure to click on "Desktop development with C++"), which is needed for multidict.
 
@@ -110,7 +111,7 @@ pip install dali-rp2
 ```
 
 ### Installation on Other Unix-like Systems
-* install python 3.8 or greater
+* install python 3.10 or greater
 * install pip3
 
 Then install DaLI:
