@@ -176,7 +176,6 @@ class InputPlugin(AbstractInputPlugin):
         pickle_api_cache_enabled: Optional[str] = None
     ) -> None:
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
-        self.__api_url: str = InputPlugin.__API_URL
         self.__auth: _CoinbaseAuth = _CoinbaseAuth(api_key, api_secret)
         self.__logger: logging.Logger = create_logger(f"{self.__COINBASE}/{self.account_holder}")
         self.__logger.setLevel(logging.DEBUG)
@@ -605,7 +604,7 @@ class InputPlugin(AbstractInputPlugin):
         crypto_amount = RP2Decimal(transaction[_AMOUNT][_AMOUNT]) if _AMOUNT in transaction and _AMOUNT in transaction[_AMOUNT] else fallback_amount
         native_amount = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT]) if _NATIVE_AMOUNT in transaction and _AMOUNT in transaction[_NATIVE_AMOUNT] else fallback_amount
         spot_price = RP2Decimal(transaction[_NATIVE_AMOUNT][_AMOUNT]) / RP2Decimal(transaction[_AMOUNT][_AMOUNT]) \
-            if not isinstance(crypto_amount, type(fallback_amount)) and not ininstance(native_amount, type(fallback_amount)) \
+            if not isinstance(crypto_amount, type(fallback_amount)) and not isinstance(native_amount, type(fallback_amount)) \
             else Keyword.UNKNOWN.value
         fiat_fee = RP2Decimal("0") # not provided by Coinbase, conservatively assume 0; use transaction hints otherwise
         self.__logger.debug("Asset delisting: %s", json.dumps(transaction))
