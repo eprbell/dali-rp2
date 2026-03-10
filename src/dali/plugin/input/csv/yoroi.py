@@ -42,6 +42,7 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import Keyword
+from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
 
 _SENT: str = "Withdrawal"
@@ -60,6 +61,7 @@ class InputPlugin(AbstractInputPlugin):
     __BUY_CURRENCY_INDEX: int = 2
     __SELL_AMOUNT_INDEX: int = 3
     __SELL_CURRENCY_INDEX: int = 4
+    __COMMENT_INDEX: int = 9
 
     __DELIMITER = ","
 
@@ -118,7 +120,29 @@ class InputPlugin(AbstractInputPlugin):
                 if amount_number == ZERO and fee_number > ZERO:
                     self.__logger.warning("Possible dusting attack (fee > 0, total = 0), skipping transaction: %s", raw_data)
                     continue
-                if transaction_type in {_RECV, _SENT}:
+
+                # Check for staking rewards (Deposit with "Staking Reward" in comment)
+                comment: str = line[self.__COMMENT_INDEX] if len(line) > self.__COMMENT_INDEX and line[self.__COMMENT_INDEX] else ""
+                is_staking_reward: bool = transaction_type == _RECV and "Staking Reward" in comment
+
+                if is_staking_reward:
+                    # Create InTransaction for staking rewards
+                    result.append(
+                        InTransaction(
+                            plugin=self.__YOROI,
+                            unique_id=crypto_hash,
+                            raw_data=raw_data,
+                            timestamp=f"{timestamp_value}",
+                            asset=currency,
+                            exchange=self.__account_nickname,
+                            holder=self.account_holder,
+                            transaction_type=Keyword.STAKING.value,
+                            spot_price=spot_price,
+                            crypto_in=str(amount_number),
+                            notes=comment,
+                        )
+                    )
+                elif transaction_type in {_RECV, _SENT}:
                     result.append(
                         IntraTransaction(
                             plugin=self.__YOROI,
