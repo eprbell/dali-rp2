@@ -107,6 +107,7 @@ def _get_pair_conversion_rate(timestamp: datetime, from_asset: str, to_asset: st
     rate: Optional[RP2Decimal] = None
     pair_converter: Optional[AbstractPairConverterPlugin] = None
     for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
+        print(f"pair_converter: {pair_converter}")
         rate = cast(AbstractPairConverterPlugin, pair_converter).get_conversion_rate(timestamp, from_asset, to_asset, exchange)
         if rate:
             break

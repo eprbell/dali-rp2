@@ -1,4 +1,4 @@
-# Copyright 2022  Steve Davis
+# Copyright 2026 anlach
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,26 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# CSV Format:
-#   0: "Operation Date"  # For example, "2022-06-05T00:39:14.007Z"
-#   1: "Currency Ticker"
-#   2: "Operation Type"
-#   3: "Operation Amount"
-#   4: "Operation Fees"  # This value is often missing or incorrect for receive transactions
-#   5: "Operation Hash"
-#   6: "Account Name"
-#   7: "Account xpub"  # Public key
-#   8: "Countervalue Ticker"  # Fiat ticker
-#   9: "Countervalue at Operation Date"  # Total fiat value
-#  10: "Countervalue at CSV Export"
-#
-# Note: the Ledger Live software displays this warning message when exporting operation history:
-#       The countervalues in the export is provided for information
-#       purposes only. Do not rely on such data for accounting, tax,
-#       regulation or legal purposes, as they only represent an
-#       estimation of the price of the assets at the time of transactions
-#       and export, under the valuation methods provided by our
-#       service provider, Kaiko
+# This plugin parses the export from Yoroi wallet.
+# CSV Format: 
+# 0: "Type (Trade, IN or OUT)", 
+# 1: "Buy Amount",
+# 2: "Buy Cur.",
+# 3: "Sell Amount",
+# 4: "Sell Cur.",
+# 5: "Fee Amount (optional)",
+# 6: "Fee Cur. (optional)",
+# 7: "Exchange (optional)",
+# 8: "Trade Group (optional)",
+# 9: "Comment (optional)",
+# 10: "Date",
+# 11: "ID"
 
 
 import logging
@@ -39,7 +33,8 @@ from csv import reader
 from datetime import datetime
 from typing import List, Optional
 
-import dateutil
+import pytz
+from dateutil.parser import parse
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -49,37 +44,39 @@ from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import Keyword
 from dali.intra_transaction import IntraTransaction
 
-_SENT: str = "OUT"
-_RECV: str = "IN"
+_SENT: str = "Withdrawal"
+_RECV: str = "Deposit"
 
 
 class InputPlugin(AbstractInputPlugin):
-    __LEDGER: str = "Ledger"
+    __YOROI: str = "Yoroi"
 
-    __TIMESTAMP_INDEX: int = 0
-    __CURRENCY_INDEX: int = 2
-    __OPERATION_TYPE_INDEX: int = 3
-    __QUANTITY_INDEX: int = 4
+    __TYPE_INDEX: int = 0
+    __DATETIME_INDEX: int = 10
+    __TRANSACTION_ID_INDEX: int = 11
     __FEE_INDEX: int = 5
-    __TRANSACTION_ID_INDEX: int = 6
+    __FEE_CURRENCY_INDEX: int = 6
+    __BUY_AMOUNT_INDEX: int = 1
+    __BUY_CURRENCY_INDEX: int = 2
+    __SELL_AMOUNT_INDEX: int = 3
+    __SELL_CURRENCY_INDEX: int = 4
 
     __DELIMITER = ","
-
-    __CURRENCY_ALIAS_DICT = {
-        "FANTOM": "FTM",
-    }
 
     def __init__(
         self,
         account_holder: str,
         account_nickname: str,
         csv_file: str,
+        timezone: str,
         native_fiat: Optional[str] = None,
     ) -> None:
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__account_nickname: str = account_nickname
         self.__csv_file: str = csv_file
-        self.__logger: logging.Logger = create_logger(f"{self.__LEDGER}/{self.__account_nickname}/{self.account_holder}")
+        self.__timezone = pytz.timezone(timezone)
+
+        self.__logger: logging.Logger = create_logger(f"{self.__YOROI}/{self.__account_nickname}/{self.account_holder}")
 
     def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
@@ -94,25 +91,37 @@ class InputPlugin(AbstractInputPlugin):
                     header_found = True
                     self.__logger.debug("Header: %s", raw_data)
                     continue
-                timestamp: str = line[self.__TIMESTAMP_INDEX]
-                timestamp_value: datetime = dateutil.parser.isoparse(timestamp)  # For example, "2022-06-05T00:39:14.007Z"
                 self.__logger.debug("Transaction: %s", raw_data)
-                currency: str = line[self.__CURRENCY_INDEX]
-                currency = self.__CURRENCY_ALIAS_DICT.get(currency, currency)
-                transaction_type: str = line[self.__OPERATION_TYPE_INDEX]
-                spot_price: str = Keyword.UNKNOWN.value
-                crypto_hash: str = line[self.__TRANSACTION_ID_INDEX]
-                fee_str: str = line[self.__FEE_INDEX]
-                fee_number: RP2Decimal = RP2Decimal(fee_str) if fee_str else ZERO  # Fee is sometimes missing
-                quantity_number: RP2Decimal = RP2Decimal(line[self.__QUANTITY_INDEX])
 
-                if quantity_number == ZERO and fee_number > ZERO:
-                    self.__logger.warning("Possible dusting attack (fee > 0, total amount = 0): %s", raw_data)
+                timestamp_value: datetime = parse(line[self.__DATETIME_INDEX])
+                timestamp_value = self.__timezone.normalize(self.__timezone.localize(timestamp_value))
+
+                transaction_type: str = line[self.__TYPE_INDEX]
+                spot_price: str = Keyword.UNKNOWN.value
+                crypto_hash: str = line[self.__TRANSACTION_ID_INDEX] if line[self.__TRANSACTION_ID_INDEX] else Keyword.UNKNOWN.value
+                currency: str = None
+                if transaction_type == _RECV:
+                    currency = line[self.__BUY_CURRENCY_INDEX]
+                    amount_number = RP2Decimal(line[self.__BUY_AMOUNT_INDEX])
+                elif transaction_type == _SENT:
+                    currency = line[self.__SELL_CURRENCY_INDEX]
+                    amount_number = RP2Decimal(line[self.__SELL_AMOUNT_INDEX])
+                else:
+                    self.__logger.error("Unsupported transaction type (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
                     continue
-                if transaction_type in {_SENT, _RECV}:  # Need example data for sent transactions, untested as of 7/9/2022
+                fee_currency: str = line[self.__FEE_CURRENCY_INDEX] if line[self.__FEE_CURRENCY_INDEX] else None
+                if fee_currency and fee_currency == currency and line[self.__FEE_INDEX]:
+                    fee_number: RP2Decimal = RP2Decimal(line[self.__FEE_INDEX])
+                else:
+                    fee_number = ZERO
+
+                if amount_number == ZERO and fee_number > ZERO:
+                    self.__logger.warning("Possible dusting attack (fee > 0, total = 0), skipping transaction: %s", raw_data)
+                    continue
+                if transaction_type in {_RECV, _SENT}:
                     result.append(
                         IntraTransaction(
-                            plugin=self.__LEDGER,
+                            plugin=self.__YOROI,
                             unique_id=crypto_hash,
                             raw_data=raw_data,
                             timestamp=f"{timestamp_value}",
@@ -122,8 +131,8 @@ class InputPlugin(AbstractInputPlugin):
                             to_exchange=self.__account_nickname if transaction_type == _RECV else Keyword.UNKNOWN.value,
                             to_holder=self.account_holder if transaction_type == _RECV else Keyword.UNKNOWN.value,
                             spot_price=spot_price,
-                            crypto_sent=str(quantity_number + fee_number) if transaction_type == _SENT else Keyword.UNKNOWN.value,
-                            crypto_received=str(quantity_number) if transaction_type == _RECV else Keyword.UNKNOWN.value,
+                            crypto_sent=str(amount_number + fee_number) if transaction_type == _SENT else Keyword.UNKNOWN.value,
+                            crypto_received=str(amount_number) if transaction_type == _RECV else Keyword.UNKNOWN.value,
                             notes=None,
                         )
                     )

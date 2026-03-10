@@ -83,11 +83,11 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             try:
                 granularity = list(TIME_GRANULARITY.keys())[retry_count]
                 if self._authorized:
-                    candle = self.client.get_candles(f"{from_asset}-{to_asset}", str(start.timestamp()), str(end.timestamp()), granularity).to_dict()[
+                    candle = self.client.get_candles(f"{from_asset}-{to_asset}", int(start.timestamp()), int(end.timestamp()), granularity).to_dict()[
                         "candles"
                     ][0]
                 else:
-                    candle = self.client.get_public_candles(f"{from_asset}-{to_asset}", str(start.timestamp()), str(end.timestamp()), granularity).to_dict()[
+                    candle = self.client.get_public_candles(f"{from_asset}-{to_asset}", int(start.timestamp()), int(end.timestamp()), granularity).to_dict()[
                         "candles"
                     ][0]
                 candle_start = datetime.fromtimestamp(int(candle["start"]), timezone.utc)
@@ -100,6 +100,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     close=RP2Decimal(candle["close"]),
                     volume=RP2Decimal(candle["volume"]),
                 )
+                return result
             except ValueError:
                 retry_count += 1
 
