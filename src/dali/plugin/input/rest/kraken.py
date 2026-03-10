@@ -66,6 +66,10 @@ _SALE: str = "sale"
 _SETTLED: str = "settled"
 _STAKING: str = "staking"
 _EARN: str = "earn"
+_REWARD: str = "reward"
+_RECEIVE: str = "receive"
+_SPEND: str = "spend"
+_CONVERSION: str = "conversion"
 _TIMESTAMP: str = "time"
 _TRADE: str = "trade"
 _TRADES: str = "trades"
@@ -434,6 +438,93 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         crypto_in=crypto_in,
                         crypto_fee=crypto_fee,
                         fiat_fee=fiat_fee,
+                        notes=ledger_id,
+                    )
+                )
+            elif record[_TYPE] == _REWARD:
+                # Staking/rewards - similar to earn
+                spot_price = Keyword.UNKNOWN.value
+                crypto_in = str(amount)
+
+                result.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset_base,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.STAKING.value,
+                        spot_price=spot_price,
+                        crypto_in=crypto_in,
+                        crypto_fee=crypto_fee,
+                        fiat_fee=fiat_fee,
+                        notes=ledger_id,
+                    )
+                )
+            elif record[_TYPE] == _RECEIVE:
+                # Crypto received - InTransaction (receiving crypto)
+                spot_price = Keyword.UNKNOWN.value
+
+                result.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset_base,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.BUY.value,
+                        spot_price=spot_price,
+                        crypto_in=str(amount),
+                        crypto_fee=crypto_fee,
+                        fiat_fee=fiat_fee,
+                        notes=ledger_id,
+                    )
+                )
+            elif record[_TYPE] == _SPEND:
+                # Crypto spent - OutTransaction
+                spot_price = Keyword.UNKNOWN.value
+
+                result.append(
+                    OutTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset_base,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.SELL.value,
+                        spot_price=spot_price,
+                        crypto_out_no_fee=str(amount),
+                        crypto_fee=crypto_fee,
+                        crypto_out_with_fee=str(amount + RP2Decimal(record[_FEE])) if record[_FEE] else str(amount),
+                        fiat_out_no_fee=Keyword.UNKNOWN.value,
+                        fiat_fee=fiat_fee,
+                        notes=ledger_id,
+                    )
+                )
+            elif record[_TYPE] == _CONVERSION:
+                # Asset conversion - e.g., fiat to stablecoin (USD to USDC)
+                # This is acquiring the new asset, so InTransaction
+                spot_price = Keyword.UNKNOWN.value
+
+                result.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset_base,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.BUY.value,
+                        spot_price=spot_price,
+                        crypto_in=str(amount),
+                        crypto_fee=crypto_fee,
                         notes=ledger_id,
                     )
                 )
