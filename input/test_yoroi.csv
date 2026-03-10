@@ -1,0 +1,15 @@
+"Type (Trade, IN or OUT)",Buy Amount,Buy Cur.,Sell Amount,Sell Cur.,Fee Amount (optional),Fee Cur. (optional),Exchange (optional),Trade Group (optional),Comment (optional),Date,ID
+Deposit,0.856478,ADA,,,,,,,Staking Reward Epoch 616,2026-02-28 13:44:51,aaaa0000-bbbb-1111-cccc-222233334444
+Deposit,0.847159,ADA,,,,,,,Staking Reward Epoch 615,2026-02-23 13:44:51,aaaa0001-bbbb-1111-cccc-222233334445
+Deposit,0.904925,ADA,,,,,,,Staking Reward Epoch 614,2026-02-18 13:44:51,aaaa0002-bbbb-1111-cccc-222233334446
+Deposit,0.918631,ADA,,,,,,,Staking Reward Epoch 613,2026-02-13 13:44:51,aaaa0003-bbbb-1111-cccc-222233334447
+Withdrawal,,,12.7,ADA,0.185169,ADA,,,,2025-10-12 12:24:35,aaaa0004-bbbb-1111-cccc-222233334448
+Deposit,2,ADA,,,,,,,,2025-10-12 12:24:35,aaaa0005-bbbb-1111-cccc-222233334449
+Deposit,23.220286,ADA,,,,,,,,2025-10-12 12:20:35,aaaa0006-bbbb-1111-cccc-22223333444a
+Withdrawal,,,1.9068,ADA,0.368377,ADA,,,,2025-10-12 12:20:19,aaaa0007-bbbb-1111-cccc-22223333444b
+Deposit,576.169246,ADA,,,,,,,,2025-10-12 12:11:19,aaaa0008-bbbb-1111-cccc-22223333444c
+Withdrawal,,,2.7,ADA,0.189965,ADA,,,,2025-10-12 12:11:03,aaaa0009-bbbb-1111-cccc-22223333444d
+Deposit,4.699782,ADA,,,,,,,,2025-10-12 12:05:23,aaaa000a-bbbb-1111-cccc-22223333444e
+Withdrawal,,,-0.23096,ADA,0.308658,ADA,,,,2025-10-12 12:04:51,aaaa000b-bbbb-1111-cccc-22223333444f
+Deposit,0.620602,ADA,,,,,,,Staking Reward Epoch 588,2025-10-11 14:44:51,aaaa000c-bbbb-1111-cccc-222233334450
+Deposit,0.827951,ADA,,,,,,,Staking Reward Epoch 587,2025-10-06 14:44:51,aaaa000d-bbbb-1111-cccc-222233334451
