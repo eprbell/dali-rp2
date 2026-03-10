@@ -43,7 +43,9 @@ from rp2.rp2_decimal import ZERO, RP2Decimal
 from dali.abstract_input_plugin import AbstractInputPlugin
 from dali.abstract_transaction import AbstractTransaction
 from dali.configuration import Keyword
+from dali.in_transaction import InTransaction
 from dali.intra_transaction import IntraTransaction
+from dali.out_transaction import OutTransaction
 
 
 class InputPlugin(AbstractInputPlugin):
@@ -132,6 +134,9 @@ class InputPlugin(AbstractInputPlugin):
                     self.__logger.warning("Failed to parse timestamp '%s': %s", timestamp_str, e)
                     continue
 
+                # Use transaction hash as unique_id if present, otherwise use transaction ID
+                tx_unique_id = transaction_hash if transaction_hash else unique_id
+
                 # Handle different transaction types
                 if transaction_type == self.__RECEIVE:
                     # Receive: crypto comes into wallet (no USD involved)
@@ -147,7 +152,7 @@ class InputPlugin(AbstractInputPlugin):
                     result.append(
                         IntraTransaction(
                             plugin=self.__STRIKE,
-                            unique_id=unique_id or transaction_hash or Keyword.UNKNOWN.value,
+                            unique_id=tx_unique_id or Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{timestamp_value}",
                             asset=self.__CURRENCY,
@@ -182,7 +187,7 @@ class InputPlugin(AbstractInputPlugin):
                     result.append(
                         IntraTransaction(
                             plugin=self.__STRIKE,
-                            unique_id=unique_id or transaction_hash or Keyword.UNKNOWN.value,
+                            unique_id=tx_unique_id or Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{timestamp_value}",
                             asset=self.__CURRENCY,
@@ -199,6 +204,7 @@ class InputPlugin(AbstractInputPlugin):
 
                 elif transaction_type == self.__PURCHASE:
                     # Purchase: fiat out (negative USD), crypto in (positive BTC)
+                    # This is a crypto BUY - create InTransaction for BTC, OutTransaction for USD
                     if not amount_usd or not amount_btc:
                         self.__logger.warning("Purchase transaction missing USD or BTC amount, skipping: %s", raw_data)
                         continue
@@ -208,21 +214,26 @@ class InputPlugin(AbstractInputPlugin):
                         self.__logger.warning("Purchase transaction has non-positive BTC amount: %s", amount_btc)
                         continue
 
-                    # For purchase, USD is negative (fiat spent), BTC is positive (crypto received)
+                    usd_amount = RP2Decimal(amount_usd)
+                    fee_usd_amount = RP2Decimal(fee_usd) if fee_usd else ZERO
+
+                    # Use transaction hash as unique_id if present, otherwise use transaction ID
+                    tx_unique_id = transaction_hash if transaction_hash else unique_id
+
+                    # Create InTransaction for the crypto received (BTC)
                     result.append(
-                        IntraTransaction(
+                        InTransaction(
                             plugin=self.__STRIKE,
-                            unique_id=unique_id or transaction_hash or Keyword.UNKNOWN.value,
+                            unique_id=tx_unique_id or Keyword.UNKNOWN.value,
                             raw_data=raw_data,
                             timestamp=f"{timestamp_value}",
                             asset=self.__CURRENCY,
-                            from_exchange=Keyword.UNKNOWN.value,
-                            from_holder=Keyword.UNKNOWN.value,
-                            to_exchange=self.__account_nickname,
-                            to_holder=self.account_holder,
+                            exchange=self.__STRIKE,
+                            holder=self.account_holder,
+                            transaction_type=Keyword.BUY.value,
                             spot_price=exchange_rate if exchange_rate else Keyword.UNKNOWN.value,
-                            crypto_sent=Keyword.UNKNOWN.value,
-                            crypto_received=str(btc_amount),
+                            crypto_in=str(btc_amount),
+                            crypto_fee=fee_btc if fee_btc else None,
                             notes=description if description else None,
                         )
                     )
