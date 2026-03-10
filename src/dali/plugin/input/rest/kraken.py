@@ -65,6 +65,7 @@ _ROLLOVER: str = "rollover"
 _SALE: str = "sale"
 _SETTLED: str = "settled"
 _STAKING: str = "staking"
+_EARN: str = "earn"
 _TIMESTAMP: str = "time"
 _TRADE: str = "trade"
 _TRADES: str = "trades"
@@ -78,6 +79,11 @@ _TRADE_RECORD_LIMIT: int = 50
 _KRAKEN_FIAT_SET: Set[str] = {"AUD", "CAD", "EUR", "GBP", "JPY", "USD", "ZAUD", "ZCAD", "ZEUR", "ZGBP", "ZJPY", "ZUSD"}
 
 _KRAKEN_FIAT_LIST = list(set(list(_KRAKEN_FIAT_SET) + list(_FIAT_SET)))
+
+# Kraken yield-bearing asset suffixes
+# .B = balances in new yield-bearing products
+# .F = balances earning automatically in Kraken Rewards (formerly .S staking)
+# See: https://docs.kraken.com/rest/
 
 
 class InputPlugin(AbstractCcxtInputPlugin):
@@ -159,6 +165,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
             raise RP2RuntimeError("Exchange is not instance of class kraken.")
         return super_client
 
+    def _get_base_from_asset(self, asset: str) -> str:
+        # Handle Kraken yield-bearing assets (.B, .F suffixes)
+        # These are read-only assets - to interact with them, use the base asset
+        # e.g., USDT.B -> USDT, SUI.F -> SUI
+        if asset.endswith(".B") or asset.endswith(".F"):
+            base_asset = asset[:-2]
+            self.__logger.debug("Stripping yield-bearing suffix from asset %s -> %s", asset, base_asset)
+            return self.base_id_to_base.get(base_asset, base_asset)
+        return self.base_id_to_base.get(asset, asset)
+
     def _get_process_deposits_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
         pass
 
@@ -223,7 +239,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
             is_fiat_asset: bool = record[_ASSET] in _KRAKEN_FIAT_LIST
 
             amount: RP2Decimal = RP2Decimal(abs(RP2Decimal(record[_AMOUNT])))
-            asset_base: str = self.base_id_to_base[record[_ASSET]]
+            asset_base: str = self._get_base_from_asset(record[_ASSET])
             raw_data = str(record)
 
             if record[_TYPE] in {_WITHDRAWAL, _DEPOSIT}:
@@ -376,6 +392,51 @@ class InputPlugin(AbstractCcxtInputPlugin):
             elif record[_TYPE] == _SETTLED:
                 # ignorable in terms of in/out/intra
                 pass
+            elif record[_TYPE] == _EARN:
+                # Earn/ staking rewards - create InTransaction for rewards received
+                spot_price = Keyword.UNKNOWN.value
+                crypto_in = str(amount)
+
+                result.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset_base,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.STAKING.value,
+                        spot_price=spot_price,
+                        crypto_in=crypto_in,
+                        crypto_fee=crypto_fee,
+                        fiat_fee=fiat_fee,
+                        notes=ledger_id,
+                    )
+                )
+            elif record[_TYPE] == _STAKING:
+                # Legacy staking rewards (deprecated March 2024, but may exist in older data)
+                # Handle similarly to Earn
+                spot_price = Keyword.UNKNOWN.value
+                crypto_in = str(amount)
+
+                result.append(
+                    InTransaction(
+                        plugin=self.__PLUGIN_NAME,
+                        unique_id=Keyword.UNKNOWN.value,
+                        raw_data=raw_data,
+                        timestamp=timestamp_value,
+                        asset=asset_base,
+                        exchange=self.__EXCHANGE_NAME,
+                        holder=self.account_holder,
+                        transaction_type=Keyword.STAKING.value,
+                        spot_price=spot_price,
+                        crypto_in=crypto_in,
+                        crypto_fee=crypto_fee,
+                        fiat_fee=fiat_fee,
+                        notes=ledger_id,
+                    )
+                )
             else:
                 self.__logger.error(f"Unsupported transaction type: {record[_TYPE]} (skipping): %s. Please open an issue at %s", raw_data, self.ISSUES_URL)
                 unhandled_types.update({record[_TYPE]: ledger_id})
