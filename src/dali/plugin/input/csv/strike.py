@@ -25,6 +25,9 @@
 # 8: Description
 # 9: Exchange Rate
 # 10: Transaction Hash (crypto transaction hash)
+#
+# The plugin accepts a comma-separated list of CSV files (strike_csv_files parameter)
+# or a single CSV file (csv_file parameter for backward compatibility).
 
 
 import logging
@@ -33,7 +36,6 @@ from datetime import datetime
 from typing import List, Optional
 
 import pytz
-from dateutil.parser import parse
 from rp2.abstract_country import AbstractCountry
 from rp2.logger import create_logger
 from rp2.rp2_decimal import ZERO, RP2Decimal
@@ -73,13 +75,14 @@ class InputPlugin(AbstractInputPlugin):
         self,
         account_holder: str,
         account_nickname: str,
-        csv_file: str,
+        strike_csv_files: str,
         timezone: str,
         native_fiat: Optional[str] = None,
     ) -> None:
         super().__init__(account_holder=account_holder, native_fiat=native_fiat)
         self.__account_nickname: str = account_nickname
-        self.__csv_file: str = csv_file
+        # Accept comma-separated list of CSV files
+        self.__csv_files: List[str] = [f.strip() for f in strike_csv_files.split(",") if f.strip()]
         self.__timezone = pytz.timezone(timezone)
 
         self.__logger: logging.Logger = create_logger(f"{self.__STRIKE}/{self.__account_nickname}/{self.account_holder}")
@@ -87,8 +90,18 @@ class InputPlugin(AbstractInputPlugin):
     def load(self, country: AbstractCountry) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
 
-        with open(self.__csv_file, encoding="utf-8") as csv_file:
-            lines = reader(csv_file, delimiter=self.__DELIMITER)
+        for csv_file in self.__csv_files:
+            self.__logger.debug("Loading CSV file: %s", csv_file)
+            result.extend(self.parse_csv_file(csv_file))
+
+        self.__logger.debug("Total transactions loaded: %d", len(result))
+        return result
+
+    def parse_csv_file(self, file_path: str) -> List[AbstractTransaction]:
+        result: List[AbstractTransaction] = []
+
+        with open(file_path, encoding="utf-8") as csv_file_handle:
+            lines = reader(csv_file_handle, delimiter=self.__DELIMITER)
             header_found: bool = False
             for line in lines:
                 raw_data: str = self.__DELIMITER.join(line)
