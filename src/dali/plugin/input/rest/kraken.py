@@ -486,7 +486,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 )
             elif record[_TYPE] == _SPEND:
                 # Crypto spent - OutTransaction
+                # If spending fiat (e.g., fiat withdrawal), set fiat_out_no_fee to the amount
                 spot_price = Keyword.UNKNOWN.value
+
+                if is_fiat_asset:
+                    fiat_out_no_fee: str = str(amount)
+                else:
+                    fiat_out_no_fee = Keyword.UNKNOWN.value
 
                 result.append(
                     OutTransaction(
@@ -502,7 +508,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         crypto_out_no_fee=str(amount),
                         crypto_fee=crypto_fee,
                         crypto_out_with_fee=str(amount + RP2Decimal(record[_FEE])) if record[_FEE] else str(amount),
-                        fiat_out_no_fee=Keyword.UNKNOWN.value,
+                        fiat_out_no_fee=fiat_out_no_fee,
                         fiat_fee=fiat_fee,
                         notes=ledger_id,
                     )
