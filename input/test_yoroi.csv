@@ -1,15 +1,13 @@
-"Type (Trade, IN or OUT)",Buy Amount,Buy Cur.,Sell Amount,Sell Cur.,Fee Amount (optional),Fee Cur. (optional),Exchange (optional),Trade Group (optional),Comment (optional),Date,ID
-Deposit,0.856478,ADA,,,,,,,Staking Reward Epoch 616,2026-02-28 13:44:51,aaaa0000-bbbb-1111-cccc-222233334444
-Deposit,0.847159,ADA,,,,,,,Staking Reward Epoch 615,2026-02-23 13:44:51,aaaa0001-bbbb-1111-cccc-222233334445
-Deposit,0.904925,ADA,,,,,,,Staking Reward Epoch 614,2026-02-18 13:44:51,aaaa0002-bbbb-1111-cccc-222233334446
-Deposit,0.918631,ADA,,,,,,,Staking Reward Epoch 613,2026-02-13 13:44:51,aaaa0003-bbbb-1111-cccc-222233334447
-Withdrawal,,,12.7,ADA,0.185169,ADA,,,,2025-10-12 12:24:35,aaaa0004-bbbb-1111-cccc-222233334448
-Deposit,2,ADA,,,,,,,,2025-10-12 12:24:35,aaaa0005-bbbb-1111-cccc-222233334449
-Deposit,23.220286,ADA,,,,,,,,2025-10-12 12:20:35,aaaa0006-bbbb-1111-cccc-22223333444a
-Withdrawal,,,1.9068,ADA,0.368377,ADA,,,,2025-10-12 12:20:19,aaaa0007-bbbb-1111-cccc-22223333444b
-Deposit,576.169246,ADA,,,,,,,,2025-10-12 12:11:19,aaaa0008-bbbb-1111-cccc-22223333444c
-Withdrawal,,,2.7,ADA,0.189965,ADA,,,,2025-10-12 12:11:03,aaaa0009-bbbb-1111-cccc-22223333444d
-Deposit,4.699782,ADA,,,,,,,,2025-10-12 12:05:23,aaaa000a-bbbb-1111-cccc-22223333444e
-Withdrawal,,,-0.23096,ADA,0.308658,ADA,,,,2025-10-12 12:04:51,aaaa000b-bbbb-1111-cccc-22223333444f
-Deposit,0.620602,ADA,,,,,,,Staking Reward Epoch 588,2025-10-11 14:44:51,aaaa000c-bbbb-1111-cccc-222233334450
-Deposit,0.827951,ADA,,,,,,,Staking Reward Epoch 587,2025-10-06 14:44:51,aaaa000d-bbbb-1111-cccc-222233334451
+"Type (Trade, IN or OUT)","Buy Amount","Buy Cur.","Sell Amount","Sell Cur.","Fee Amount (optional)","Fee Cur. (optional)","Exchange (optional)","Trade Group (optional)","Comment (optional)","Date","ID"
+"Deposit","0.5","ADA","","","","","","","Staking Reward Epoch 100","2025-06-01 12:00:00",""
+"Deposit","0.6","ADA","","","","","","","Staking Reward Epoch 101","2025-06-06 12:00:00",""
+"Deposit","0.7","ADA","","","","","","","Staking Reward Epoch 102","2025-06-11 12:00:00",""
+"Withdrawal","","","10.0","ADA","0.2","ADA","","","","2025-06-15 10:00:00","aaaa0000bbbb1111cccc2222dddd3333eeee4444"
+"Deposit","12.7","ADA","","","0.2","ADA","","","","2025-06-15 10:00:00","aaaa1111bbbb2222cccc3333dddd4444eeee5555"
+"Withdrawal","","","220.0","ADA","0.3","ADA","","","","2025-06-20 10:00:00","bbbb1111cccc2222dddd3333eeee4444ffff5555"
+"Deposit","222.7","ADA","","","0.3","ADA","","","","2025-06-20 10:00:00","bbbb2222cccc3333dddd4444eeee5555ffff6666"
+"Withdrawal","","","800.0","ADA","0.2","ADA","","","","2025-06-25 10:00:00","cccc3333dddd4444eeee5555ffff6666gggg7777"
+"Deposit","802.7","ADA","","","0.2","ADA","","","","2025-06-25 10:00:00","cccc4444dddd5555eeee6666ffff7777gggg8888"
+"Deposit","100.0","ADA","","","","","","","","2025-07-01 12:00:00","dddd5555eeee6666ffff7777gggg8888hhhh9999"
+"Withdrawal","","","50.0","ADA","0.18","ADA","","","","2025-07-05 10:00:00","eeee6666ffff7777gggg8888hhhh9999iiii0000"
+"Deposit","52.0","ADA","","","0.18","ADA","","","","2025-07-05 10:00:00","eeee7777ffff8888gggg9999hhhh0000iiii1111"

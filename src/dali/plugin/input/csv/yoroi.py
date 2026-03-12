@@ -52,7 +52,6 @@ from dali.out_transaction import OutTransaction
 
 _SENT: str = "Withdrawal"
 _RECV: str = "Deposit"
-_DELEGATE: str = "Delegation"
 
 # Minswap order types
 _ORDER_TYPE_MARKET: str = "Market"
@@ -569,9 +568,6 @@ class InputPlugin(AbstractInputPlugin):
             elif transaction_type == _SENT:
                 currency = line["sell_currency"]
                 amount_number = RP2Decimal(line["sell_amount"]) if line["sell_amount"] else ZERO
-            elif transaction_type == _DELEGATE:
-                currency = line["buy_currency"] if line["buy_currency"] else line["sell_currency"]
-                amount_number = RP2Decimal(line["buy_amount"]) if line["buy_amount"] else RP2Decimal(line["sell_amount"])
             else:
                 self.__logger.error("Unsupported transaction type: %s", transaction_type)
                 continue
@@ -606,7 +602,7 @@ class InputPlugin(AbstractInputPlugin):
                         notes=comment,
                     )
                 )
-            elif transaction_type in {_RECV, _SENT, _DELEGATE}:
+            elif transaction_type in {_RECV, _SENT}:
                 result.append(
                     IntraTransaction(
                         plugin=self.__YOROI,
@@ -614,13 +610,13 @@ class InputPlugin(AbstractInputPlugin):
                         raw_data=raw_data,
                         timestamp=f"{timestamp_value}",
                         asset=currency,
-                        from_exchange=self.__account_nickname if transaction_type in {_SENT, _DELEGATE} else Keyword.UNKNOWN.value,
-                        from_holder=self.account_holder if transaction_type in {_SENT, _DELEGATE} else Keyword.UNKNOWN.value,
-                        to_exchange=self.__account_nickname if transaction_type in {_RECV, _DELEGATE} else Keyword.UNKNOWN.value,
-                        to_holder=self.account_holder if transaction_type in {_RECV, _DELEGATE} else Keyword.UNKNOWN.value,
+                        from_exchange=self.__account_nickname if transaction_type == _SENT else Keyword.UNKNOWN.value,
+                        from_holder=self.account_holder if transaction_type == _SENT else Keyword.UNKNOWN.value,
+                        to_exchange=self.__account_nickname if transaction_type == _RECV else Keyword.UNKNOWN.value,
+                        to_holder=self.account_holder if transaction_type == _RECV else Keyword.UNKNOWN.value,
                         spot_price=spot_price,
-                        crypto_sent=str(amount_number + fee_number) if transaction_type in {_SENT, _DELEGATE} else Keyword.UNKNOWN.value,
-                        crypto_received=str(amount_number) if transaction_type in {_RECV, _DELEGATE} else Keyword.UNKNOWN.value,
+                        crypto_sent=str(amount_number + fee_number) if transaction_type == _SENT else Keyword.UNKNOWN.value,
+                        crypto_received=str(amount_number) if transaction_type == _RECV else Keyword.UNKNOWN.value,
                         notes=None,
                     )
                 )
