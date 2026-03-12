@@ -452,8 +452,8 @@ def _get_operation_notes(order_type: str, paid: ParsedField, receive: ParsedFiel
 
 
 class InputPlugin(AbstractInputPlugin):
-    __YOROI: str = "Yoroi+Minswap"
-    __MINSWAP: str = "Minswap"
+    __YOROI: str = "Yoroi"
+    __MINSWAP_PLUGIN: str = "Yoroi+Minswap"
 
     __TYPE_INDEX: int = 0
     __DATETIME_INDEX: int = 10
@@ -640,19 +640,19 @@ class InputPlugin(AbstractInputPlugin):
             if minswap_tx["order_type"] == _ORDER_TYPE_DEPOSIT:
                 # Find matching Yoroi withdrawal
                 yoroi_withdrawal = _get_yoroi_tx_by_hash(yoroi_data, minswap_tx["created_tx"])
-                _create_lp_deposit_transactions(minswap_tx, yoroi_withdrawal, self.__account_nickname, self.account_holder, self.__YOROI, result)
+                _create_lp_deposit_transactions(minswap_tx, yoroi_withdrawal, self.__account_nickname, self.account_holder, self.__MINSWAP_PLUGIN, result)
 
         # Second pass: Swaps (Market, Limit)
         for minswap_tx in minswap_txs:
             if minswap_tx["order_type"] in [_ORDER_TYPE_MARKET, _ORDER_TYPE_LIMIT]:
                 yoroi_withdrawal = _get_yoroi_tx_by_hash(yoroi_data, minswap_tx["created_tx"])
-                _create_swap_transactions(minswap_tx, yoroi_withdrawal, self.__account_nickname, self.account_holder, self.__YOROI, result)
+                _create_swap_transactions(minswap_tx, yoroi_withdrawal, self.__account_nickname, self.account_holder, self.__MINSWAP_PLUGIN, result)
 
         # Third pass: LP Removals (Zap Out)
         for minswap_tx in minswap_txs:
             if minswap_tx["order_type"] == _ORDER_TYPE_ZAP_OUT:
                 yoroi_withdrawal = _get_yoroi_tx_by_hash(yoroi_data, minswap_tx["created_tx"])
-                _create_zap_out_transactions(minswap_tx, yoroi_withdrawal, self.__account_nickname, self.account_holder, self.__YOROI, result)
+                _create_zap_out_transactions(minswap_tx, yoroi_withdrawal, self.__account_nickname, self.account_holder, self.__MINSWAP_PLUGIN, result)
 
         self.__logger.info(
             "Minswap processed: %d swaps, %d LP deposits, %d LP removals",
