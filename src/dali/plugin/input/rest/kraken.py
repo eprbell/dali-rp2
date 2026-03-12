@@ -270,7 +270,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 )
                 continue
 
-            crypto_fee: str = "0" if is_fiat_asset else str(record[_FEE])
+            crypto_fee: Union[str, None] = str(record[_FEE]) if not is_fiat_asset else None
             fiat_fee: Union[str, None] = record[_FEE] if is_fiat_asset else None
 
             if record[_TYPE] == _TRADE and not is_fiat_asset:
