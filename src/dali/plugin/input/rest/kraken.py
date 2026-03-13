@@ -21,7 +21,7 @@
 # https://docs.ccxt.com/en/latest/index.html
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from ccxt import Exchange, kraken
@@ -116,10 +116,13 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self.use_cache: Optional[bool] = use_cache
 
         # Parse end_date (ISO format like "2025-12-31")
+        # Note: end_date is treated as UTC end of day for filtering
         self.__end_date: Optional[datetime] = None
         if end_date:
             try:
-                self.__end_date = datetime.strptime(end_date, "%Y-%m-%d")
+                # Parse as naive datetime, then make it timezone-aware (UTC, end of day)
+                naive_end = datetime.strptime(end_date, "%Y-%m-%d")
+                self.__end_date = naive_end.replace(hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc)
                 self.__logger.info("Filtering transactions up to end_date: %s", end_date)
             except ValueError:
                 self.__logger.warning("Invalid end_date format: %s (expected YYYY-MM-DD)", end_date)
