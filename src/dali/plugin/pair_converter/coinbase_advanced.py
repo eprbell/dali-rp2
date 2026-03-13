@@ -97,8 +97,7 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                 if not candles:
                     raise NoPriceDataFoundError(
                         f"No price data found for {from_asset}-{to_asset} at timestamp {start.isoformat()}. "
-                        f"The candles list is empty - no price data is available for this asset pair in the requested time period. "
-                        f"Please verify that {from_asset}/{to_asset} is traded on Coinbase Advanced Trade."
+                        f"The candles list is empty - no price data is available for this asset pair from Coinbase Advanced. "
                     )
 
                 candle = candles[0]
