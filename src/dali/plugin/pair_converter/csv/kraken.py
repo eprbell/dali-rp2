@@ -53,6 +53,14 @@ _ERROR: str = "error"
 _ERRORS: str = "errors"
 _FILES: str = "files"
 
+# Quarterly zip file parameters
+_QUARTERLY_ZIP_PREFIX: str = "Kraken_OHLCVT_Q"
+_QUARTERLY_ZIP_SUFFIX: str = ".zip"
+_QUARTERLY_CSV_FILE_ID: Dict[int, str] = {
+    # File IDs for quarterly CSV files (to be updated quarterly)
+    # Format: {quarter_year_combined: file_id} - will be populated dynamically
+}
+
 # The endpoint we will use to query Google Drive for the specific file we need
 # We will also use this to request a file download.
 _GOOGLE_APIS_URL: str = "https://www.googleapis.com/drive/v3/files"
@@ -147,6 +155,10 @@ class Kraken:
     __UNIFIED_CSV_FILE: str = __CSV_DIRECTORY + "Kraken_OHLCVT.zip"
     __CACHE_KEY: str = "Kraken-csv-download"
 
+    # Configuration options
+    _USE_QUARTERLY_ZIP: bool = False  # If True, use quarterly zip files instead of unified
+    _QUARTERLY_FILE_IDS: Dict[str, str] = {}  # Map of "Q{quarter}_{year}" -> Google Drive file ID
+
     __TIMEOUT: int = 30
     __THREAD_COUNT: int = 3
 
@@ -160,15 +172,32 @@ class Kraken:
 
     __DELIMITER: str = ","
 
-    def __init__(self, transaction_manifest: TransactionManifest, force_download: bool = False) -> None:
+    # Default quarterly file IDs - these should be updated when new quarters are released
+    # Format: "Q{quarter}_{year}" -> Google Drive file ID
+    DEFAULT_QUARTERLY_FILE_IDS: Dict[str, str] = {
+        "Q1_2024": "1example1",
+        "Q2_2024": "1example2",
+        "Q3_2024": "1example3",
+        "Q4_2024": "1ptNqWYidLkhb2VAKuLCxmp2OXEfGO-AP",  # Current unified file as fallback
+        "Q1_2025": "1example5",
+        "Q2_2025": "1example6",
+        "Q3_2025": "1example7",
+        "Q4_2025": "1example8",
+    }
+
+    def __init__(self, transaction_manifest: TransactionManifest, force_download: bool = False, use_quarterly_zip: bool = False, quarterly_file_ids: Optional[Dict[str, str]] = None) -> None:
         self.__logger: logging.Logger = create_logger(self.__KRAKEN_OHLCVT)
         self.__session: Session = requests.Session()
         self.__cached_pairs: Dict[str, _PairStartEnd] = {}
         self.__cache_loaded: bool = False
         self.__force_download: bool = force_download
         self.__unchunked_assets: Set[str] = transaction_manifest.assets
+        self.__use_quarterly_zip: bool = use_quarterly_zip
+        self.__quarterly_file_ids: Dict[str, str] = quarterly_file_ids if quarterly_file_ids is not None else self.DEFAULT_QUARTERLY_FILE_IDS.copy()
 
         self.__logger.debug("Assets: %s", self.__unchunked_assets)
+        if self.__use_quarterly_zip:
+            self.__logger.info("Using quarterly zip mode. Configured quarters: %s", list(self.__quarterly_file_ids.keys()))
 
         if not path.exists(self.__CACHE_DIRECTORY):
             makedirs(self.__CACHE_DIRECTORY)
@@ -178,6 +207,76 @@ class Kraken:
 
     def cache_key(self) -> str:
         return self.__CACHE_KEY
+
+    def _get_quarter_from_timestamp(self, timestamp: int) -> Tuple[int, int]:
+        """Get quarter (1-4) and year from a Unix timestamp.
+
+        Args:
+            timestamp: Unix timestamp in seconds
+
+        Returns:
+            Tuple of (quarter, year)
+        """
+        dt = datetime.fromtimestamp(timestamp, timezone.utc)
+        month = dt.month
+        year = dt.year
+
+        if month <= 3:
+            return (1, year)
+        elif month <= 6:
+            return (2, year)
+        elif month <= 9:
+            return (3, year)
+        else:
+            return (4, year)
+
+    def _get_quarterly_zip_key(self, timestamp: int) -> str:
+        """Get the quarterly zip key (e.g., 'Q4_2024') from a timestamp.
+
+        Args:
+            timestamp: Unix timestamp in seconds
+
+        Returns:
+            Quarterly key string like 'Q4_2024'
+        """
+        quarter, year = self._get_quarter_from_timestamp(timestamp)
+        return f"Q{quarter}_{year}"
+
+    def _get_quarterly_zip_filename(self, timestamp: int) -> str:
+        """Get the quarterly zip filename from a timestamp.
+
+        Args:
+            timestamp: Unix timestamp in seconds
+
+        Returns:
+            Filename like 'Kraken_OHLCVT_Q4_2024.zip'
+        """
+        quarter, year = self._get_quarter_from_timestamp(timestamp)
+        return f"{_QUARTERLY_ZIP_PREFIX}{quarter}_{year}{_QUARTERLY_ZIP_SUFFIX}"
+
+    def _get_quarterly_zip_path(self, timestamp: int) -> str:
+        """Get the full path to the quarterly zip file for a given timestamp.
+
+        Args:
+            timestamp: Unix timestamp in seconds
+
+        Returns:
+            Full path to the quarterly zip file
+        """
+        filename = self._get_quarterly_zip_filename(timestamp)
+        return path.join(self.__CSV_DIRECTORY, filename)
+
+    def _get_quarterly_file_id(self, timestamp: int) -> Optional[str]:
+        """Get the Google Drive file ID for the quarterly zip containing the given timestamp.
+
+        Args:
+            timestamp: Unix timestamp in seconds
+
+        Returns:
+            Google Drive file ID or None if not configured
+        """
+        quarterly_key = self._get_quarterly_zip_key(timestamp)
+        return self.__quarterly_file_ids.get(quarterly_key)
 
     def __load_cache(self) -> None:
         result = cast(Dict[str, _PairStartEnd], load_from_cache(self.cache_key()))
@@ -263,6 +362,83 @@ class Kraken:
         except JSONDecodeError as exc:
             self.__logger.debug("Fetching of kraken csv files failed. Try again later.")
             raise RP2RuntimeError("JSON decode error") from exc
+
+    def __download_quarterly_csv(self, timestamp: int) -> None:
+        """Download the quarterly zip file for the given timestamp.
+
+        Args:
+            timestamp: Unix timestamp in seconds (used to determine which quarter to download)
+        """
+        file_id = self._get_quarterly_file_id(timestamp)
+        if file_id is None:
+            raise RP2RuntimeError(f"No file ID configured for quarter {self._get_quarterly_zip_key(timestamp)}")
+
+        zip_path = self._get_quarterly_zip_path(timestamp)
+
+        try:
+            retry_count = 0
+            while True:
+                # Downloading the quarterly zipfile from Google Drive
+                response = self.__session.get("https://docs.google.com/uc?export=download&confirm=1", params={"id": file_id}, stream=True)
+
+                # Use response.text instead of response.content since an html form will be returned
+                html_content = response.text
+
+                # Check for virus scan warning and handle it
+                if "Google Drive - Virus scan warning" in html_content:
+                    id_match = re.search(r'name="id"\s+value="([^"]+)"', html_content)
+                    export_match = re.search(r'name="export"\s+value="([^"]+)"', html_content)
+                    confirm_match = re.search(r'name="confirm"\s+value="([^"]+)"', html_content)
+                    uuid_match = re.search(r'name="uuid"\s+value="([^"]+)"', html_content)
+
+                    if id_match and export_match and confirm_match and uuid_match:
+                        file_id = id_match.group(1)
+                        export = export_match.group(1)
+                        confirm = confirm_match.group(1)
+                        uuid = uuid_match.group(1)
+                    else:
+                        raise ValueError("Failed to extract parameters from HTML")
+
+                    params = {"id": file_id, "export": export, "confirm": confirm, "uuid": uuid}
+                    query_string = "&".join(f"{key}={value}" for key, value in params.items())
+
+                    response = requests.get(_GOOGLE_DRIVE_DOWNLOAD_URL, params=params, stream=True, timeout=self.DEFAULT_TIMEOUT)
+                    self.__logger.info("Downloading quarterly CSV from %s?%s", _GOOGLE_DRIVE_DOWNLOAD_URL, query_string)
+
+                with open(zip_path, "wb") as file, ProgressBar(
+                    max_value=UnknownLength, widgets=["Downloading: ", BouncingBar(), " ", DataSize(), " ", AdaptiveTransferSpeed()]
+                ) as progress_bar:
+                    progress_bar.start()
+                    for chunk in response.iter_content(_CHUNK_SIZE_BYTES):
+                        if chunk:
+                            file.write(chunk)
+                            progress_bar.update(progress_bar.value + len(chunk))
+                    progress_bar.finish()
+
+                if is_zipfile(zip_path):
+                    break
+                retry_count += 1
+                if retry_count > 2:
+                    raise RP2RuntimeError("Invalid zipfile. Giving up. Try again later.")
+                self._remove_quarterly_csv_file(timestamp)
+                self.__logger.info("Downloaded file is invalid, trying to download again.")
+
+        except JSONDecodeError as exc:
+            self.__logger.debug("Fetching of quarterly kraken csv files failed. Try again later.")
+            raise RP2RuntimeError("JSON decode error") from exc
+
+    def _remove_quarterly_csv_file(self, timestamp: int) -> None:
+        """Remove the quarterly zip file for the given timestamp.
+
+        Args:
+            timestamp: Unix timestamp in seconds (used to determine which quarter file to remove)
+        """
+        zip_path = self._get_quarterly_zip_path(timestamp)
+        try:
+            remove(zip_path)
+            self.__logger.info("%s has been safely deleted.", zip_path)
+        except FileNotFoundError:
+            self.__logger.info("File %s not found.", zip_path)
 
     def _split_chunks_size_n(self, file_name: str, csv_file: str, chunk_size: int = _CHUNK_SIZE) -> None:
         pair, duration_in_minutes = file_name.strip(".csv").split("_", 1)
@@ -457,12 +633,98 @@ class Kraken:
             self.__logger.debug("Retrieving cached bar%s for %s, %s at %s", plural, base_asset, quote_asset, epoch_timestamp)
             return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
 
-        if self._unzip_and_chunk(base_asset, quote_asset, all_bars):
+        if self._unzip_and_chunk(base_asset, quote_asset, all_bars, epoch_timestamp):
             return self._retrieve_cached_bars(base_asset, quote_asset, epoch_timestamp, all_bars, timespan)
 
         return None
 
-    def _unzip_and_chunk(self, base_asset: str, quote_asset: str, all_bars: bool = False) -> bool:
+    def _unzip_and_chunk(self, base_asset: str, quote_asset: str, all_bars: bool = False, timestamp: Optional[int] = None) -> bool:
+        # This function was called because the trading pair hasn't been chunked yet.
+        # In order to chunk a new trading pair, we need the CSV file (unified or quarterly).
+
+        # Determine which zip file to use
+        if self.__use_quarterly_zip and timestamp is not None:
+            return self._unzip_and_chunk_quarterly(base_asset, quote_asset, all_bars, timestamp)
+        else:
+            return self._unzip_and_chunk_unified(base_asset, quote_asset, all_bars)
+
+    def _unzip_and_chunk_quarterly(self, base_asset: str, quote_asset: str, all_bars: bool, timestamp: int) -> bool:
+        """Extract and chunk data from a quarterly zip file.
+
+        Args:
+            base_asset: The base asset (e.g., 'ETH')
+            quote_asset: The quote asset (e.g., 'USD')
+            all_bars: If True, retrieve all bars for the time range
+            timestamp: Unix timestamp to determine which quarterly zip to use
+
+        Returns:
+            True if successful, False otherwise
+        """
+        quarterly_zip_path = self._get_quarterly_zip_path(timestamp)
+
+        # Download quarterly zip if not exists
+        if not path.exists(quarterly_zip_path) and (self.__force_download or self._prompt_download_confirmation()):
+            self.__download_quarterly_csv(timestamp)
+
+        self.__logger.info("Attempting to retrieve %s%s pair from quarterly Kraken CSV file: %s", base_asset, quote_asset, path.basename(quarterly_zip_path))
+
+        # If still doesn't exist, try fallback to unified or fail
+        if not path.exists(quarterly_zip_path):
+            self.__logger.warning("Quarterly zip not found: %s. Falling back to unified zip.", quarterly_zip_path)
+            return self._unzip_and_chunk_unified(base_asset, quote_asset, all_bars)
+
+        successful = False
+        for _ in range(2):
+            try:
+                with ZipFile(quarterly_zip_path, "r") as zip_ref:
+                    all_timespans_for_pair: List[str]
+                    if all_bars:
+                        all_timespans_for_pair = [x for x in zip_ref.namelist() if x.startswith(f"{base_asset}")]
+                    else:
+                        all_timespans_for_pair = [x for x in zip_ref.namelist() if x.startswith(f"{base_asset}{quote_asset}_")]
+
+                    self.__logger.debug("Chunking from quarterly zip: %s", all_timespans_for_pair)
+
+                    if all_timespans_for_pair:
+                        csv_files: Dict[str, str] = {}
+                        for file_name in all_timespans_for_pair:
+                            self.__logger.debug("Reading in file %s for Kraken CSV pricing.", file_name)
+                            csv_files[file_name] = zip_ref.read(file_name).decode(encoding="utf-8")
+
+                        with ThreadPool(self.__THREAD_COUNT) as pool:
+                            pool.starmap(self._split_chunks_size_n, zip(list(csv_files.keys()), list(csv_files.values())))
+                        successful = True
+                        break
+                    self.__logger.debug("Market %s%s not found in quarterly Kraken files. Skipping file read.", base_asset, quote_asset)
+                    return False
+            except BadZipFile:
+                self.__logger.info("Corrupt quarterly CSV file found, deleting and trying again.")
+                self._remove_quarterly_csv_file(timestamp)
+                if self.__force_download or self._prompt_download_confirmation():
+                    self.__download_quarterly_csv(timestamp)
+
+        if not successful:
+            # Fall back to unified zip
+            self.__logger.warning("Failed to process quarterly zip. Falling back to unified zip.")
+            return self._unzip_and_chunk_unified(base_asset, quote_asset, all_bars)
+
+        save_to_cache(self.cache_key(), self.__cached_pairs)
+        self.__unchunked_assets.discard(base_asset)
+        self.__logger.debug("Leftover assets: %s", self.__unchunked_assets)
+
+        return True
+
+    def _unzip_and_chunk_unified(self, base_asset: str, quote_asset: str, all_bars: bool = False) -> bool:
+        """Extract and chunk data from the unified zip file (original behavior).
+
+        Args:
+            base_asset: The base asset (e.g., 'ETH')
+            quote_asset: The quote asset (e.g., 'USD')
+            all_bars: If True, retrieve all bars for the time range
+
+        Returns:
+            True if successful, False otherwise
+        """
         # This function was called because the trading pair hasn't been chunked yet.
         # In order to chunk a new trading pair, we need the unified CSV file.
         if not path.exists(self.__UNIFIED_CSV_FILE) and (self.__force_download or self._prompt_download_confirmation()):
