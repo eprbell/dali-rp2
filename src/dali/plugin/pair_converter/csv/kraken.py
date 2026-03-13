@@ -562,18 +562,16 @@ class Kraken:
         self.__logger.info("Attempting to retrieve %s%s pair from quarterly Kraken CSV file: %s", base_asset, quote_asset, path.basename(quarterly_zip_path))
 
         if not path.exists(quarterly_zip_path):
-            self.__logger.error(
-                "Quarterly zip not found: %s. Please manually download the quarterly zip file "
-                "from https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data "
-                "and save it as %s in the %s directory.",
-                path.basename(quarterly_zip_path),
+            # Quarterly zip not found - fall back to unified zip (which has the most recent data)
+            self.__logger.warning(
+                "Quarterly zip not found: %s. Falling back to unified CSV file for recent data. "
+                "If you want to use quarterly zip files, please manually download them from "
+                "https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data "
+                "and save them in the %s directory.",
                 path.basename(quarterly_zip_path),
                 self.__CSV_DIRECTORY,
             )
-            raise RP2RuntimeError(
-                f"Quarterly zip file not found: {path.basename(quarterly_zip_path)}. "
-                f"Please download it manually and place it in {self.__CSV_DIRECTORY} with the filename {path.basename(quarterly_zip_path)}"
-            )
+            return self._unzip_and_chunk_unified(base_asset, quote_asset, all_bars)
 
         successful = False
         for _ in range(2):
