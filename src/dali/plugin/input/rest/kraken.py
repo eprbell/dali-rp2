@@ -177,6 +177,21 @@ class InputPlugin(AbstractCcxtInputPlugin):
             base_asset = asset[:-2]
             self.__logger.debug("Stripping yield-bearing suffix from asset %s -> %s", asset, base_asset)
             return self.base_id_to_base.get(base_asset, base_asset)
+        # Handle Kraken staking assets with numeric days suffix (.S, .M)
+        # Examples: SOL03.S -> SOL, DOT28.S -> DOT, ATOM21.S -> ATOM
+        # The .S suffix is used for staking (formerly .S staking), .M may also appear
+        # Format: ASSET + digits + .S or ASSET + digits + .M
+        if asset.endswith(".S") or asset.endswith(".M"):
+            # Find the position where the suffix starts (last 2 chars: .S or .M)
+            suffix_len = 2
+            # Look for digits before the suffix and strip them too
+            base_with_possible_num = asset[:-suffix_len]
+            # Strip trailing digits (the days-to-unstake number)
+            while base_with_possible_num and base_with_possible_num[-1].isdigit():
+                base_with_possible_num = base_with_possible_num[:-1]
+            if base_with_possible_num and base_with_possible_num != asset:
+                self.__logger.debug("Stripping staking suffix from asset %s -> %s", asset, base_with_possible_num)
+                return self.base_id_to_base.get(base_with_possible_num, base_with_possible_num)
         return self.base_id_to_base.get(asset, asset)
 
     def _get_process_deposits_pagination_detail_set(self) -> Optional[AbstractPaginationDetailSet]:
