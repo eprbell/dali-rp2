@@ -173,7 +173,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         # Handle Kraken yield-bearing assets (.B, .F suffixes)
         # These are read-only assets - to interact with them, use the base asset
         # e.g., USDT.B -> USDT, SUI.F -> SUI
-        if asset.endswith(".B") or asset.endswith(".F"):
+        if asset.endswith(".B") or asset.endswith(".F") or asset.endswith(".HOLD"):
             base_asset = asset[:-2]
             self.__logger.debug("Stripping yield-bearing suffix from asset %s -> %s", asset, base_asset)
             return self.base_id_to_base.get(base_asset, base_asset)
@@ -240,7 +240,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
 
             timestamp_value: str = self._rp2_timestamp_from_seconds_epoch(record[_TIMESTAMP])
 
-            is_fiat_asset: bool = record[_ASSET] in _KRAKEN_FIAT_LIST or record[_ASSET].endswith('.F')
+            is_fiat_asset: bool = record[_ASSET] in _KRAKEN_FIAT_LIST or record[_ASSET].endswith('.F') or record[_ASSET].endswith('.HOLD')
 
             amount: RP2Decimal = RP2Decimal(abs(RP2Decimal(record[_AMOUNT])))
             asset_base: str = self._get_base_from_asset(record[_ASSET])
