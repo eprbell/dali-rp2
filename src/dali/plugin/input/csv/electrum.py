@@ -95,7 +95,6 @@ class InputPlugin(AbstractInputPlugin):
 
                 amount: RP2Decimal = RP2Decimal(line[self.__AMOUNT_CHAIN_BC_INDEX]) if line[self.__AMOUNT_CHAIN_BC_INDEX] else RP2Decimal(line[self.__AMOUNT_LIGHTNING_BC_INDEX])
                 is_deposit = amount > ZERO
-                print("amount and fee", amount, line[self.__NETWORK_FEE_SATOSHI_INDEX])
                 if not is_deposit:
                     amount = amount * RP2Decimal("-1") + RP2Decimal(line[self.__NETWORK_FEE_SATOSHI_INDEX])/self.__SATS_PER_BTC
 
