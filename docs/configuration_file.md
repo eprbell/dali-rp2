@@ -510,6 +510,15 @@ Accuracy will improve once new CSV data is released, which is typically 2 weeks 
 ##### Note on Unified CSV File
 The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. It is 4 GB as of April 2024. You can also manually download the file from the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
 
+##### Note on Quarterly Zip Files
+As an alternative to the unified CSV file, Kraken also provides quarterly zip files that contain data for a single quarter. These are smaller (typically ~500 MB) and can be used to reduce download time and disk space. To use quarterly zip files instead of the unified file:
+
+1. Set `use_quarterly_zip = True` in the Kraken Locked CCXT configuration
+2. Manually download the quarterly zip files from the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable -->
+3. Place the files in `.dali_cache/kraken/csv/` with the naming convention `Kraken_OHLCVT_Q{quarter}_{year}.zip` (e.g., `Kraken_OHLCVT_Q4_2024.zip`)
+
+The plugin will automatically select the appropriate quarterly zip file based on the timestamp of the transaction. If a quarterly zip file is not found for the requested timestamp, an error will be raised asking you to download the required file.
+
 ### CCXT Exchangerate Host
 This plugin is based on the CCXT Python library. It uses the Exchangerate.host API for forex rates.
 
@@ -605,16 +614,18 @@ This plugin makes use of the CCXT plugin, but locks all routes to Kraken(US).
 
 Initialize this plugin section as follows:
 <pre>
-[dali.plugin.pair_converter.ccxt_kraken</em>]
+[dali.plugin.pair_converter.ccxt_kraken]
 historical_price_type = <em>&lt;historical_price_type&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 google_api_key = <em>&lt;google_api_key&gt;</em>
+use_quarterly_zip = <em>&lt;boolean&gt;</em>
 </pre>
 
 Where:
 * `<historical_price_type>` is one of `open`, `high`, `low`, `close`, `nearest`. When DaLi downloads historical market data, it captures a `bar` of data surrounding the timestamp of the transaction. Each bar has a starting timestamp, an ending timestamp, and OHLC prices. You can choose which price to select for price lookups. The open, high, low, and close prices are self-explanatory. The `nearest` price is either the open price or the close price of the bar depending on whether the transaction time is nearer the bar starting time or the bar ending time.
 * `fiat_priority` is an optional list of strings in JSON format (e.g. `["_1stpriority_", "_2ndpriority_"...]`) that ranks the priority of fiat in the routing system. If no `fiat_priority` is given, the default priority is USD, JPY, KRW, EUR, GBP, AUD, which is based on the volume of the fiat market paired with BTC (ie. BTC/USD has the highest worldwide volume, then BTC/JPY, etc.).
 * `google_api_key` is an optional string for the Google API Key that is needed by some CSV readers, most notably the Kraken CSV reader. It is used to download the OHLCV files for a market. No data is ever sent to Google Drive. This is only used to retrieve data. To get a Google API Key, visit the [Google Console Page](https://console.developers.google.com/) and setup a new project. Be sure to enable the Google Drive API by clicking [+ ENABLE APIS AND SERVICES] and selecting the Google Drive API.
+* `use_quarterly_zip` is an optional boolean (default: False). When set to True, the plugin uses quarterly zip files instead of the unified CSV file. When enabled, you must manually download the quarterly zip files from the [Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data) and place them in `.dali_cache/kraken/csv/` with the naming convention `Kraken_OHLCVT_Q{quarter}_{year}.zip` (e.g., `Kraken_OHLCVT_Q4_2024.zip`). See [Note on Quarterly Zip Files](#note-on-quarterly-zip-files) for more details.
 
 The Kraken Locked CCXT plugin still makes use of fiat exchange rate routing. Pricing will resolve to any major fiat currency even if it doesn't have a market (ie. not used to trade with) on Kraken.
 
