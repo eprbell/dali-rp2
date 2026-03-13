@@ -270,7 +270,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
                 )
                 continue
 
-            crypto_fee: Union[str, None] = str(record[_FEE]) if not is_fiat_asset else None
+            # For OutTransaction (spend), crypto_fee must be a string
+            out_crypto_fee: str = str(record[_FEE]) if not is_fiat_asset else "0"
+            # For InTransaction (buy/trade), only one fee can be non-None
+            in_crypto_fee: Union[str, None] = str(record[_FEE]) if not is_fiat_asset else None
             fiat_fee: Union[str, None] = record[_FEE] if is_fiat_asset else None
 
             if record[_TYPE] == _TRADE and not is_fiat_asset:
@@ -311,7 +314,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             transaction_type=transaction_type,
                             spot_price=spot_price,
                             crypto_in=crypto_in,
-                            crypto_fee=crypto_fee,
+                            crypto_fee=in_crypto_fee,
                             fiat_in_no_fee=fiat_in_no_fee,
                             fiat_in_with_fee=fiat_in_with_fee,
                             fiat_fee=fiat_fee,
@@ -335,7 +338,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                             transaction_type=transaction_type,
                             spot_price=spot_price,
                             crypto_out_no_fee=crypto_out_no_fee,
-                            crypto_fee=crypto_fee,
+                            crypto_fee=out_crypto_fee,
                             crypto_out_with_fee=crypto_out_with_fee,
                             fiat_out_no_fee=fiat_out_no_fee,
                             fiat_fee=fiat_fee,
@@ -362,7 +365,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.SELL.value,
                         spot_price=spot_price,
                         crypto_out_no_fee=crypto_out_no_fee,
-                        crypto_fee=crypto_fee,
+                        crypto_fee=out_crypto_fee,
                         crypto_out_with_fee=crypto_out_with_fee,
                         fiat_out_no_fee=fiat_out_no_fee,
                         fiat_fee=fiat_fee,
@@ -385,7 +388,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.BUY.value,
                         spot_price=spot_price,
                         crypto_in=crypto_in,
-                        crypto_fee=crypto_fee,
+                        crypto_fee=in_crypto_fee,
                         fiat_fee=fiat_fee,
                         notes=ledger_id,
                     )
@@ -413,7 +416,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.STAKING.value,
                         spot_price=spot_price,
                         crypto_in=crypto_in,
-                        crypto_fee=crypto_fee,
+                        crypto_fee=in_crypto_fee,
                         fiat_fee=fiat_fee,
                         notes=ledger_id,
                     )
@@ -436,7 +439,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.STAKING.value,
                         spot_price=spot_price,
                         crypto_in=crypto_in,
-                        crypto_fee=crypto_fee,
+                        crypto_fee=in_crypto_fee,
                         fiat_fee=fiat_fee,
                         notes=ledger_id,
                     )
@@ -458,7 +461,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.STAKING.value,
                         spot_price=spot_price,
                         crypto_in=crypto_in,
-                        crypto_fee=crypto_fee,
+                        crypto_fee=in_crypto_fee,
                         fiat_fee=fiat_fee,
                         notes=ledger_id,
                     )
@@ -479,7 +482,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.BUY.value,
                         spot_price=spot_price,
                         crypto_in=str(amount),
-                        crypto_fee=crypto_fee,
+                        crypto_fee=in_crypto_fee,
                         fiat_fee=fiat_fee,
                         notes=ledger_id,
                     )
@@ -506,7 +509,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.SELL.value,
                         spot_price=spot_price,
                         crypto_out_no_fee=str(amount),
-                        crypto_fee=crypto_fee,
+                        crypto_fee=out_crypto_fee,
                         crypto_out_with_fee=str(amount + RP2Decimal(record[_FEE])) if record[_FEE] else str(amount),
                         fiat_out_no_fee=fiat_out_no_fee,
                         fiat_fee=fiat_fee,
@@ -530,7 +533,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
                         transaction_type=Keyword.BUY.value,
                         spot_price=spot_price,
                         crypto_in=str(amount),
-                        crypto_fee=crypto_fee,
+                        crypto_fee=in_crypto_fee,
                         notes=ledger_id,
                     )
                 )
