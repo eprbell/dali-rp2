@@ -511,7 +511,7 @@ Accuracy will improve once new CSV data is released, which is typically 2 weeks 
 The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. It is 4 GB as of April 2024. You can also manually download the file from the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
 
 ##### Note on Quarterly Zip Files
-As an alternative to the unified CSV file, Kraken also provides quarterly zip files that contain data for a single quarter. These are smaller (typically 50-200 MB) and can be used to reduce download time and disk space. To use quarterly zip files instead of the unified file:
+As an alternative to the unified CSV file, Kraken also provides quarterly zip files that contain data for a single quarter. These are smaller (typically ~500 MB) and can be used to reduce download time and disk space. To use quarterly zip files instead of the unified file:
 
 1. Set `use_quarterly_zip = True` in the Kraken Locked CCXT configuration
 2. Manually download the quarterly zip files from the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable -->
