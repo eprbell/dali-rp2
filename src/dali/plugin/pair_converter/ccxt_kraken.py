@@ -24,10 +24,12 @@ class PairConverterPlugin(CcxtPairConverterPlugin):
         self,
         historical_price_type: str,
         fiat_priority: Optional[str] = None,
+        use_quarterly_zip: bool = False,
     ) -> None:
         super().__init__(
             historical_price_type=historical_price_type,
             default_exchange="Kraken",
             fiat_priority=fiat_priority,
             exchange_locked=True,
+            use_quarterly_zip=use_quarterly_zip,
         )

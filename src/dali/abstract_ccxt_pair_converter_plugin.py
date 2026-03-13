@@ -274,6 +274,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         untradeable_assets: Optional[str] = None,
         aliases: Optional[str] = None,
         cache_modifier: Optional[str] = None,
+        use_quarterly_zip: bool = False,
     ) -> None:
         exchange_cache_modifier = "_".join(default_exchange.replace(" ", "_") if default_exchange and exchange_locked else "")
         cache_modifier = cache_modifier if cache_modifier else ""
@@ -310,6 +311,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         self.__aliases: Optional[Dict[str, Dict[Alias, RP2Decimal]]] = None if aliases is None else self._process_aliases(aliases)
         self._fiat_priority: Dict[str, float] = FIAT_PRIORITY
         self._fiat_list: List[str] = DEFAULT_FIAT_LIST
+        self.__use_quarterly_zip: bool = use_quarterly_zip
 
     def _add_bar_to_cache(self, key: AssetPairAndTimestamp, historical_bar: HistoricalBar) -> None:
         self._cache[self._floor_key(key)] = historical_bar
@@ -546,7 +548,11 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         elif csv_pricing == self.__default_csv_reader.klass and self.__exchange_csv_reader.get(self.__default_csv_reader.name) is not None:
             csv_reader = self.__exchange_csv_reader.get(self.__default_csv_reader.name)
         elif csv_pricing is not None:
-            csv_reader = csv_pricing(self._manifest)
+            # Pass use_quarterly_zip to Kraken CSV plugin
+            if csv_pricing.__name__ == "Kraken":
+                csv_reader = csv_pricing(self._manifest, use_quarterly_zip=self.__use_quarterly_zip)
+            else:
+                csv_reader = csv_pricing(self._manifest)
 
             if csv_pricing == self.__default_csv_reader.klass:
                 self.__exchange_csv_reader[self.__default_csv_reader.name] = csv_reader
