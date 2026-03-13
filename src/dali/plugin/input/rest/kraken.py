@@ -104,6 +104,7 @@ class InputPlugin(AbstractCcxtInputPlugin):
         native_fiat: str,
         thread_count: Optional[int] = __DEFAULT_THREAD_COUNT,
         use_cache: Optional[bool] = True,
+        end_date: Optional[str] = None,
     ) -> None:
         self.__api_key = api_key
         self.__api_secret = api_secret
@@ -113,6 +114,16 @@ class InputPlugin(AbstractCcxtInputPlugin):
         self.__logger: logging.Logger = create_logger(f"{self.__EXCHANGE_NAME}")
         self.base_id_to_base: Dict[str, str] = {}
         self.use_cache: Optional[bool] = use_cache
+
+        # Parse end_date (ISO format like "2025-12-31")
+        self.__end_date: Optional[datetime] = None
+        if end_date:
+            try:
+                self.__end_date = datetime.strptime(end_date, "%Y-%m-%d")
+                self.__logger.info("Filtering transactions up to end_date: %s", end_date)
+            except ValueError:
+                self.__logger.warning("Invalid end_date format: %s (expected YYYY-MM-DD)", end_date)
+
         self._initialize_client()
 
     def exchange_name(self) -> str:
@@ -168,6 +179,10 @@ class InputPlugin(AbstractCcxtInputPlugin):
         if not isinstance(super_client, kraken):
             raise RP2RuntimeError("Exchange is not instance of class kraken.")
         return super_client
+
+    @property
+    def _end_date(self) -> Optional[datetime]:
+        return self.__end_date
 
     def _get_base_from_asset(self, asset: str) -> str:
         # Handle Kraken yield-bearing assets (.B, .F suffixes)
@@ -228,7 +243,35 @@ class InputPlugin(AbstractCcxtInputPlugin):
             self._initialize_markets()
 
         (trade_history, ledger) = self._gather_api_data()
-        return self._compute_transaction_set(trade_history, ledger)
+        result = self._compute_transaction_set(trade_history, ledger)
+
+        # Filter by end_date if specified (since CCXT's 'since' parameter is start time, not end time)
+        if self.__end_date:
+            result = self._filter_by_end_date(result)
+
+        return result
+
+    def _filter_by_end_date(self, transactions: List[AbstractTransaction]) -> List[AbstractTransaction]:
+        """Filter transactions to only include those on or before the end_date."""
+        filtered: List[AbstractTransaction] = []
+        for transaction in transactions:
+            # Parse the transaction timestamp (format: "2025-12-31 23:59:59+0000")
+            try:
+                tx_datetime = datetime.strptime(transaction.timestamp, "%Y-%m-%d %H:%M:%S%z")
+                if tx_datetime <= self.__end_date:
+                    filtered.append(transaction)
+            except ValueError:
+                # If we can't parse, include the transaction to be safe
+                self.__logger.warning("Could not parse timestamp: %s, including transaction", transaction.timestamp)
+                filtered.append(transaction)
+
+        self.__logger.info(
+            "Filtered %d transactions to %d based on end_date %s",
+            len(transactions),
+            len(filtered),
+            self.__end_date.strftime("%Y-%m-%d"),
+        )
+        return filtered
 
     def _compute_transaction_set(self, trade_history: Dict[str, Dict[str, str]], ledger: Dict[str, Dict[str, str]]) -> List[AbstractTransaction]:
         result: List[AbstractTransaction] = []
