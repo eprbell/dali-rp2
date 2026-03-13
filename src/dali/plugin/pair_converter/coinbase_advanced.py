@@ -23,6 +23,11 @@ from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 from dali.transaction_manifest import TransactionManifest
 
+# Custom exception for when no price data is found
+class NoPriceDataFoundError(Exception):
+    """Raised when no price data is available for the requested asset pair and timestamp."""
+    pass
+
 TIME_GRANULARITY: Dict[str, int] = {
     "ONE_MINUTE": 60,
     "FIVE_MINUTE": 300,
@@ -83,13 +88,20 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
             try:
                 granularity = list(TIME_GRANULARITY.keys())[retry_count]
                 if self._authorized:
-                    candle = self.client.get_candles(f"{from_asset}-{to_asset}", int(start.timestamp()), int(end.timestamp()), granularity).to_dict()[
-                        "candles"
-                    ][0]
+                    candles_dict = self.client.get_candles(f"{from_asset}-{to_asset}", int(start.timestamp()), int(end.timestamp()), granularity).to_dict()
                 else:
-                    candle = self.client.get_public_candles(f"{from_asset}-{to_asset}", int(start.timestamp()), int(end.timestamp()), granularity).to_dict()[
-                        "candles"
-                    ][0]
+                    candles_dict = self.client.get_public_candles(f"{from_asset}-{to_asset}", int(start.timestamp()), int(end.timestamp()), granularity).to_dict()
+
+                candles = candles_dict.get("candles", [])
+
+                if not candles:
+                    raise NoPriceDataFoundError(
+                        f"No price data found for {from_asset}-{to_asset} at timestamp {start.isoformat()}. "
+                        f"The candles list is empty - no price data is available for this asset pair in the requested time period. "
+                        f"Please verify that {from_asset}/{to_asset} is traded on Coinbase Advanced Trade."
+                    )
+
+                candle = candles[0]
                 candle_start = datetime.fromtimestamp(int(candle["start"]), timezone.utc)
                 result = HistoricalBar(
                     duration=timedelta(seconds=TIME_GRANULARITY[granularity]),
@@ -101,6 +113,9 @@ class PairConverterPlugin(AbstractPairConverterPlugin):
                     volume=RP2Decimal(candle["volume"]),
                 )
                 return result
+            except NoPriceDataFoundError:
+                # Re-raise our custom exception with informative message
+                raise
             except ValueError:
                 retry_count += 1
             except Exception as e:
