@@ -225,7 +225,7 @@ def _try_derive_spot_price(
         derived_price = (input_amount * conversion.rate) / output_amount
 
         LOGGER.debug(
-            "Derived spot price for %s: %s %s = %s (from %s %s * %s %s/%s)",
+            "Derived spot price for %s: %s %s = %s (from %s %s * %s %s/%s / %s)",
             output_asset,
             derived_price,
             native_fiat,
@@ -233,6 +233,7 @@ def _try_derive_spot_price(
             input_currency,
             conversion.rate,
             native_fiat,
+            output_amount,
         )
 
         return derived_price
