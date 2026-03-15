@@ -107,13 +107,44 @@ def _get_pair_conversion_rate(timestamp: datetime, from_asset: str, to_asset: st
     rate: Optional[RP2Decimal] = None
     pair_converter: Optional[AbstractPairConverterPlugin] = None
     for pair_converter in global_configuration[Keyword.HISTORICAL_PAIR_CONVERTERS.value]:
-        print(f"pair_converter: {pair_converter}")
-        rate = cast(AbstractPairConverterPlugin, pair_converter).get_conversion_rate(timestamp, from_asset, to_asset, exchange)
-        if rate:
-            break
+        LOGGER.debug(
+            "Attempting pair conversion: timestamp=%s, from_asset=%s, to_asset=%s, exchange=%s, converter=%s",
+            timestamp,
+            from_asset,
+            to_asset,
+            exchange,
+            pair_converter.name(),
+        )
+        try:
+            rate = cast(AbstractPairConverterPlugin, pair_converter).get_conversion_rate(timestamp, from_asset, to_asset, exchange)
+            if rate:
+                LOGGER.debug(
+                    "Pair conversion successful: %s/%s = %s via %s",
+                    from_asset,
+                    to_asset,
+                    rate,
+                    pair_converter.name(),
+                )
+                break
+        except Exception as e:
+            LOGGER.debug(
+                "Pair converter %s failed for %s/%s at %s: %s",
+                pair_converter.name(),
+                from_asset,
+                to_asset,
+                timestamp,
+                str(e),
+            )
+            # Continue to next pair converter
+            continue
 
     if pair_converter is None:
         raise RP2RuntimeError("No pair converter plugin found")
+
+    if rate is None:
+        raise RP2RuntimeError(
+            f"No price data found for {from_asset}/{to_asset} at {timestamp} from any pair converter plugin"
+        )
 
     return RateAndPairConverter(rate, pair_converter)
 
@@ -136,6 +167,16 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
     # the contract with RP2, which requires spot_price to be > 0. If this situation is detected and the user passed the read_spot_price_from_web, then
     # ignore the 0 and use a price read from the Internet.
     if is_unknown(transaction.spot_price) or RP2Decimal(transaction.spot_price) == ZERO:  # type: ignore
+        # Debug log the transaction data before attempting web price lookup
+        LOGGER.debug(
+            "Transaction requires web price lookup: unique_id=%s, timestamp=%s, asset=%s, spot_price=%s, exchange=%s, fiat_ticker=%s",
+            transaction.unique_id,
+            transaction.timestamp_value,
+            transaction.asset,
+            transaction.spot_price,
+            _get_originating_exchange(transaction),
+            transaction.fiat_ticker,
+        )
         conversion: RateAndPairConverter = _get_pair_conversion_rate(
             timestamp=transaction.timestamp_value,
             from_asset=transaction.asset,
