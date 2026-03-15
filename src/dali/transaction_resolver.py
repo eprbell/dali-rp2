@@ -13,8 +13,9 @@
 # limitations under the License.
 
 
+import re
 from datetime import datetime
-from typing import Any, Dict, List, NamedTuple, Optional, cast
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, cast
 
 from progressbar import ProgressBar
 from progressbar.widgets import AdaptiveETA, Bar, Percentage, Timer
@@ -157,8 +158,94 @@ def _get_originating_exchange(transaction: AbstractTransaction) -> str:
     raise RP2RuntimeError(f"Internal error: not a transaction: {transaction}")
 
 
+def _parse_derivation_info(notes: Optional[str]) -> Optional[Tuple[str, RP2Decimal]]:
+    """Parse DERIVE info from transaction notes.
+
+    Format: DERIVE:<input_currency>:<input_amount_with_fees>
+    Example: DERIVE:ADA:150.5
+
+    Returns: (input_currency, input_amount) or None if not found
+    """
+    if not notes:
+        return None
+    import re
+
+    match = re.search(r"DERIVE:([A-Z]+):([\d.]+)", notes)
+    if match:
+        currency = match.group(1)
+        amount = RP2Decimal(match.group(2))
+        return (currency, amount)
+    return None
+
+
+def _try_derive_spot_price(
+    transaction: AbstractTransaction,
+    native_fiat: str,
+    global_configuration: Dict[str, Any],
+) -> Optional[RP2Decimal]:
+    """Try to derive spot price from transaction derivation info.
+
+    This is used when direct price lookup fails (e.g., for obscure tokens like MIN).
+    The derivation info stores: input_currency + input_amount_from_swap.
+    We can derive the output token price as: (input_amount * input_price) / output_amount
+    """
+    notes = transaction.notes
+    derive_info = _parse_derivation_info(notes)
+    if not derive_info:
+        return None
+
+    input_currency, input_amount = derive_info
+    output_asset = transaction.asset
+    output_amount: RP2Decimal
+
+    if isinstance(transaction, InTransaction):
+        output_amount = RP2Decimal(transaction.crypto_in)
+    elif isinstance(transaction, OutTransaction):
+        output_amount = RP2Decimal(transaction.crypto_out_no_fee)
+    else:
+        return None
+
+    if output_amount == ZERO:
+        return None
+
+    try:
+        # Get the price of the input currency in native fiat
+        conversion: RateAndPairConverter = _get_pair_conversion_rate(
+            timestamp=transaction.timestamp_value,
+            from_asset=input_currency,
+            to_asset=native_fiat,
+            exchange=_get_originating_exchange(transaction),
+            global_configuration=global_configuration,
+        )
+        if conversion.rate is None:
+            return None
+
+        # Derive the output token price:
+        # price = (input_amount * input_price_in_fiat) / output_amount
+        derived_price = (input_amount * conversion.rate) / output_amount
+
+        LOGGER.debug(
+            "Derived spot price for %s: %s %s = %s (from %s %s * %s %s/%s)",
+            output_asset,
+            derived_price,
+            native_fiat,
+            input_amount,
+            input_currency,
+            conversion.rate,
+            native_fiat,
+        )
+
+        return derived_price
+
+    except Exception as e:
+        LOGGER.debug("Failed to derive spot price: %s", str(e))
+        return None
+
+
 def _update_spot_price_from_web(transaction: AbstractTransaction, global_configuration: Dict[str, Any]) -> AbstractTransaction:
     init_parameters: Dict[str, Any] = transaction.constructor_parameter_dictionary
+    native_fiat = global_configuration[Keyword.NATIVE_FIAT.value]
+
     if transaction.spot_price is None:  # type: ignore
         return transaction
 
@@ -177,25 +264,43 @@ def _update_spot_price_from_web(transaction: AbstractTransaction, global_configu
             _get_originating_exchange(transaction),
             transaction.fiat_ticker,
         )
-        conversion: RateAndPairConverter = _get_pair_conversion_rate(
-            timestamp=transaction.timestamp_value,
-            from_asset=transaction.asset,
-            to_asset=global_configuration[Keyword.NATIVE_FIAT.value],
-            exchange=_get_originating_exchange(transaction),
-            global_configuration=global_configuration,
-        )
-        if conversion.rate is None:
+
+        # Try direct price lookup first
+        derived_rate: Optional[RP2Decimal] = None
+        source: str = ""
+        pair_converter_name: str = ""
+
+        try:
+            conversion: RateAndPairConverter = _get_pair_conversion_rate(
+                timestamp=transaction.timestamp_value,
+                from_asset=transaction.asset,
+                to_asset=native_fiat,
+                exchange=_get_originating_exchange(transaction),
+                global_configuration=global_configuration,
+            )
+            if conversion.rate is not None:
+                derived_rate = conversion.rate
+                source = f"{conversion.pair_converter.historical_price_type} spot_price read from {conversion.pair_converter.name()}"
+                pair_converter_name = conversion.pair_converter.name()
+        except RP2RuntimeError:
+            # Direct lookup failed - will try derivation fallback below
+            pass
+
+        # If direct lookup failed, try deriving from swap input
+        if derived_rate is None:
+            derived_rate = _try_derive_spot_price(transaction, native_fiat, global_configuration)
+            if derived_rate is not None:
+                source = "derived from swap input (token has no direct market)"
+
+        if derived_rate is None:
             raise RP2RuntimeError(
                 f"Spot price for {transaction.unique_id + ':' if transaction.unique_id else ''}"
-                f"{transaction.timestamp_value}:{transaction.asset}->{global_configuration[Keyword.NATIVE_FIAT.value]}"
-                " not found on any pair converter plugin"
+                f"{transaction.timestamp_value}:{transaction.asset}->{native_fiat}"
+                " not found on any pair converter plugin and could not be derived from swap input"
             )
 
-        notes: str = (
-            f"{conversion.pair_converter.historical_price_type} spot_price read from {conversion.pair_converter.name()} "
-            f"plugin; {transaction.notes if transaction.notes else ''}"
-        )
-        init_parameters[Keyword.SPOT_PRICE.value] = str(conversion.rate)
+        notes: str = f"{source}; {transaction.notes if transaction.notes else ''}"
+        init_parameters[Keyword.SPOT_PRICE.value] = str(derived_rate)
         init_parameters[Keyword.NOTES.value] = notes
         init_parameters[Keyword.IS_SPOT_PRICE_FROM_WEB.value] = True
         init_parameters[Keyword.FIAT_TICKER.value] = transaction.fiat_ticker

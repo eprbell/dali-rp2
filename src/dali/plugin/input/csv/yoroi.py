@@ -263,6 +263,12 @@ def _create_swap_transactions(
     # Cost basis = ADA given (including fees)
     cost_basis = input_amount + total_fee
 
+    # Include derivation info for when direct price lookup fails
+    # Format: DERIVE:<input_currency>:<input_amount_with_fees>
+    # This allows deriving token price from the known ADA price
+    derive_info = f"DERIVE:{input_currency}:{cost_basis}"
+    notes_with_derive = f"{notes} | {derive_info}"
+
     result.append(
         InTransaction(
             plugin=plugin_name,
@@ -276,7 +282,7 @@ def _create_swap_transactions(
             spot_price=Keyword.UNKNOWN.value,
             crypto_in=str(output_asset.amount),
             crypto_fee=str(execution_fee),
-            notes=notes,
+            notes=notes_with_derive,
         )
     )
 
