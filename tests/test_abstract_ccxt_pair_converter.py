@@ -23,6 +23,8 @@ from rp2.rp2_error import RP2ValueError
 from dali.abstract_ccxt_pair_converter_plugin import (
     _BINANCE,
     _COINBASE_PRO,
+    _HUOBI,
+    _KRAKEN,
     _ONE_HOUR,
     _SIX_HOUR,
     _TIME_GRANULARITY,
@@ -252,6 +254,35 @@ class TestAbstractCcxtPairConverterPlugin:
         assert refined_optimizations[datetime(2023, 1, 10)]["A"]["B"] == 3.0
         assert refined_optimizations[datetime(2023, 1, 10)]["A"]["C"] == 2.0
         assert refined_optimizations[datetime(2023, 1, 10)]["A"]["D"] == 1.0
+
+    def test_kraken_csv_update_file_needs_offline_mode(self) -> None:
+        # A configuration mistake, reported when the plugin starts rather than once pricing reaches Kraken
+        with pytest.raises(RP2ValueError, match="kraken_csv_offline"):
+            MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, kraken_csv_update_file="update.zip")
+
+        MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value, kraken_csv_update_file="update.zip", kraken_csv_offline=True)
+
+    def test_matic_is_priced_from_krakens_historical_market(self) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        graph: MappedGraph[str] = MappedGraph[str]("Pionex")
+        current_markets: Dict[str, List[str]] = {}
+
+        plugin._add_alternative_markets(graph, current_markets)  # pylint: disable=protected-access
+
+        # MATIC was replaced by POL, so exchanges no longer list MATIC markets, but Kraken's CSV data still has MATICUSD
+        assert current_markets["MATICUSD"] == [_KRAKEN]
+        matic: Optional[Vertex[str]] = graph.get_vertex("MATIC")
+        assert matic
+        assert "USD" in {neighbor.name for neighbor in matic.neighbors}
+
+    def test_nexo_is_priced_from_huobi(self) -> None:
+        plugin = MockAbstractCcxtPairConverterPlugin(Keyword.HISTORICAL_PRICE_HIGH.value)
+        current_markets: Dict[str, List[str]] = {}
+
+        plugin._add_alternative_markets(MappedGraph[str]("Pionex"), current_markets)  # pylint: disable=protected-access
+
+        # Bitfinex no longer lists NEXO, while Huobi has its 1 minute candles back to 2022
+        assert current_markets["NEXOUSDT"] == [_HUOBI]
 
     # To be enabled when _fetch_historical_bars is implemented
     def disabled_test_find_historical_bars_add_to_cache(self, mocker: Any, historical_bars: Dict[str, HistoricalBar]) -> None:

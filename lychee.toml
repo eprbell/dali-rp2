@@ -4,5 +4,6 @@ exclude = [
   "https://www.cointracker.io/.*",
   "https://dev.binance.vision/.*",
   "https://support.kraken.com/.*",
-  "https://www.pionex.com/.*"
+  "https://www.pionex.com/.*",
+  "https://deepwiki.com/.*"
 ]

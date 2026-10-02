@@ -120,7 +120,7 @@ def _dali_main_internal(country: AbstractCountry) -> None:
 
             # Plugin section
             plugin_module = import_module(normalized_section_name)
-            plugin_configuration: Dict[str, Union[str, int, float, bool]]
+            plugin_configuration: Dict[str, Union[str, int, float, bool, None]]
             if hasattr(plugin_module, "PairConverterPlugin"):
                 plugin_configuration = _validate_plugin_configuration(ini_config, section_name, signature(plugin_module.PairConverterPlugin))
                 pair_converter_plugin: AbstractPairConverterPlugin = plugin_module.PairConverterPlugin(**plugin_configuration)
@@ -412,8 +412,11 @@ def _validate_header_configuration(ini_config: ConfigParser, section_name: str) 
 
 
 # Typecheck plugin section parameters against the plugin constructor signature and build an initialization parameter dictionary
-def _validate_plugin_configuration(ini_config: ConfigParser, plugin_name: str, constructor_signature: Signature) -> Dict[str, Union[str, int, float, bool]]:
-    result: Dict[str, Union[str, int, float, bool]] = {}
+def _validate_plugin_configuration(
+    ini_config: ConfigParser, plugin_name: str, constructor_signature: Signature
+) -> Dict[str, Union[str, int, float, bool, None]]:
+    # Optional parameters missing from the section are passed as None
+    result: Dict[str, Union[str, int, float, bool, None]] = {}
 
     for parameter in constructor_signature.parameters:
         annotation: Any = constructor_signature.parameters[parameter].annotation

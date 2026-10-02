@@ -154,3 +154,14 @@ class TestMappedGraph:
         assert first_parent_in_clone.get_weight(second_child_in_clone) == 1.0
         assert second_parent_in_clone.get_weight(first_child_in_clone) == 4.0
         assert second_parent_in_clone.get_weight(second_child_in_clone) == 3.0
+
+    def test_pionex_chain_specific_assets_are_aliases(self) -> None:
+        pionex_graph: MappedGraph[str] = MappedGraph[str]("Pionex")
+
+        # Pionex names some assets after the chain they were deposited on, which no market uses
+        for chain_specific_asset, asset in (("BUSDBEP20", "BUSD"), ("USDTBEP20", "USDT")):
+            chain_specific_asset_in_graph: Optional[Vertex[str]] = pionex_graph.get_vertex(chain_specific_asset)
+            asset_in_graph: Optional[Vertex[str]] = pionex_graph.get_vertex(asset)
+            assert chain_specific_asset_in_graph, chain_specific_asset
+            assert asset_in_graph
+            assert chain_specific_asset_in_graph.has_neighbor(asset_in_graph)

@@ -46,6 +46,9 @@ _EXCHANGE_SPECIFIC_ALIASES = {
     "Pionex": {
         Alias(from_asset="MBTC", to_asset="BTC"): RP2Decimal("0.001"),
         Alias(from_asset="METH", to_asset="ETH"): RP2Decimal("0.001"),
+        # Named after the chain they were deposited on
+        Alias(from_asset="BUSDBEP20", to_asset="BUSD"): RP2Decimal("1"),
+        Alias(from_asset="USDTBEP20", to_asset="USDT"): RP2Decimal("1"),
     },
 }
 

@@ -459,6 +459,8 @@ default_exchange = <em>&lt;default_exchange&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
 aliases = <em>&lt;untradeable_assets&gt;</em>
+kraken_csv_offline = <em>&lt;kraken_csv_offline&gt;</em>
+kraken_csv_update_file = <em>&lt;kraken_csv_update_file&gt;</em>
 </pre>
 
 Where:
@@ -471,6 +473,9 @@ Where:
 ```ini
 aliases = UNIVERSAL, XETH, ETH, 1; Kraken, KILOBTC, BTC, 1000; Kraken, SATOSHI, BTC, 0.00000001
 ```
+
+* `kraken_csv_offline` is an optional boolean (`true` or `false`, `false` if not set). When it's `true`, Kraken prices only come from your local copy of Kraken's complete CSV data, and DaLI doesn't download Kraken's CSV data or trades. See the [note on Kraken's CSV data](#note-on-krakens-csv-data) below.
+* `kraken_csv_update_file` is an optional path to a quarterly update file from Kraken, which DaLI merges into the local copy of Kraken's CSV data. It only works with `kraken_csv_offline = true`: otherwise DaLI stops with an error when it starts. See the [note on quarterly update files](#note-on-quarterly-update-files) below.
 
 The CCXT pair converter plugin uses a routing system to find the shortest pricing path between a base asset and a quote asset (what the asset is priced in). It does this by assembling a graph of nodes made out of assets and edges made from markets with a preference for the exchange the asset was purchased on. Fiat exchange rates from the European Central Bank are also added to the graph to allow any fiat to be converted between each other.
 
@@ -491,20 +496,28 @@ Be aware that:
 * Some exchanges, in particular Binance.com, might not be available in certain territories.
 
 #### A Special Note for Prices from Kraken Exchange
-Prices for the latest quarter from the Kraken exchange may be inaccurate due to the restrictions of the Kraken REST API. Only the latest 720 bars can be retrieved, so different candles must be used depending on how old the transaction is from the time you are pulling the pricing data. The following chart provides a rough estimate of what candles are used for which timeframe.
+Prices from the Kraken exchange come from the candle of the minute of the transaction, which has one of two sources:
+* For every quarter Kraken has published, Kraken's CSV data (see the [note on Kraken's CSV data](#note-on-krakens-csv-data) below).
+* For the latest quarter, which Kraken publishes a few weeks after it ends, the trades of that minute from Kraken's public Trades endpoint. Kraken allows about one request per second, so this takes about a second per transaction. With `kraken_csv_offline = true`, DaLI stops with an error for these times instead (see below).
 
-transaction age    | candle used
--------------------|-------------
-0 - 12 hours old   |          1m
-.5 - 2.5 days old  |          5m
-2.5 - 7.5 days old |         15m
-7.5 - 30 days old  |          1h
-1 - 4 months old   |          4h
+If a minute had no trades, the candle of the smallest timeframe around it with trades is used instead (5 minutes, 15 minutes, 1 hour, 12 hours or 1 day). Kraken's REST candles are only used when Kraken has no trades for the market around that time: the REST API only returns its latest 720 candles, so older prices from it come from coarse candles (e.g. 4 hour candles for transactions 1 to 4 months old) and can be off by several percent. For the same reason, if Kraken's servers can't be reached, DaLI stops with an error instead of using the REST API. Run it again once Kraken can be reached.
 
-Accuracy will improve once new CSV data is released, which is typically 2 weeks after the end of a quarter. Also, the Kraken REST API is very slow. It may take 20-30 seconds per transaction to retrieve prices for the latest quarter.
+##### Note on Kraken's CSV Data
+Kraken publishes the complete candle history of every market as one zip file (about 9 GB, split into ~2 GB parts) on the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable -->, and adds each quarter a few weeks after it ends. DaLI doesn't download all of it: the first time it needs a Kraken market, it downloads only that market's CSV files from Kraken's latest release and caches them in `.dali_cache/kraken/`. That's about 120 MB for BTC/USD and a few MB for most other markets. When Kraken publishes a new release, DaLI notices and downloads the markets it needs again from it, as they are needed.
 
-##### Note on Unified CSV File
-The unified CSV file is a CSV file that contains all the candles for all the assets on the Kraken exchange. It is used to retrieve the price for the transaction if the transaction is older than the latest quarter. The plugin will prompt you to download the unified CSV file if it is needed for the transaction. It is 4 GB as of April 2024. You can also manually download the file from the <!-- markdown-link-check-disable -->[Kraken Exchange](https://support.kraken.com/hc/en-us/articles/360047124832-Downloadable-historical-OHLCVT-Open-High-Low-Close-Volume-Trades-data)<!-- markdown-link-check-enable --> and put it in `.dali_cache/kraken/csv/`.
+If you'd rather keep all of the data locally, for example to work offline, set `kraken_csv_offline = true`, download every part, join them into one file named `Kraken_OHLCVT.zip` and put it in `.dali_cache/kraken/csv/`. Don't unzip it: DaLI reads the zip file directly. Kraken prices then only come from that file, and DaLI doesn't download Kraken's CSV data or trades (the CCXT plugin still uses the Internet for market lists and fiat exchange rates). For a market or a time that the file doesn't have, such as the latest quarter, DaLI stops with an error saying where the local data ends, rather than use a less accurate source. Keeping the file current is up to you: replace it with a newer release (then delete `.dali_cache/Kraken-csv-download`, so markets are read again from it) or merge quarterly update files into it.
+
+Without `kraken_csv_offline = true`, a local `Kraken_OHLCVT.zip` is ignored, so an old copy downloaded by a previous version of DaLI doesn't keep you on old data.
+
+Be aware that prices DaLI has already looked up are cached, and new Kraken data doesn't change them. To price those transactions again with new data, delete the plugin's price cache: `.dali_cache/Frankfurter` for the CCXT plugin or `.dali_cache/Fiat from exchangerate.host` for the CCXT Exchangerate Host plugin. Don't delete `.dali_cache/kraken/`, which holds the downloaded markets and the local zip file, if you use one.
+
+##### Note on Quarterly Update Files
+Update files are only for `kraken_csv_offline = true`, because they are merged into the local `Kraken_OHLCVT.zip` (see above). Without offline mode, DaLI already uses Kraken's latest release, so setting `kraken_csv_update_file` stops DaLI with an error when it starts. If Kraken publishes a quarter as a separate update file, download it and set `kraken_csv_update_file` to its path (absolute, or relative to the directory you run DaLI from). The first time DaLI needs a price from Kraken, it merges the update file into the local file and then deletes the update file. You can leave the parameter set: it is ignored until you put a new update file at the same path.
+
+Be aware that:
+* Merging rewrites the ~9 GB local file. It can take a while and needs enough free disk space for a temporary copy of it. If the merge fails, the local file is left unchanged and the update file is kept.
+* Rows the local file already has are skipped, so an update that overlaps it doesn't create duplicates. Markets that are new in the update are added.
+* After a merge, each Kraken market is read again from the local file the first time it's needed, so the first price lookups are slower.
 
 ### CCXT Exchangerate Host
 This plugin is based on the CCXT Python library. It uses the Exchangerate.host API for forex rates.
@@ -518,6 +531,8 @@ fiat_access_key = <em>&lt;fiat_access_key&gt;</em>
 fiat_priority = <em>&lt;fiat_priority&gt;</em>
 untradeable_assets = <em>&lt;untradeable_assets&gt;</em>
 aliases = <em>&lt;untradeable_assets&gt;</em>
+kraken_csv_offline = <em>&lt;kraken_csv_offline&gt;</em>
+kraken_csv_update_file = <em>&lt;kraken_csv_update_file&gt;</em>
 </pre>
 
 Where:

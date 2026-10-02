@@ -161,7 +161,7 @@ class AbstractTransaction:
             return False
         if not isinstance(other, AbstractTransaction):
             raise RP2RuntimeError(f"Internal error: operand has non-AbstractTransaction value {repr(other)}")
-        result: bool = self.unique_id == other.unique_id and self.plugin == self.plugin and self.asset == self.asset
+        result: bool = self.unique_id == other.unique_id and self.plugin == other.plugin and self.asset == other.asset
         return result
 
     def __ne__(self, other: object) -> bool:

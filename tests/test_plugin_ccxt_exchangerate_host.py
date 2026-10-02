@@ -686,12 +686,13 @@ class TestCcxtExchangerateHostPlugin:
         if os.path.exists(cache_path):
             os.remove(cache_path)
 
-        kraken_csv = KrakenCsvPricing(transaction_manifest=TransactionManifest([FAKE_TRANSACTION], 1, "USD"))
+        # Reads the test file as a local unified file, which only offline mode uses. Offline mode checks that it exists when it starts.
+        mocker.patch.object(KrakenCsvPricing, "_Kraken__UNIFIED_CSV_FILE", "input/USD_OHLCVT_test.zip")
+        kraken_csv = KrakenCsvPricing(transaction_manifest=TransactionManifest([FAKE_TRANSACTION], 1, "USD"), offline=True)
         mocker.patch.object(kraken_csv, "cache_key").return_value = "Test-" + kraken_csv.cache_key()
         mocker.patch.object(kraken_csv, "_Kraken__CACHE_DIRECTORY", "output/kraken_test")
         if not os.path.exists("output/kraken_test"):
             os.makedirs("output/kraken_test")
-        mocker.patch.object(kraken_csv, "_Kraken__UNIFIED_CSV_FILE", "input/USD_OHLCVT_test.zip")
 
         mocker.patch.object(plugin, "_AbstractCcxtPairConverterPlugin__exchange_csv_reader", {"Kraken": kraken_csv})
         exchange = kraken(

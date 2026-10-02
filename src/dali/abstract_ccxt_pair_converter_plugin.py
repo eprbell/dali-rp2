@@ -63,6 +63,7 @@ from dali.historical_bar import HistoricalBar
 from dali.logger import LOGGER
 from dali.mapped_graph import Alias, MappedGraph
 from dali.plugin.pair_converter.csv.kraken import Kraken as KrakenCsvPricing
+from dali.plugin.pair_converter.csv.kraken import check_kraken_csv_options
 from dali.transaction_manifest import TransactionManifest
 
 # Native format keywords
@@ -149,8 +150,9 @@ _ALT_MARKET_EXCHANGES_DICT: Dict[str, str] = {
     "CYBERUSDT": _BINANCE,
     "EDGUSDT": _GATE,
     "ETHWUSD": _KRAKEN,
+    "MATICUSD": _KRAKEN,  # Replaced by POL, so no longer listed, but Kraken's CSV data has it until 2025-03-31
     "MAVUSDT": _BINANCE,
-    "NEXOUSDT": _BITFINEX,  # To be replaced with Huobi once a CSV plugin is available
+    "NEXOUSDT": _HUOBI,  # Bitfinex no longer lists NEXO, while Huobi has its 1 minute candles back to 2022
     "OPUSDT": _BINANCE,
     "RVNUSDT": _BINANCE,
     "SEIUSDT": _BINANCE,
@@ -175,6 +177,7 @@ _ALT_MARKET_BY_BASE_DICT: Dict[str, str] = {
     "CYBER": "USDT",
     "EDG": "USDT",
     "ETHW": "USD",
+    "MATIC": "USD",
     "MAV": "USDT",
     "NEXO": "USDT",
     "OP": "USDT",
@@ -274,6 +277,8 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         untradeable_assets: Optional[str] = None,
         aliases: Optional[str] = None,
         cache_modifier: Optional[str] = None,
+        kraken_csv_update_file: Optional[str] = None,
+        kraken_csv_offline: Optional[bool] = None,
     ) -> None:
         exchange_cache_modifier = "_".join(default_exchange.replace(" ", "_") if default_exchange and exchange_locked else "")
         cache_modifier = cache_modifier if cache_modifier else ""
@@ -291,6 +296,12 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         self.__csv_pricing_dict: Dict[str, Any] = _CSV_PRICING_DICT
         self.__default_csv_reader: ExchangeNameAndClass = ExchangeNameAndClass(_KRAKEN, _CSV_PRICING_DICT[_KRAKEN])
         self.__exchange_csv_reader: Dict[str, Any] = {}
+        self._logger.info("Untradeable assets: %s", untradeable_assets)
+        self._logger.info("Kraken update file: %s", kraken_csv_update_file)
+        self.__kraken_csv_update_file: Optional[str] = kraken_csv_update_file
+        # Offline, Kraken prices only come from the local unified CSV file, which is also where update files are merged
+        self.__kraken_csv_offline: bool = kraken_csv_offline is True
+        check_kraken_csv_options(kraken_csv_update_file, self.__kraken_csv_offline)
 
         # key: name of exchange, value: AVLTree of all snapshots of the graph
         # TO BE IMPLEMENTED - Combine all graphs into one graph where assets can 'teleport' between exchanges
@@ -546,7 +557,7 @@ class AbstractCcxtPairConverterPlugin(AbstractPairConverterPlugin):
         elif csv_pricing == self.__default_csv_reader.klass and self.__exchange_csv_reader.get(self.__default_csv_reader.name) is not None:
             csv_reader = self.__exchange_csv_reader.get(self.__default_csv_reader.name)
         elif csv_pricing is not None:
-            csv_reader = csv_pricing(self._manifest)
+            csv_reader = csv_pricing(self._manifest, update_file=self.__kraken_csv_update_file, offline=self.__kraken_csv_offline)
 
             if csv_pricing == self.__default_csv_reader.klass:
                 self.__exchange_csv_reader[self.__default_csv_reader.name] = csv_reader
